@@ -1,0 +1,20 @@
+
+export const steelEffects = {
+  'flash-cannon': { status: 'spDefense-down', chance: 10 },
+  'iron-head': { status: 'flinch', chance: 30 },
+  'metal-claw': { status: 'attack-up', chance: 10 },
+  'steel-wing': { status: 'defense-up', chance: 10 },
+  'mirror-shot': { status: 'accuracy-down', chance: 30 },
+  'meteor-mash': { status: 'attack-up', chance: 20 },
+  'bullet-punch': { status: 'priority', chance: 0 }, 
+  'smart-strike': { status: 'always-hit', chance: 0 },
+  'anchor-shot': { status: 'trap', chance: 100 },
+  'steel-beam': { status: 'recoil-half', chance: 100 },
+  'steel-roller': { status: 'remove-terrain', chance: 100 },
+  'iron-tail': { status: 'defense-down', chance: 30 },
+  'gyro-ball': { status: 'speed-based', chance: 100 },
+  'double-iron-bash': { status: 'flinch', chance: 30 },
+  'doom-desire': { status: 'doom-desire', chance: 100 },
+  'magnet-bomb': { status: 'always-hit', chance: 100 },
+  'shift-gear': { status: 'shift-gear', chance: 100 },
+};

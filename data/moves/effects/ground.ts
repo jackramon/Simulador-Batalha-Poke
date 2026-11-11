@@ -1,0 +1,23 @@
+
+export const groundEffects = {
+  'sand-attack': { status: 'accuracy-down', chance: 100 },
+  'earth-power': { status: 'spDefense-down', chance: 10 },
+  'bulldoze': { status: 'speed-down', chance: 100 },
+  'mud-slap': { status: 'accuracy-down', chance: 100 },
+  'mud-shot': { status: 'speed-down', chance: 100 },
+  'fissure': { status: 'ohko', chance: 30 },
+  'stomping-tantrum': { status: 'tantrum-boost', chance: 100 },
+  'mud-bomb': { status: 'accuracy-down', chance: 30 },
+  'scorching-sands': { status: 'burn', chance: 30 },
+  'drill-run': { status: 'high-crit', chance: 100 },
+  'sand-tomb': { status: 'sand-tomb', chance: 100 },
+  'headlong-rush': { status: 'headlong-rush-drop', chance: 100 },
+  'spikes': { status: 'spikes', chance: 100 },
+  'bone-rush': { status: 'none', chance: 0 },
+  'bonemerang': { status: 'none', chance: 0 },
+  'thousand-waves': { status: 'trap', chance: 100 },
+  'mud-sport': { status: 'mud-sport', chance: 100 },
+  'earthquake': { status: 'none', chance: 0 },
+  'magnitude': { status: 'none', chance: 0 },
+  'sandsear-storm': { status: 'sandsear-storm', chance: 20 },
+};

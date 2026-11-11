@@ -1,0 +1,27 @@
+
+export const bugDescriptions: Record<string, string> = {
+  'leech-life': 'Um ataque que drena vida. O usuário recupera metade do dano.',
+  'pin-missile': 'Dispara mísseis de espinhos de 2 a 5 vezes seguidas.',
+  'twineedle': 'Atinge o alvo duas vezes com ferrões. Pode envenenar.',
+  'fury-cutter': 'Um ataque que fica mais forte a cada vez que acerta consecutivamente.',
+  'megahorn': 'Um ataque brutal usando um chifre duro e resistente.',
+  'signal-beam': 'Dispara um raio de luz estranho. Pode confundir o alvo.',
+  'silver-wind': 'Vento com pó de prata. Pode aumentar todos os atributos.',
+  'u-turn': 'Após atacar, o usuário volta para a Pokébola e troca de lugar.',
+  'x-scissor': 'O usuário corta o oponente cruzando suas garras ou foices.',
+  'bug-buzz': 'O usuário vibra para gerar uma onda sonora danosa. Pode baixar a Def. Esp.',
+  'bug-bite': 'Morde o alvo. Se ele tiver uma fruta, o usuário a come.',
+  'quiver-dance': 'Uma dança leve e mística que aumenta o Atq. Especial, Def. Especial e Velocidade.',
+  'sticky-web': 'Tece uma rede pegajosa ao redor da equipe adversária que reduz a Velocidade de quem entrar em campo.',
+  'first-impression': 'Ataca com prioridade e alto poder. Só funciona no primeiro turno.',
+  'pollen-puff': 'Uma bola de pólen que explode em inimigos ou cura aliados.',
+  'pounce': 'O usuário salta sobre o oponente, reduzindo a Velocidade dele.',
+  'skitter-smack': 'Desliza e ataca o oponente, reduzindo o Atq. Especial dele.',
+  'string-shot': 'Lança fios de seda no oponente, reduzindo drasticamente a Velocidade.',
+  'struggle-bug': 'O usuário resiste enquanto ataca. Reduz o Atq. Especial do alvo.',
+  'lunge': 'O usuário dá um bote no alvo, reduzindo o Ataque dele.',
+  'silk-trap': 'O usuário tece uma teia para se proteger. Se atingido por contato, reduz a Velocidade do atacante.',
+  'steamroller': 'O usuário esmaga o oponente rolando sobre ele. Causa dano dobrado e nunca erra se o alvo usou Minimizar. Pode fazer recuar.',
+  'rage-powder': 'O usuário espalha um pó irritante que atrai a atenção dos oponentes, forçando-os a atacá-lo.',
+  'attack-order': 'O usuário convoca seus subordinados para atacar o alvo. Tem alta chance de acerto crítico.'
+};

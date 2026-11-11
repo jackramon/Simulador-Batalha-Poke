@@ -1,0 +1,25 @@
+
+export const flyingEffects = {
+  'hurricane': { status: 'confusion', chance: 30 },
+  'air-slash': { status: 'flinch', chance: 30 },
+  'sky-attack': { status: 'flinch', chance: 30 },
+  'bounce': { status: 'paralysis', chance: 30 },
+  'beak-blast': { status: 'burn', chance: 100 }, // Queima ao contato durante carregamento
+  'air-cutter': { status: 'high-crit', chance: 100 },
+  'brave-bird': { status: 'recoil', chance: 100 },
+  'pluck': { status: 'bug-bite-effect', chance: 100 },
+  'tailwind': { status: 'tailwind', chance: 100 },
+  'defog': { status: 'defog', chance: 100 },
+  'aeroblast': { status: 'high-crit', chance: 100 },
+  'dragon-ascent': { status: 'dragon-ascent-drop', chance: 100 },
+  'sky-drop': { status: 'sky-drop-user', chance: 100 },
+  'dual-wingbeat': { status: 'none', chance: 0 },
+  'peck': { status: 'none', chance: 0 },
+  'wing-attack': { status: 'none', chance: 0 },
+  'fly': { status: 'flying', chance: 0 },
+  'drill-peck': { status: 'none', chance: 0 },
+  'aerial-ace': { status: 'always-hit', chance: 0 },
+  'acrobatics': { status: 'none', chance: 0 },
+  'chatter': { status: 'confusion', chance: 100 },
+  'mirror-move': { status: 'unique', chance: 100 },
+};

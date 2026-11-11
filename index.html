@@ -1,0 +1,222 @@
+
+<!DOCTYPE html>
+<html lang="pt-BR">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Simulador de Batalha Pokémon</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script>
+      tailwind.config = {
+        darkMode: 'class',
+        theme: {
+          extend: {
+            fontFamily: {
+              sans: ['Inter', 'sans-serif'],
+            },
+          }
+        }
+      }
+    </script>
+    <style>
+      body {
+        background-color: #f0f4f8;
+        font-family: 'Inter', sans-serif;
+        min-height: 100vh;
+      }
+      .pokemon-card {
+        box-shadow: 0 10px 15px -3px rgba(0, 0, 0, 0.1), 0 4px 6px -2px rgba(0, 0, 0, 0.05);
+        transition: transform 0.3s ease-in-out;
+      }
+      .pokemon-card:hover {
+        transform: translateY(-4px);
+      }
+      .hp-bar-fill {
+        transition: width 0.5s ease-out;
+      }
+      .message-log {
+        border-left: 4px solid #3b82f6;
+        scroll-behavior: smooth;
+      }
+      .btn-move {
+        transition: all 0.1s ease-in-out;
+        box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);
+        text-shadow: 1px 1px 2px rgba(0,0,0,0.3);
+      }
+      .btn-move:hover {
+        transform: translateY(-1px);
+        box-shadow: 0 6px 8px rgba(0, 0, 0, 0.15);
+      }
+      .btn-move:active {
+        transform: translateY(1px);
+        box-shadow: none;
+      }
+      .btn-move:disabled {
+        opacity: 0.5;
+        cursor: not-allowed;
+        transform: none;
+        box-shadow: none;
+      }
+      .type-tag {
+        text-shadow: 1px 1px 1px rgba(0,0,0,0.4);
+      }
+
+      /* AI Choice Highlight */
+      .btn-ai-selected {
+        border-color: #fbbf24 !important; /* amber-400 */
+        box-shadow: 0 0 20px 8px rgba(251, 191, 36, 0.75) !important;
+        animation: pulse-glow 0.8s infinite alternate;
+        z-index: 50;
+        transform: scale(1.04);
+        position: relative;
+      }
+      @keyframes pulse-glow {
+        from { box-shadow: 0 0 12px 3px rgba(251, 191, 36, 0.5); }
+        to { box-shadow: 0 0 25px 12px rgba(251, 191, 36, 0.9); }
+      }
+
+      /* AI Pulse Indicator */
+      .ai-active-pulse {
+        animation: ai-pulse 2s infinite;
+      }
+      @keyframes ai-pulse {
+        0% { transform: scale(1); box-shadow: 0 0 0 0 rgba(79, 70, 229, 0.7); }
+        70% { transform: scale(1.1); box-shadow: 0 0 0 10px rgba(79, 70, 229, 0); }
+        100% { transform: scale(1); box-shadow: 0 0 0 0 rgba(79, 70, 229, 0); }
+      }
+
+      /* Battle Animations */
+      @keyframes lunge {
+        0% { transform: translate(0, 0); }
+        50% { transform: translate(30px, -30px) scale(1.1); }
+        100% { transform: translate(0, 0); }
+      }
+      @keyframes lunge-enemy {
+        0% { transform: translate(0, 0); }
+        50% { transform: translate(-30px, 30px) scale(1.1); }
+        100% { transform: translate(0, 0); }
+      }
+      @keyframes shake {
+        0% { transform: translate(0, 0); }
+        20% { transform: translate(-10px, 0); filter: brightness(3) sepia(1) hue-rotate(-50deg) saturate(5); } /* Flash Red */
+        40% { transform: translate(10px, 0); }
+        60% { transform: translate(-10px, 0); }
+        80% { transform: translate(10px, 0); }
+        100% { transform: translate(0, 0); filter: none; }
+      }
+      
+      .anim-lunge {
+        animation: lunge 0.3s ease-in-out;
+        z-index: 20;
+      }
+      .anim-lunge-enemy {
+        animation: lunge-enemy 0.3s ease-in-out;
+        z-index: 20;
+      }
+      .anim-shake {
+        animation: shake 0.4s ease-in-out;
+      }
+
+      /* Stat Change Indicators */
+      .stat-badge {
+        text-shadow: 1px 1px 0 #000;
+        box-shadow: 0 2px 4px rgba(0,0,0,0.3);
+      }
+
+      /* Type Colors */
+      .type-normal { background-color: #A8A878; }
+      .type-fire { background-color: #F08030; }
+      .type-water { background-color: #6890F0; }
+      .type-electric { background-color: #F8D030; }
+      .type-grass { background-color: #78C850; }
+      .type-ice { background-color: #98D8D8; }
+      .type-fighting { background-color: #C03028; }
+      .type-poison { background-color: #A040A0; }
+      .type-ground { background-color: #E0C068; }
+      .type-flying { background-color: #A890F0; }
+      .type-psychic { background-color: #F85888; }
+      .type-bug { background-color: #A8B820; }
+      .type-rock { background-color: #B8A038; }
+      .type-ghost { background-color: #705898; }
+      .type-dragon { background-color: #7038F8; }
+      .type-steel { background-color: #B8B8D0; }
+      .type-fairy { background-color: #EE99AC; }
+      .type-dark { background-color: #705848; }
+
+      /* Status Colors */
+      .status-paralysis { background-color: #f59e0b; }
+      .status-poison, .status-toxic { background-color: #8b5cf6; }
+      .status-burn { background-color: #ef4444; }
+      .status-sleep { background-color: #0ea5e9; }
+      .status-freeze { background-color: #3b82f6; }
+      .status-confusion { background-color: #ec4899; }
+      .status-leech-seed { background-color: #22c55e; }
+      
+      .critical-hit {
+        animation: pulse 0.5s;
+        font-weight: bold;
+        color: #f97316;
+      }
+      @keyframes pulse {
+        0% { transform: scale(1); }
+        50% { transform: scale(1.05); }
+        100% { transform: scale(1); }
+      }
+      @keyframes bounce {
+        0%, 100% { transform: translateY(0); }
+        50% { transform: translateY(-5px); }
+      }
+      .action-indicator {
+        animation: bounce 1s infinite;
+      }
+      
+      /* Weather specific backgrounds */
+      .weather-none { background-color: #f3f4f6; color: #6b7280; border-color: #d1d5db; }
+      .weather-sun { background-color: #fef3c7; color: #d97706; border-color: #f59e0b; }
+      .weather-rain { background-color: #dbeafe; color: #2563eb; border-color: #3b82f6; }
+      .weather-sand { background-color: #f5f5f4; color: #78716c; border-color: #a8a29e; }
+      .weather-hail { background-color: #ecfeff; color: #0891b2; border-color: #22d3ee; }
+
+      .info-tooltip {
+          cursor: help;
+          text-decoration: underline;
+          text-decoration-style: dotted;
+          text-decoration-color: rgba(255,255,255,0.7);
+      }
+      .stat-arrow-up { color: #16a34a; font-size: 0.8rem; }
+      .stat-arrow-down { color: #dc2626; font-size: 0.8rem; }
+
+      /* Toast animation */
+      .info-toast {
+        transition: opacity 0.3s ease;
+      }
+
+      /* Terastallization Pulse */
+      @keyframes teraPulse {
+        0% { box-shadow: 0 0 0 0 var(--tera-color); }
+        50% { box-shadow: 0 0 15px 3px var(--tera-color); }
+        100% { box-shadow: 0 0 0 0 var(--tera-color); }
+      }
+      .tera-border-pulse {
+        animation: teraPulse 2s infinite;
+      }
+
+      /* ===== DARK MODE OVERRIDES ===== */
+      .dark body { background-color: #0f172a; }
+      .dark .message-log { background-color: #1e293b !important; color: #94a3b8; border-left-color: #3b82f6; }
+      .dark .weather-none { background-color: #1e293b; color: #94a3b8; border-color: #334155; }
+      .dark .weather-sun  { background-color: #451a03; color: #fbbf24; border-color: #92400e; }
+      .dark .weather-rain { background-color: #0c1a2e; color: #60a5fa; border-color: #1d4ed8; }
+      .dark .weather-sand { background-color: #1c1917; color: #a8a29e; border-color: #57534e; }
+      .dark .weather-hail { background-color: #082f49; color: #38bdf8; border-color: #0284c7; }
+      .dark .stat-arrow-up   { color: #4ade80; }
+      .dark .stat-arrow-down { color: #f87171; }
+      .dark .btn-move:not(:disabled) { box-shadow: 0 4px 6px rgba(0,0,0,0.5); }
+      .dark .pokemon-card { box-shadow: 0 10px 15px -3px rgba(0,0,0,0.4); }
+    </style>
+</head>
+  <body>
+    <div id="root"></div>
+  <script type="module" src="/index.tsx"></script>
+</body>
+</html>

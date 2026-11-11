@@ -1,0 +1,20 @@
+
+export const iceEffects = {
+  'ice-beam': { status: 'freeze', chance: 10 },
+  'blizzard': { status: 'freeze', chance: 10 },
+  'aurora-beam': { status: 'attack-down', chance: 10 },
+  'icy-wind': { status: 'speed-down', chance: 100 },
+  'freeze-dry': { status: 'freeze', chance: 10 },
+  'ice-punch': { status: 'freeze', chance: 10 },
+  'frost-breath': { status: 'always-crit', chance: 100 },
+  'ice-fang': { status: 'ice-fang-effect', chance: 100 },
+  'ice-spinner': { status: 'remove-terrain', chance: 100 },
+  'powder-snow': { status: 'freeze', chance: 10 },
+  'icicle-crash': { status: 'flinch', chance: 30 },
+  'hail': { status: 'weather', chance: 100 },
+  'snowscape': { status: 'weather', chance: 100 },
+  'mist': { status: 'mist', chance: 100 },
+  'haze': { status: 'haze', chance: 100 },
+  'ice-burn': { status: 'ice-burn-effect', chance: 30 },
+  'freeze-shock': { status: 'freeze-shock-effect', chance: 30 },
+};

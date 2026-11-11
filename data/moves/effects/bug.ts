@@ -1,0 +1,21 @@
+
+export const bugEffects = {
+  'bug-buzz': { status: 'spDefense-down', chance: 10 },
+  'skitter-smack': { status: 'spAttack-down', chance: 100 },
+  'lunge': { status: 'attack-down', chance: 100 },
+  'bug-bite': { status: 'bug-bite-effect', chance: 100 },
+  'fury-cutter': { status: 'fury-cutter-streak', chance: 100 },
+  'silver-wind': { status: 'all-stats-up', chance: 10 },
+  'infestation': { status: 'infestation', chance: 100 },
+  'u-turn': { status: 'switch-self', chance: 100 },
+  'signal-beam': { status: 'confusion', chance: 10 },
+  'pounce': { status: 'speed-down', chance: 100 },
+  'twineedle': { status: 'poison', chance: 20 },
+  'fell-stinger': { status: 'fell-stinger', chance: 100 },
+  'sticky-web': { status: 'sticky-web', chance: 100 },
+  'struggle-bug': { status: 'spAttack-down', chance: 100 },
+  'silk-trap': { status: 'silk-trap', chance: 100 },
+  'steamroller': { status: 'stomp-effect', chance: 30 },
+  'rage-powder': { status: 'rage-powder', chance: 100 },
+  'attack-order': { status: 'high-crit', chance: 100 },
+};

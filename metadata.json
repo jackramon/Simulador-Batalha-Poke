@@ -1,0 +1,5 @@
+{
+  "name": "Pokémon Battle Simulator 4",
+  "description": "A feature-rich Pokémon battle simulator with team selection, weather mechanics, abilities, items, and comprehensive battle logic.",
+  "requestFramePermissions": []
+}

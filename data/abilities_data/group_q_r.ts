@@ -1,0 +1,20 @@
+
+export const GROUP_Q_R: Record<string, any> = {
+  'quark-drive': { name: 'Drive Quark', type: 'passive', desc: 'Aumenta o maior status em Terreno Elétrico ou com Energia Booster.' },
+  'queenly-majesty': { name: 'Majestade Real', type: 'immunity', value: 'priority', desc: 'Impede o oponente de usar movimentos de prioridade contra este Pokémon.' },
+  'quick-draw': { name: 'Saque Rápido', type: 'passive', desc: 'Tem 30% de chance de fazer o Pokémon agir primeiro em sua faixa de prioridade.' },
+  'quick-feet': { name: 'Pés Rápidos', type: 'passive', desc: 'Aumenta a Velocidade em 50% se o Pokémon tiver uma condição de status.' },
+  'rain-dish': { name: 'Prato de Chuva', type: 'passive', desc: 'Recupera HP gradualmente durante a chuva ao final de cada turno.' },
+  'rattled': { name: 'Assustado', type: 'passive', desc: 'Aumenta Velocidade ao ser atingido por Inseto, Fantasma ou Noturno.' },
+  'receiver': { name: 'Receptor', type: 'passive', desc: 'Herda a habilidade de um aliado que foi derrotado em batalha.' },
+  'reckless': { name: 'Imprudente', type: 'passive', desc: 'Aumenta o poder de golpes com recuo.' },
+  'refrigerate': { name: 'Refrigerar', type: 'passive', desc: 'Transforma golpes Normais em Gelo e aumenta seu poder.' },
+  'regenerator': { name: 'Regenerador', type: 'onSwitchOut', desc: 'Recupera 1/3 do HP máximo ao ser trocado ou sair da batalha.' },
+  'ripen': { name: 'Maturação', type: 'passive', desc: 'Dobra o efeito de frutas comidas.' },
+  'rivalry': { name: 'Rivalidade', type: 'passive', desc: 'Causa mais dano se o oponente for do mesmo gênero.' },
+  'rks-system': { name: 'Sistema RKS', type: 'passive', desc: 'Muda o tipo dependendo da Memória segurada.' },
+  'rock-head': { name: 'Cabeça de Pedra', type: 'passive', desc: 'Impede dano de recuo (exceto Struggle).' },
+  'rocky-payload': { name: 'Carga Rochosa', type: 'passive', desc: 'Aumenta o poder dos movimentos do tipo Pedra em 50%.' },
+  'rough-skin': { name: 'Pele áspera', type: 'onContact', desc: 'Causa dano ao atacante em golpes de contato.' },
+  'run-away': { name: 'Fugitivo', type: 'passive', desc: 'Garante fuga de batalhas selvagens.' },
+};

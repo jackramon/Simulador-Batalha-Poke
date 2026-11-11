@@ -1,0 +1,26 @@
+
+export const groundDescriptions: Record<string, string> = {
+  'sand-attack': 'O usuário joga areia no rosto do alvo, reduzindo a Precisão.',
+  'earthquake': 'O usuário gera um terremoto que atinge todos os Pokémon ao redor.',
+  'fissure': 'O usuário abre uma fissura no chão. Causa nocaute instantâneo (OHKO).',
+  'dig': 'O usuário cava no primeiro turno e ataca no segundo.',
+  'bone-club': 'O usuário golpeia com um osso. Pode fazer o alvo recuar.',
+  'mud-slap': 'Joga lama no rosto do alvo, causando dano e reduzindo a Precisão.',
+  'mud-shot': 'Lança uma bola de lama que reduz a Velocidade do alvo.',
+  'earth-power': 'Faz o chão explodir com poder. Pode reduzir a Def. Especial.',
+  'mud-bomb': 'Lança uma bomba de lama dura. Pode reduzir a Precisão.',
+  'bulldoze': 'O usuário pisa forte, atingindo todos ao redor e reduzindo a Velocidade.',
+  'drill-run': 'O usuário gira como uma broca. Tem alta chance de acerto crítico.',
+  'precipice-blades': 'Lâminas de rocha surgem do precipício para atacar os oponentes.',
+  'high-horsepower': 'O usuário ataca brutalmente com todo o corpo.',
+  'scorching-sands': 'O usuário joga areia escaldante no alvo. Pode deixar o alvo com queimaduras.',
+  'sand-tomb': 'Prende o alvo em um ciclone de areia por 4 a 5 turnos.',
+  'headlong-rush': 'O usuário ataca com todo o corpo. Reduz a Defesa e a Defesa Especial do usuário.',
+  'bone-rush': 'O usuário golpeia o alvo com um osso duro de 2 a 5 vezes seguidas.',
+  'bonemerang': 'O usuário arremessa o osso como um bumerangue que atinge o alvo duas vezes.',
+  'thousand-waves': 'O usuário rasteja pelo chão com ondas que causam dano e impedem o alvo de fugir.',
+  'shore-up': 'O usuário restaura seu próprio HP. A quantidade restaurada aumenta significativamente em uma tempestade de areia.',
+  'spikes': 'O usuário espalha espinhos no chão do oponente. Oponentes que entram na batalha sofrem dano.',
+  'mud-sport': 'O usuário cobre o campo com lama, enfraquecendo golpes elétricos por 5 turnos.',
+  'sandsear-storm': 'O usuário ataca com uma tempestade de areia quente. Pode deixar o alvo queimado.'
+};

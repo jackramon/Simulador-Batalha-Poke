@@ -1,0 +1,26 @@
+
+export const dragonDescriptions: Record<string, string> = {
+  'dragon-rage': 'Lança uma onda de choque que causa sempre 40 de dano.',
+  'dragon-breath': 'O usuário sopra um hálito quente. Tem 30% de chance de paralisar o alvo.',
+  'outrage': 'O usuário se enfurece por 2 a 3 turnos e depois fica confuso.',
+  'twister': 'Cria um tornado violento para atacar. Pode fazer o alvo recuar.',
+  'dragon-dance': 'Uma dança mística que aumenta o Ataque e a Velocidade.',
+  'dragon-claw': 'O usuário corta o alvo com garras afiadas enormes.',
+  'dragon-pulse': 'O usuário abre a boca e dispara uma onda de choque dracônica.',
+  'dragon-rush': 'O usuário investe com uma aura ameaçadora. Pode fazer recuar.',
+  'draco-meteor': 'Invoca cometas do céu. Reduz drasticamente o Atq. Especial.',
+  'dual-chop': 'O usuário ataca duas vezes com partes do corpo brutais.',
+  'dragon-tail': 'O usuário acerta o alvo, forçando a troca de Pokémon.',
+  'clanging-scales': 'Esfrega escamas para fazer barulho e atacar. Reduz a Defesa.',
+  'dragon-darts': 'O usuário atira Dreepy nos alvos duas vezes.',
+  'roar-of-time': 'Um ataque que distorce o tempo. O usuário deve descansar depois.',
+  'eternabeam': 'A forma original de Eternatus ataca. O usuário deve descansar depois.',
+  'breaking-swipe': 'O usuário gira sua cauda resistente para atacar. Reduz o Ataque do oponente.',
+  'scale-shot': 'Dispara escamas de 2 a 5 vezes. Aumenta Velocidade, reduz Defesa.',
+  'dynamax-cannon': 'Dispara um raio poderoso do núcleo. Dano dobrado em alvos Dynamax.',
+  'glaive-rush': 'Arremessa o corpo inteiro. O usuário torna-se vulnerável: ataques recebidos não erram e causam o dobro de dano.',
+  'core-enforcer': 'Se o usuário atacar depois do alvo, a habilidade do alvo é anulada.',
+  'dragon-energy': 'Converte força vital em poder. Quanto menos HP o usuário tiver, menor o poder.',
+  'dragon-hammer': 'O usuário usa seu corpo como um martelo para atacar o alvo.',
+  'dragon-cheer': 'O usuário solta um grito que aumenta a chance de acerto crítico dos aliados. Dragões recebem um bônus maior.'
+};
