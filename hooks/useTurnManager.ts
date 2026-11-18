@@ -7,6 +7,7 @@ import * as AirLock from '../services/engine/handlers/abilities/air_lock';
 import { BattleCoordinator } from '../services/engine/coordinator';
 import { calculateTypeEffectiveness } from '../services/battleUtils';
 import { TurnAnimator } from '../services/animation/turnAnimator';
+import { removerItem } from '../utils/safeStorage';
 
 interface TurnManagerProps {
     state: BattleState;
@@ -122,7 +123,7 @@ export const useTurnManager = ({
         setState(prev => ({ ...prev, isBattleInProgress: false, winner: null, waitingForAction: false }));
         setP1Action(null);
         setP2Action(null);
-        localStorage.removeItem('poke_sim_battle_state'); // Hardcoded key match
+        removerItem('poke_sim_battle_state'); // Hardcoded key match
     };
 
     const triggerAI = () => {

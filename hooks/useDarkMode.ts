@@ -1,8 +1,9 @@
 import { useState, useEffect, useCallback } from 'react';
+import { lerItem, gravarItem } from '../utils/safeStorage';
 
 export function useDarkMode(): [boolean, () => void] {
   const [isDark, setIsDark] = useState<boolean>(() => {
-    return localStorage.getItem('darkMode') === 'true';
+    return lerItem('darkMode') === 'true';
   });
 
   useEffect(() => {
@@ -12,7 +13,7 @@ export function useDarkMode(): [boolean, () => void] {
     } else {
       root.classList.remove('dark');
     }
-    localStorage.setItem('darkMode', String(isDark));
+    gravarItem('darkMode', String(isDark));
   }, [isDark]);
 
   const toggle = useCallback(() => setIsDark(prev => !prev), []);

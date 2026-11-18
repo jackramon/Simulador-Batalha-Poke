@@ -5,6 +5,7 @@ import { fetchTeam, clearApiCache, fetchRawPokemonData } from '../services/api';
 import { ITEMS_DATA, POKEMON_TO_MEGA_STONES, MEGA_STONES } from '../data/items';
 import * as Effects from '../services/effectHandlers';
 import { enableDeterministicRandom, disableDeterministicRandom } from '../utils/prng';
+import { removerItem } from '../utils/safeStorage';
 
 const KEY_BATTLE_STATE = 'poke_sim_battle_state';
 const KEY_BATTLE_CONFIG = 'poke_sim_battle_config';
@@ -109,7 +110,7 @@ export const useBattleState = () => {
               }
           } catch (error) {
               console.error("Erro ao carregar dados salvos:", error);
-              localStorage.removeItem(KEY_BATTLE_STATE);
+              removerItem(KEY_BATTLE_STATE);
           }
       };
       loadData();
@@ -292,7 +293,7 @@ export const useBattleState = () => {
 
   const resetBattle = () => {
       setState({...state, isBattleInProgress: false, winner: null});
-      localStorage.removeItem(KEY_BATTLE_STATE);
+      removerItem(KEY_BATTLE_STATE);
   };
 
   const generateRandomInventory = (team: Pokemon[], megaEnabled: boolean): PlayerInventory => {
