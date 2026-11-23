@@ -18,7 +18,7 @@ describe('Uivo (Howl)', () => {
 
     // Validação
     expect(attacker.statStages.attack).toBe(1);
-    expect(logs.some(l => l.message.includes('Ataque aumentado'))).toBe(true);
+    expect(logs.map(l => l.message)).toEqual(['Ataque de Atacante aumentou!']);
   });
 
   it('não deve aumentar o Ataque além do limite de +6', () => {
@@ -30,6 +30,6 @@ describe('Uivo (Howl)', () => {
     handleHowl(attacker, logs, state);
 
     expect(attacker.statStages.attack).toBe(6);
-    expect(logs.some(l => l.message.includes('não pode ter Ataque alterado mais'))).toBe(true);
+    expect(logs.map(l => l.message)).toEqual(['Atacante não pode ter Ataque aumentado mais!']);
   });
 });
