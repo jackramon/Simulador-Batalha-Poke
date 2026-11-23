@@ -3,12 +3,12 @@
 ## Como usar este arquivo
 
 - Consulte este roadmap antes de cada rodada e execute somente o item solicitado.
-- Atualize o item concluído depois das validações e do push verificado, registrando commit e resultado dos testes.
-- Não marque um item como concluído enquanto houver regressões ou publicação pendente.
+- Depois das validações e antes do commit, atualize status, resultados e próximo item **no mesmo commit da tarefa**, sem criar um commit documental separado.
+- Não grave o SHA do próprio commit neste arquivo: informe-o no resumo final depois do push. Não marque um item como concluído com regressões e sempre verifique a publicação antes do resumo.
 - Mantenha `PROJECT_CONTEXT.md` atualizado a cada alteração.
 - Para economizar tokens: inspecione somente os arquivos da tarefa e suas dependências diretas, reutilize a baseline registrada, use testes focados durante a iteração e rode a suíte completa na validação final. Não refaça auditorias globais já concluídas.
 
-**Próximo item:** 0.5 — Avaliar as vulnerabilidades de dependências.
+**Próximo item:** 1.1 — Criar fixtures locais de batalha, sem dependência da PokeAPI.
 
 ## Etapa 0 — Restaurar uma baseline confiável
 
@@ -32,8 +32,11 @@
   - Commit de implementação: `baae8a606c37495f30810e2c646dbb234c75ac86`, com push verificado em `origin/main`.
   - Validação publicada: 16 testes focados novos; 26 arquivos e 69/69 testes aprovados, lint, build Node 18 e `git diff --check` aprovados.
 
-- [ ] **0.5 — Avaliar as vulnerabilidades de dependências.**
-  - Separar produção e desenvolvimento, aplicar atualizações controladas e validar zero regressão; não executar atualizações cegas em massa.
+- [x] **0.5 — Avaliar as vulnerabilidades de dependências.**
+  - Antes: 17 pacotes vulneráveis no total (2 baixas, 4 moderadas, 8 altas e 3 críticas) e 6 em produção (2 moderadas, 2 altas e 2 críticas), com cadeias separadas por `npm ls`.
+  - Após dry-run, `npm audit fix` sem `--force` e atualização controlada de `tsx`; faixas do `package.json` e majors diretos preservados, sem edição manual do lockfile ou de `node_modules`.
+  - Depois: 0 vulnerabilidades no total e 0 em produção, sem ocorrências residuais; `npm ci` reproduzível sem alterar os manifestos e `npm ls --all` sem problemas.
+  - Validação: 6 arquivos e 21/21 testes focados do servidor/produção; 26 arquivos e 69/69 testes na suíte completa; lint, build e `git diff --check` aprovados.
 
 ## Etapa 1 — Criar testes de caracterização antes da refatoração
 
@@ -75,5 +78,6 @@
 
 - Última suíte integral informada: **26 arquivos e 69/69 testes aprovados**.
 - `npm run lint`, `npm run build` e `git diff --check`: aprovados.
-- Último commit de implementação validado e publicado: `baae8a606c37495f30810e2c646dbb234c75ac86`.
+- Auditoria do item 0.5: **17 → 0** ocorrências no total e **6 → 0** em produção; instalação por `npm ci` reproduzida sem alterações nos manifestos.
+- SHA do item 0.5 informado somente no resumo final após o push; último SHA registrado no roadmap: `baae8a606c37495f30810e2c646dbb234c75ac86` (item 0.4).
 - Pendência não bloqueante: aviso de chunk acima de 500 kB, planejado no item 4.5.

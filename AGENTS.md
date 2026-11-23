@@ -10,6 +10,6 @@ O arquivo `PROJECT_CONTEXT.md` contém:
 
 **Regra de Ouro:** Após concluir qualquer alteração solicitada pelo usuário, você deve **ATUALIZAR** o arquivo `PROJECT_CONTEXT.md` adicionando um breve resumo da sua alteração na seção "Registro de Alterações (Changelog)". Isso garante que o contexto do projeto permaneça sempre atualizado para futuras interações.
 
-**Roadmap Vivo:** Antes de iniciar uma rodada do plano de desenvolvimento, consulte `ROADMAP.md`. Após validar e publicar o item, atualize seu status, commit e resultados das validações. Não marque um item como concluído com testes ou push pendentes.
+**Roadmap Vivo:** Antes de iniciar uma rodada, consulte `ROADMAP.md`. Após as validações e antes do commit, atualize status, resultados e próximo item **no mesmo commit da tarefa**, evitando commit documental separado. Não grave o SHA do próprio commit no arquivo; informe esse SHA no resumo final após o push. Não marque um item como concluído com regressões e sempre verifique a publicação antes do resumo.
 
 **Regra de Zero Regressão:** Sempre que você fizer alguma alteração, deve garantir **ZERO REGRESSÃO** no que já foi implementado. Nenhuma funcionalidade existente (como habilidades, itens, mecânicas de clima, replay, etc.) deve ser quebrada ao adicionar novas features.
