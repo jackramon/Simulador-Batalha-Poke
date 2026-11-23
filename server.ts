@@ -2,8 +2,10 @@ import express from 'express';
 import { createServer as createViteServer } from 'vite';
 import { GoogleGenAI } from '@google/genai';
 import path from 'path';
+import { loadLocalEnv } from './server/env';
 
 async function startServer() {
+  loadLocalEnv();
   const app = express();
   const PORT = Number(process.env.PORT) || 3000;
 
