@@ -8,7 +8,7 @@
 - Mantenha `PROJECT_CONTEXT.md` atualizado a cada alteração.
 - Para economizar tokens: inspecione somente os arquivos da tarefa e suas dependências diretas, reutilize a baseline registrada, use testes focados durante a iteração e rode a suíte completa na validação final. Não refaça auditorias globais já concluídas.
 
-**Próximo item:** 0.4 — Restrição do proxy de LLM quando acessado pela rede.
+**Próximo item:** 0.5 — Avaliar as vulnerabilidades de dependências.
 
 ## Etapa 0 — Restaurar uma baseline confiável
 
@@ -27,8 +27,10 @@
   - Commit de implementação: `4e76fc87c156a16d09d650861b05d8f9a46c3b04`, com push verificado em `origin/main`.
   - Validação publicada: testes focados 4/4 e produção 1/1; 22 arquivos e 53/53 testes aprovados, lint, build Node 18 e `git diff --check` aprovados.
 
-- [ ] **0.4 — Restringir o proxy de LLM quando acessado pela rede.**
-  - Avaliar e implementar proteção de acesso, rate limit, timeouts e allowlist de modelos sem quebrar os provedores e fallbacks existentes.
+- [x] **0.4 — Restringir o proxy de LLM quando acessado pela rede.**
+  - Bind em `127.0.0.1` por padrão com `LLM_PROXY_HOST` explícito; bloqueio remoto por socket em `/api/llm-action`; rate limit 429/`Retry-After` em LLM e catálogo; cancelamento real em OpenRouter, DeepSeek, catálogo e Gemini; allowlist de modelos aplicada às escolhas, ao catálogo e aos fallbacks.
+  - Commit de implementação: `baae8a606c37495f30810e2c646dbb234c75ac86`, com push verificado em `origin/main`.
+  - Validação publicada: 16 testes focados novos; 26 arquivos e 69/69 testes aprovados, lint, build Node 18 e `git diff --check` aprovados.
 
 - [ ] **0.5 — Avaliar as vulnerabilidades de dependências.**
   - Separar produção e desenvolvimento, aplicar atualizações controladas e validar zero regressão; não executar atualizações cegas em massa.
@@ -71,7 +73,7 @@
 
 ## Registro resumido da baseline
 
-- Última suíte integral informada: **22 arquivos e 53/53 testes aprovados**.
+- Última suíte integral informada: **26 arquivos e 69/69 testes aprovados**.
 - `npm run lint`, `npm run build` e `git diff --check`: aprovados.
-- Último commit de implementação validado e publicado: `4e76fc87c156a16d09d650861b05d8f9a46c3b04`.
+- Último commit de implementação validado e publicado: `baae8a606c37495f30810e2c646dbb234c75ac86`.
 - Pendência não bloqueante: aviso de chunk acima de 500 kB, planejado no item 4.5.
