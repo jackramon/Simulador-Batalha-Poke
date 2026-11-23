@@ -11,7 +11,7 @@ import { describe, expect, it } from 'vitest';
 const STARTUP_TIMEOUT_MS = 10_000;
 
 function delay(milliseconds: number) {
-  return new Promise(resolve => setTimeout(resolve, milliseconds));
+  return new Promise((resolve) => setTimeout(resolve, milliseconds));
 }
 
 async function getAvailablePort() {
@@ -24,7 +24,7 @@ async function getAvailablePort() {
 
   const port = (server.address() as AddressInfo).port;
   await new Promise<void>((resolve, reject) => {
-    server.close(error => error ? reject(error) : resolve());
+    server.close((error) => (error ? reject(error) : resolve()));
   });
   return port;
 }
@@ -32,10 +32,10 @@ async function getAvailablePort() {
 async function isPortAvailable(port: number) {
   const server = createServer();
 
-  return new Promise<boolean>(resolve => {
+  return new Promise<boolean>((resolve) => {
     server.once('error', () => resolve(false));
     server.listen(port, '127.0.0.1', () => {
-      server.close(error => resolve(!error));
+      server.close((error) => resolve(!error));
     });
   });
 }
@@ -65,7 +65,7 @@ async function stopServer(child: ChildProcess) {
     return;
   }
 
-  await new Promise<void>(resolve => {
+  await new Promise<void>((resolve) => {
     const forceKillTimer = setTimeout(() => child.kill('SIGKILL'), 3_000);
     child.once('exit', () => {
       clearTimeout(forceKillTimer);
@@ -84,7 +84,8 @@ describe('servidor de produção', () => {
     const temporaryRoot = mkdtempSync(path.join(tmpdir(), 'pokemon-production-'));
     const serverPath = path.join(temporaryRoot, 'server.cjs');
     const port = await getAvailablePort();
-    const spaHtml = '<!doctype html><html><body><div id="root">Regressão de produção</div></body></html>';
+    const spaHtml =
+      '<!doctype html><html><body><div id="root">Regressão de produção</div></body></html>';
     let child: ChildProcess | undefined;
 
     try {
@@ -104,7 +105,9 @@ describe('servidor de produção', () => {
 
       // O substituto impede qualquer chamada real aos provedores durante o teste.
       const fetchStubPath = path.join(temporaryRoot, 'fetch-stub.cjs');
-      writeFileSync(fetchStubPath, `
+      writeFileSync(
+        fetchStubPath,
+        `
         globalThis.fetch = async url => {
           if (url === 'https://openrouter.ai/api/v1/models') {
             return {
@@ -116,7 +119,8 @@ describe('servidor de produção', () => {
           }
           throw new Error('Chamada externa bloqueada no teste: ' + url);
         };
-      `);
+      `,
+      );
 
       let output = '';
       child = spawn(process.execPath, ['--require', fetchStubPath, serverPath], {
@@ -125,7 +129,15 @@ describe('servidor de produção', () => {
           ...process.env,
           NODE_ENV: 'production',
           PORT: String(port),
-          NODE_PATH: [path.resolve('node_modules'), process.env.NODE_PATH].filter(Boolean).join(path.delimiter),
+          // Quatro primeiras chamadas passam; a quinta valida o 429 sem espera real.
+          LLM_PROXY_HOST: '127.0.0.1',
+          LLM_ALLOWED_PAID_MODELS: '',
+          LLM_REQUEST_TIMEOUT_MS: '30000',
+          LLM_RATE_LIMIT_MAX: '4',
+          LLM_RATE_LIMIT_WINDOW_MS: '60000',
+          NODE_PATH: [path.resolve('node_modules'), process.env.NODE_PATH]
+            .filter(Boolean)
+            .join(path.delimiter),
           GEMINI_API_KEY: '',
           GOOGLE_API_KEY: '',
           OPENROUTER_API_KEY: '',
@@ -136,8 +148,12 @@ describe('servidor de produção', () => {
       });
       child.stdout?.setEncoding('utf8');
       child.stderr?.setEncoding('utf8');
-      child.stdout?.on('data', chunk => { output += chunk; });
-      child.stderr?.on('data', chunk => { output += chunk; });
+      child.stdout?.on('data', (chunk) => {
+        output += chunk;
+      });
+      child.stderr?.on('data', (chunk) => {
+        output += chunk;
+      });
 
       await waitForServer(child, port, () => output);
       const baseUrl = `http://127.0.0.1:${port}`;
@@ -170,6 +186,38 @@ describe('servidor de produção', () => {
       expect(await llmResponse.json()).toEqual({
         error: 'OPENROUTER_API_KEY não configurada nas Configurações (Settings).',
       });
+
+      const spoofedHeaderResponse = await fetch(`${baseUrl}/api/llm-action`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'X-Forwarded-For': '203.0.113.10',
+        },
+        body: JSON.stringify({ prompt: 'Chamada local', provider: 'openrouter' }),
+      });
+      expect(spoofedHeaderResponse.status).toBe(400);
+      expect(await spoofedHeaderResponse.json()).toEqual({
+        error: 'OPENROUTER_API_KEY não configurada nas Configurações (Settings).',
+      });
+
+      const forbiddenModelResponse = await fetch(`${baseUrl}/api/llm-action`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          prompt: 'Modelo pago fora da allowlist',
+          provider: 'openrouter',
+          model: 'openai/gpt-4o',
+        }),
+      });
+      expect(forbiddenModelResponse.status).toBe(400);
+      expect(await forbiddenModelResponse.json()).toEqual({
+        error:
+          'Modelo de openrouter não permitido. Use um modelo gratuito ou adicione-o explicitamente a LLM_ALLOWED_PAID_MODELS.',
+      });
+
+      const limitedResponse = await fetch(`${baseUrl}/api/openrouter-models`);
+      expect(limitedResponse.status).toBe(429);
+      expect(limitedResponse.headers.get('retry-after')).toMatch(/^\d+$/);
     } finally {
       if (child) {
         await stopServer(child);
