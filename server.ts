@@ -5,7 +5,7 @@ import path from 'path';
 
 async function startServer() {
   const app = express();
-  const PORT = 3000;
+  const PORT = Number(process.env.PORT) || 3000;
 
   app.use(express.json());
 
@@ -258,7 +258,12 @@ async function startServer() {
   } else {
     const distPath = path.join(process.cwd(), 'dist');
     app.use(express.static(distPath));
-    app.get('*', (req, res) => {
+    // O curinga nomeado é compatível com o Express 5 e inclui a rota raiz.
+    app.get('/{*splat}', (req, res, next) => {
+      // APIs desconhecidas continuam com o 404 padrão em vez de receber a SPA.
+      if (req.path === '/api' || req.path.startsWith('/api/')) {
+        return next();
+      }
       res.sendFile(path.join(distPath, 'index.html'));
     });
   }
