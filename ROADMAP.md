@@ -8,7 +8,7 @@
 - Mantenha `PROJECT_CONTEXT.md` atualizado a cada alteração.
 - Para economizar tokens: inspecione somente os arquivos da tarefa e suas dependências diretas, reutilize a baseline registrada, use testes focados durante a iteração e rode a suíte completa na validação final. Não refaça auditorias globais já concluídas.
 
-**Próximo item:** 1.5 — Cobrir replay manual, IA local e LLM mockado.
+**Próximo item:** 1.6 — Cobrir IA em P1/P2 e batalha espelho com a mesma espécie.
 
 ## Etapa 0 — Restaurar uma baseline confiável
 
@@ -61,7 +61,12 @@
   - Três `it.todo` registram a continuação da troca forçada, suas ações pendentes/`turnEnd` e a unificação de Roar, Dragon Tail e Red Card prevista para 2.2; essas lacunas não contam como cobertura aprovada e não foram convertidas em comportamento desejado.
   - Validação: 4 testes focados aprovados e 3 `it.todo`; suíte completa com 30 arquivos, 101 testes aprovados e 3 `it.todo` (104 registrados); `npm run lint`, `npm run build` e `git diff --check` aprovados. Nenhuma regra de produção foi alterada e nenhum helper novo foi necessário.
   - Commit: informado no resumo final após o push verificado em `origin/main`.
-- [ ] **1.5 — Cobrir replay manual, IA local e LLM mockado.**
+- [x] **1.5 — Cobrir replay manual, IA local e LLM mockado.**
+  - `tests/integration/replayAndAi.test.ts` adiciona cinco caracterizações sem alterar produção ou criar helpers: replay manual reconstrói troca de P1 e golpe de P2 a partir de `BattleReplayEvent`, repetindo a mesma seed e comparando decisões, ordem das ações, snapshots de fase e estado final completo, incluindo HP, PP, turno e identidade ativo/equipe no núcleo.
+  - `decideAIAction` para P2 produz duas vezes a mesma ação exata com estado pequeno e seed redefinida antes de cada execução; cada chamada restaura o `Math.random` em `finally`. O LLM usa apenas `fetch` stubado e `Response` local, cobrindo golpe válido, troca válida e fallback para o primeiro golpe com PP após resposta inválida, sem chamadas externas.
+  - Dois `it.todo` mantêm como lacunas, sem congelar defeitos em assertivas: replay com LLM executando IA local indevidamente (3.1) e identidade ativo/equipe quebrada no `ReplayPlayer` (3.3). Os três `it.todo` anteriores permanecem, e a integração/correção desses fluxos pertence a 3.1/3.3.
+  - Validação: 5 testes focados aprovados e 2 `it.todo`; suíte completa com 31 arquivos, 106 testes aprovados e 5 `it.todo` (111 registrados); `npm run lint`, `npm run build` e `git diff --check` aprovados. Nenhuma regra de produção foi alterada.
+  - Commit: informado no resumo final após o push verificado em `origin/main`.
 - [ ] **1.6 — Cobrir IA em P1/P2 e batalha espelho com a mesma espécie.**
 - [ ] **1.7 — Manter smoke tests automatizados de desenvolvimento e produção.**
 
@@ -93,8 +98,8 @@
 
 ## Registro resumido da baseline
 
-- Última suíte integral informada: **30 arquivos, 101 testes aprovados e 3 `it.todo`** (104 registrados); os todos são lacunas e não contam como cobertura aprovada.
+- Última suíte integral informada: **31 arquivos, 106 testes aprovados e 5 `it.todo`** (111 registrados); os todos são lacunas e não contam como cobertura aprovada.
 - `npm run lint`, `npm run build` e `git diff --check`: aprovados.
 - Auditoria do item 0.5: **17 → 0** ocorrências no total e **6 → 0** em produção; instalação por `npm ci` reproduzida sem alterações nos manifestos.
-- SHA dos itens 1.1 a 1.4 informados somente no resumo final após o push; último SHA registrado no roadmap: `baae8a606c37495f30810e2c646dbb234c75ac86` (item 0.4).
+- SHA dos itens 1.1 a 1.5 informados somente no resumo final após o push; último SHA registrado no roadmap: `baae8a606c37495f30810e2c646dbb234c75ac86` (item 0.4).
 - Pendência não bloqueante: aviso de chunk acima de 500 kB, planejado no item 4.5.
