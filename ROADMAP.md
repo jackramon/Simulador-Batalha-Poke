@@ -8,7 +8,7 @@
 - Mantenha `PROJECT_CONTEXT.md` atualizado a cada alteração.
 - Para economizar tokens: inspecione somente os arquivos da tarefa e suas dependências diretas, reutilize a baseline registrada, use testes focados durante a iteração e rode a suíte completa na validação final. Não refaça auditorias globais já concluídas.
 
-**Próximo item:** 1.1 — Criar fixtures locais de batalha, sem dependência da PokeAPI.
+**Próximo item:** 1.2 — Cobrir turno completo com golpe, troca, item e estados de campo.
 
 ## Etapa 0 — Restaurar uma baseline confiável
 
@@ -40,7 +40,11 @@
 
 ## Etapa 1 — Criar testes de caracterização antes da refatoração
 
-- [ ] **1.1 — Criar fixtures locais de batalha, sem dependência da PokeAPI.**
+- [x] **1.1 — Criar fixtures locais de batalha, sem dependência da PokeAPI.**
+  - `tests/factories.ts` passou a oferecer builders tipados de `Move`, `Pokemon`, `StatStages`, `SideHazards`, `BagItem`, `PlayerInventory` e `BattleState` completo, com defaults determinísticos, overrides explícitos, independência entre instâncias e ativo inicial idêntico a `team[0]` (ou `null` em time vazio); `createDummy` permanece como alias caracterizado e sem uso de `as any`.
+  - Testes novos em `tests/factories.test.ts`, em ciclos RED→GREEN por builder, cobrindo defaults válidos, overrides, independência de arrays/golpes/status/hazards/inventários, identidade referencial, determinismo e ausência de rede/`Math.random`/IndexedDB.
+  - Validação: 7 arquivos e 32/32 testes focados; suíte completa 27 arquivos e 86/86 testes; `npm run lint`, `npm run build` e `git diff --check` aprovados. Nenhuma regra do motor foi alterada.
+  - Commit: informado no resumo final após o push verificado em `origin/main`.
 - [ ] **1.2 — Cobrir turno completo com golpe, troca, item e estados de campo.**
 - [ ] **1.3 — Cobrir hazards, telas e efeitos temporários, incluindo seus ticks.**
 - [ ] **1.4 — Cobrir trocas voluntárias, forçadas e por desmaio.**
@@ -76,8 +80,8 @@
 
 ## Registro resumido da baseline
 
-- Última suíte integral informada: **26 arquivos e 69/69 testes aprovados**.
+- Última suíte integral informada: **27 arquivos e 86/86 testes aprovados**.
 - `npm run lint`, `npm run build` e `git diff --check`: aprovados.
 - Auditoria do item 0.5: **17 → 0** ocorrências no total e **6 → 0** em produção; instalação por `npm ci` reproduzida sem alterações nos manifestos.
-- SHA do item 0.5 informado somente no resumo final após o push; último SHA registrado no roadmap: `baae8a606c37495f30810e2c646dbb234c75ac86` (item 0.4).
+- SHA do item 1.1 informado somente no resumo final após o push; último SHA registrado no roadmap: `baae8a606c37495f30810e2c646dbb234c75ac86` (item 0.4).
 - Pendência não bloqueante: aviso de chunk acima de 500 kB, planejado no item 4.5.
