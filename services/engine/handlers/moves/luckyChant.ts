@@ -27,3 +27,14 @@ export function handleLuckyChant(
     
     log(logs, `A Canção da Sorte protegeu a equipe de ${attacker.name} contra acertos críticos!`, 'text-blue-500 font-bold');
 }
+
+export function processLuckyChantTurnEnd(state: BattleState, logs: LogEntry[]) {
+    for (const hazards of [state.p1Hazards, state.p2Hazards]) {
+        if (hazards.luckyChant <= 0) continue;
+
+        hazards.luckyChant--;
+        if (hazards.luckyChant === 0) {
+            log(logs, `A Canção da Sorte se dissipou.`, 'text-gray-500 italic');
+        }
+    }
+}

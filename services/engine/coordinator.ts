@@ -2,6 +2,7 @@
 import { BattleState, Action, BattleConfig, LogEntry, Pokemon } from '../../types';
 import * as BattleEngine from './index';
 import * as AirLock from './handlers/abilities/air_lock';
+import * as LuckyChant from './handlers/moves/luckyChant';
 import { getSortedActions } from './actions';
 
 export type TurnPhase = 
@@ -254,9 +255,11 @@ export class BattleCoordinator {
 
     const endRes = BattleEngine.processTurnEnd(state, config);
     state = endRes.newState;
+    const luckyChantLogs: LogEntry[] = [];
+    LuckyChant.processLuckyChantTurnEnd(state, luckyChantLogs);
     
     // Combina logs de separador + logs de efeitos
-    const finalEndLogs = [...endLogs, ...endRes.logs];
+    const finalEndLogs = [...endLogs, ...endRes.logs, ...luckyChantLogs];
 
     yield {
         state,
