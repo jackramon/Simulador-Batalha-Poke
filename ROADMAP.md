@@ -99,8 +99,8 @@
   - `services/engine/handlers/effects/statusMoveRegistry.ts` é a fonte declarativa única das rotas especiais, com referências diretas e adaptadores tipados; o router preserva somente os fallbacks genéricos legítimos, sem exigir handlers para dano ou status simples.
   - A paridade estrutural contra o router anterior congelado cobre 130 golpes e 118 handlers, e o registro valida funções, nomes não vazios e ausência de duplicados. `IMPLEMENTED_MOVES` não foi usado como prova de funcionamento.
   - Spikes, Stealth Rock, Sticky Web, Toxic Spikes, Reflect, Light Screen, Aurora Veil, Trick Room, Gravity, Safeguard, Mist e Lucky Chant foram conectados pelo fluxo público. Os testes cobrem lado correto, camadas máximas 3/2, entrada com hazards, redução de dano, neve para Aurora Veil, duração e expiração.
-  - O tick de Lucky Chant reside em seu handler e é chamado uma vez pelo coordenador após o `processTurnEnd` existente; `turnEnd`, switching, `instanceId`, PRNG e `secondaryEffectRouter` não foram alterados.
-  - Validação: 4 arquivos focados e 31 testes aprovados; suíte completa com 36 arquivos, 145 testes aprovados e 5 `it.todo` preservados (150 registrados), sem novos todos; `npm run lint`, `npm run build` e `git diff --check` aprovados.
+  - O tick de Lucky Chant reside em seu handler e é executado pela fonte canônica `processTurnEnd`; o coordenador consome esse resultado sem chamada adicional. A ativação pelo registry com duração inicial 5, o wiring, switching, `instanceId`, PRNG e `secondaryEffectRouter` não foram alterados.
+  - Fechamento validado por RED→GREEN: a chamada direta a `processTurnEnd` cobre 2→1→0 sem nova ativação, e o coordenador preserva a ativação em 5 com exatamente um decremento por turno até 0. Validação: 4 arquivos focados e 35 testes aprovados; suíte completa com 36 arquivos, 146 testes aprovados e 5 `it.todo` preservados (151 registrados), sem novos todos; `npm run lint`, `npm run build` e `git diff --check` aprovados.
   - Commit: informado no resumo final após o push verificado em `origin/main`.
 - [ ] **2.4 — Introduzir `instanceId` único, separado do ID da espécie.**
 - [ ] **2.5 — Definir estado transacional, evitando snapshots com objetos mutáveis compartilhados.**
@@ -125,7 +125,7 @@
 
 ## Registro resumido da baseline
 
-- Última suíte integral informada: **36 arquivos, 145 testes aprovados e 5 `it.todo`** (150 registrados); os todos são lacunas de outros itens e não contam como cobertura aprovada.
+- Última suíte integral informada: **36 arquivos, 146 testes aprovados e 5 `it.todo`** (151 registrados); os todos são lacunas de outros itens e não contam como cobertura aprovada.
 - `npm run lint`, `npm run build` e `git diff --check`: aprovados.
 - Auditoria do item 0.5: **17 → 0** ocorrências no total e **6 → 0** em produção; instalação por `npm ci` reproduzida sem alterações nos manifestos.
 - SHA dos itens 1.1 a 1.7 e dos itens 2.1/2.2/2.3 informados somente nos respectivos resumos finais após o push; último SHA registrado no roadmap: `baae8a606c37495f30810e2c646dbb234c75ac86` (item 0.4).

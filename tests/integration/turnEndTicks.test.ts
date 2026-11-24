@@ -19,9 +19,24 @@ const expectSingleTurnEnd = (result: CompletedTurn, expectedTurn: number) => {
   expect(result.finalState.turn).toBe(expectedTurn);
 };
 
-describe('ticks de fim de turno pelo coordenador público', () => {
+describe('ticks de fim de turno', () => {
   it('reexporta a mesma implementação pelo caminho de compatibilidade', () => {
     expect(compatibleProcessTurnEnd).toBe(processTurnEnd);
+  });
+
+  it('processa Lucky Chant diretamente pelo turnEnd de 2 a 0 sem nova ativação', () => {
+    const initialState = createBattleState(undefined, undefined, {
+      p1Hazards: createSideHazards({ luckyChant: 2 }),
+    });
+    const config = createBattleConfig();
+
+    const first = processTurnEnd(initialState, config);
+    expect(first.newState.p1Hazards.luckyChant).toBe(1);
+    expect(first.newState.p2Hazards.luckyChant).toBe(0);
+
+    const second = processTurnEnd(first.newState, config);
+    expect(second.newState.p1Hazards.luckyChant).toBe(0);
+    expect(second.newState.p2Hazards.luckyChant).toBe(0);
   });
 
   it('mantém os efeitos já ativos com um único decremento por turno', () => {

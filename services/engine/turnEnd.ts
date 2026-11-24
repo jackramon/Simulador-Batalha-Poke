@@ -11,6 +11,7 @@ import * as LaserFocus from './handlers/moves/laserFocus';
 import * as Uproar from './handlers/moves/uproar';
 import * as Wish from './handlers/moves/wish';
 import * as Yawn from './handlers/moves/yawn';
+import * as LuckyChant from './handlers/moves/luckyChant';
 
 function processSideHazards(hazards: SideHazards, logs: LogEntry[], sideName: string) {
     // Decrementa Reflect
@@ -285,6 +286,8 @@ export function processTurnEnd(currentState: BattleState, config: BattleConfig):
       }
     }
   });
+
+  LuckyChant.processLuckyChantTurnEnd(state, logs);
 
   state.turn++;
 
