@@ -4,7 +4,12 @@ import { decideLLMAction } from '../../services/llmAiLogic';
 import type { Action, BattleReplay } from '../../types';
 import { disableDeterministicRandom, enableDeterministicRandom } from '../../utils/prng';
 import { createBattleState, createMove, createPlayerInventory, createPokemon } from '../factories';
-import { createBattleConfig, runCoordinatorTurn } from './coordinator.helpers';
+import {
+  createBattleConfig,
+  createMoveAction,
+  createSwitchAction,
+  runCoordinatorTurn,
+} from './coordinator.helpers';
 
 describe('replay manual e decisões de IA no núcleo', () => {
   let fetchMock: ReturnType<typeof vi.fn>;
@@ -149,6 +154,71 @@ describe('replay manual e decisões de IA no núcleo', () => {
     expect(first.currentPokemon2?.moves[0].uses).toBe(11);
     expect(second.currentPokemon1?.hp).toBe(first.currentPokemon1?.hp);
     expect(second.currentPokemon2?.moves[0].uses).toBe(first.currentPokemon2?.moves[0].uses);
+    expect(fetchMock).not.toHaveBeenCalled();
+  });
+
+  it('reproduz troca forçada coordenada com a mesma seed e as mesmas ações', () => {
+    const executeReplay = () => {
+      const attacker = createPokemon({
+        id: 111,
+        name: 'Usuário do Replay Forçado',
+        hp: 400,
+        maxHP: 400,
+        speedStat: 200,
+        moves: [createMove({
+          name: 'u-turn',
+          displayName: 'U-turn',
+          power: 70,
+          type: 'bug',
+          uses: 10,
+          maxUses: 10,
+          effect: { status: 'switch-self', chance: 100 },
+        })],
+      });
+      const reserve = createPokemon({ id: 112, name: 'Reserva do Replay Forçado', hp: 400, maxHP: 400 });
+      const defender = createPokemon({
+        id: 211,
+        name: 'Oponente do Replay Forçado',
+        hp: 500,
+        maxHP: 500,
+        speedStat: 100,
+        moves: [createMove({ name: 'golpe-regravado', power: 50, uses: 12, maxUses: 12 })],
+      });
+      const initialState = createBattleState([attacker, reserve], [defender]);
+      const p1Action = createMoveAction(attacker, attacker.moves[0], 1);
+      const p2Action = createMoveAction(defender, defender.moves[0], 2);
+      const forcedEvent = { actorId: 1 as const, switchId: reserve.id, isForcedSwitch: true };
+
+      const result = runCoordinatorTurn({
+        seed: 1510,
+        initialState,
+        p1Action,
+        p2Action,
+        config: createBattleConfig({ forceAccuracyOutcome: 'hit', fixedRoll: 1 }),
+        chooseForcedSwitch: step => createSwitchAction(step.state.currentPokemon1!, reserve, forcedEvent.actorId),
+      });
+
+      return {
+        result,
+        decisions: [p1Action.data.name, p2Action.data.name, forcedEvent.switchId],
+      };
+    };
+
+    const first = executeReplay();
+    const second = executeReplay();
+
+    expect(second.decisions).toEqual(first.decisions);
+    expect(second.result.stateSnapshots).toEqual(first.result.stateSnapshots);
+    expect(structuredClone(second.result.finalState)).toEqual(structuredClone(first.result.finalState));
+    for (const run of [first, second]) {
+      expect(run.result.completed).toBe(true);
+      expect(run.result.steps.filter(step => step.phase === 'switch-forced')).toHaveLength(1);
+      expect(run.result.steps.filter(step => step.phase === 'turn-end')).toHaveLength(1);
+      expect(run.result.finalState.turn).toBe(2);
+      expect(run.result.finalState.currentPokemon1).toBe(run.result.finalState.team1[1]);
+      expect(run.result.finalState.currentPokemon1?.hp).toBeLessThan(400);
+      expect(run.result.finalState.currentPokemon1?.hp).toBeGreaterThan(0);
+    }
     expect(fetchMock).not.toHaveBeenCalled();
   });
 

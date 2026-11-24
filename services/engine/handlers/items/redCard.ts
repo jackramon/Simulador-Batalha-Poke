@@ -3,8 +3,7 @@ import { Pokemon, BattleState } from '../../../../types';
 import { log } from '../../utils';
 import * as SuctionCups from '../abilities/suction_cups';
 import * as GuardDog from '../abilities/guard_dog';
-import * as EntryAbilities from '../abilities/entry';
-import * as NaturalCure from '../abilities/natural_cure';
+import { performSwitch } from '../../switching';
 
 /**
  * Lógica para o item Cartão Vermelho (Red Card).
@@ -61,55 +60,10 @@ export function checkRedCard(
     // 5. Seleciona aleatoriamente um Pokémon da reserva do atacante
     const newPokemon = validBackups[Math.floor(Math.random() * validBackups.length)];
 
-    // 6. Executa a lógica de saída do Atacante (Phazing)
-    // Reset de atributos e status voláteis
-    attacker.statStages = { accuracy: 0, evasion: 0, attack: 0, defense: 0, spAttack: 0, spDefense: 0, speed: 0 };
-    attacker.isFlinched = false;
-    attacker.turnsActive = 0;
-    attacker.chargingMove = null;
-    attacker.mustRecharge = false;
-    attacker.lockedMove = null;
-    attacker.movesUsed = [];
-
-    // Limpa status voláteis (mantém principais e alguns específicos)
-    const persistentEffects = ['burn', 'poison', 'toxic', 'paralysis', 'sleep', 'freeze', 'disguise-busted', 'zero-to-hero-activated', 'zero-to-hero-transformed'];
-    Object.keys(attacker.statusEffects).forEach(status => {
-        if (!persistentEffects.includes(status)) {
-            delete attacker.statusEffects[status];
-        }
-    });
-
-    // Reseta contador de Toxic ao sair
-    if (attacker.statusEffects.toxic) {
-        attacker.statusEffects.toxic.turns = 0;
-    }
-
-    // Habilidades de saída
-    NaturalCure.handleNaturalCure(attacker, logs as any);
-    if (attacker.ability === 'regenerator' && !attacker.isFainted) {
-        const heal = Math.floor(attacker.maxHP / 3);
-        attacker.hp = Math.min(attacker.maxHP, attacker.hp + heal);
-        log(logs, `${attacker.name} recuperou vida ao sair (Regenerador)!`, 'text-green-500');
-    }
-
-    // 7. Atualiza o estado da batalha
-    if (isP1) {
-        state.currentPokemon1 = newPokemon;
-    } else {
-        state.currentPokemon2 = newPokemon;
-    }
-
+    // 6. Usa a transição canônica para saída, hazards, entrada e clima.
     log(logs, `${attacker.name} foi expulso da batalha!`, 'text-orange-600 font-bold');
     log(logs, `${newPokemon.name} foi arrastado para o campo!`, 'text-orange-600 font-bold');
-
-    // 8. Habilidades de entrada do novo Pokémon
-    // O oponente do novo Pokémon é o portador do Red Card (que ainda está em campo)
-    // Passamos o atacante antigo como 'lastPokemon' para lógicas de cópia
-    const entryRes = EntryAbilities.handleEntryAbilities(newPokemon, holder, true, logs as any, state, attacker);
-
-    // Atualiza clima se mudou na entrada
-    if (entryRes.weather) {
-        state.weather = entryRes.weather;
-        state.weatherTurns = 5;
-    }
+    const result = performSwitch(state, newPokemon, isP1 ? 1 : 2, true);
+    Object.assign(state, result.newState);
+    logs.push(...result.logs);
 }

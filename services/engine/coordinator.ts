@@ -39,7 +39,7 @@ export class BattleCoordinator {
     p1Action: Action | undefined,
     p2Action: Action | undefined,
     config: BattleConfig
-  ): Generator<TurnStepResult, void, void> {
+  ): Generator<TurnStepResult, void, Action | undefined> {
     let state = { ...initialState };
     const stepLogs: LogEntry[] = [];
 
@@ -74,8 +74,13 @@ export class BattleCoordinator {
 
     // Loop de execução (respeitando Speed dinâmico)
     while (pendingActions.length > 0 && state.isBattleInProgress) {
-        // Remove ações inválidas (ex: usuário desmaiou, exceto itens que podem ter lógica específica se implementada)
-        pendingActions = pendingActions.filter(act => !act.user.isFainted || act.type === 'item');
+        // Golpes de quem desmaiou ou já saiu do campo não podem continuar na fila.
+        pendingActions = pendingActions.filter(act => {
+            if (act.user.isFainted && act.type !== 'item') return false;
+            if (act.type !== 'move') return true;
+            const active = act.playerNum === 1 ? state.currentPokemon1 : state.currentPokemon2;
+            return active === act.user;
+        });
         
         if (pendingActions.length === 0) break;
 
@@ -162,8 +167,10 @@ export class BattleCoordinator {
                 // Agora confiamos na flag explícita da engine em vez de heurística
                 moveDidDamage = !!res.damageDealt;
                 
-                switchRequested = !!res.switchRequested && !res.fainted;
-                defenderSwitchRequested = !!res.defenderSwitchRequested && !res.fainted;
+                const activeAttacker = currentAction.playerNum === 1 ? state.currentPokemon1 : state.currentPokemon2;
+                const activeDefender = currentAction.playerNum === 1 ? state.currentPokemon2 : state.currentPokemon1;
+                switchRequested = !!res.switchRequested && !res.fainted && activeAttacker === currentAction.user;
+                defenderSwitchRequested = !!res.defenderSwitchRequested && !res.fainted && activeDefender === target;
                 isBatonPass = !!res.isBatonPass;
                 
                 currentAction.user.movedThisTurn = true;
@@ -182,46 +189,54 @@ export class BattleCoordinator {
         };
 
         // --- SUB-FASE: CHECAGEM DE TROCA FORÇADA (Mid-Turn) ---
-        // Se alguém foi forçado a trocar (U-Turn, Eject Button, Red Card), o turno pausa ou encerra a sequência
+        let forcedSwitch: { player: 1 | 2; user: Pokemon; isBatonPass?: boolean } | undefined;
         if (switchRequested) {
             const team = currentAction.playerNum === 1 ? state.team1 : state.team2;
-            const hasHealthy = team.some(p => !p.isFainted && p.id !== currentAction.user.id);
-            
-            if (hasHealthy) {
-                yield {
-                    state,
-                    logs: [],
-                    phase: 'switch-forced',
-                    switchPrompt: {
-                        player: currentAction.playerNum,
-                        isBatonPass,
-                        canCancel: false
-                    }
-                };
-                // Nota: O loop de ações é interrompido em trocas forçadas para manter a integridade do fluxo
-                // (O App deve lidar com o input e depois retomar/finalizar)
-                return; 
+            if (team.some(p => !p.isFainted && p !== currentAction.user)) {
+                forcedSwitch = { player: currentAction.playerNum, user: currentAction.user, isBatonPass };
             }
         }
 
-        if (defenderSwitchRequested) {
+        if (!forcedSwitch && defenderSwitchRequested) {
             const defenderNum = currentAction.playerNum === 1 ? 2 : 1;
             const defTeam = defenderNum === 1 ? state.team1 : state.team2;
             const defActive = defenderNum === 1 ? state.currentPokemon1 : state.currentPokemon2;
-            const hasHealthy = defTeam.some(p => !p.isFainted && p.id !== defActive?.id);
+            if (defActive && defTeam.some(p => !p.isFainted && p !== defActive)) {
+                forcedSwitch = { player: defenderNum, user: defActive };
+            }
+        }
 
-            if (hasHealthy) {
+        if (forcedSwitch) {
+            const forcedSwitchAction = yield {
+                state,
+                logs: [],
+                phase: 'switch-forced',
+                switchPrompt: {
+                    player: forcedSwitch.player,
+                    isBatonPass: forcedSwitch.isBatonPass,
+                    canCancel: false
+                }
+            };
+            if (forcedSwitchAction?.type === 'switch' && forcedSwitchAction.playerNum === forcedSwitch.player) {
+                const res = BattleEngine.performSwitch(
+                    state,
+                    forcedSwitchAction.data,
+                    forcedSwitch.player,
+                    config.weatherEnabled,
+                    forcedSwitch.isBatonPass
+                );
+                state = res.newState;
                 yield {
                     state,
-                    logs: [],
-                    phase: 'switch-forced',
-                    switchPrompt: {
-                        player: defenderNum,
-                        canCancel: false
-                    }
+                    logs: res.logs,
+                    phase: 'after-action',
+                    activeActorId: forcedSwitch.user.id,
+                    actionType: 'switch'
                 };
-                return;
+                // A escolha retoma a fila já ordenada deste mesmo turno, sem novo start.
+                continue;
             }
+            return;
         }
 
         // Se alguém desmaiou no meio do turno, o loop para para processar a troca

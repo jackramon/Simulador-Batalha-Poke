@@ -3,9 +3,8 @@ import { Pokemon, BattleState } from '../../../../types';
 import { log } from '../../utils';
 import * as SuctionCups from '../abilities/suction_cups';
 import * as GuardDog from '../abilities/guard_dog';
-import * as EntryAbilities from '../abilities/entry';
-import * as NaturalCure from '../abilities/natural_cure';
 import * as SheerForce from '../abilities/sheer_force';
+import { performSwitch } from '../../switching';
 import * as Ingrain from './ingrain';
 
 /**
@@ -59,54 +58,10 @@ export function handleForceSwitch(
     // 6. Seleciona aleatoriamente
     const newPokemon = validBackups[Math.floor(Math.random() * validBackups.length)];
 
-    // 7. Executa a lógica de saída do Pokémon atual (Similar ao switching.ts)
-    // Reset de atributos e status voláteis
-    defender.statStages = { accuracy: 0, evasion: 0, attack: 0, defense: 0, spAttack: 0, spDefense: 0, speed: 0 };
-    defender.isFlinched = false;
-    defender.turnsActive = 0;
-    defender.chargingMove = null;
-    defender.mustRecharge = false;
-    defender.lockedMove = null;
-    defender.movesUsed = [];
-
-    // Limpa status voláteis (mantém principais)
-    const persistentEffects = ['burn', 'poison', 'toxic', 'paralysis', 'sleep', 'freeze', 'disguise-busted', 'zero-to-hero-activated', 'zero-to-hero-transformed'];
-    Object.keys(defender.statusEffects).forEach(status => {
-        if (!persistentEffects.includes(status)) {
-            delete defender.statusEffects[status];
-        }
-    });
-
-    if (defender.statusEffects.toxic) {
-        defender.statusEffects.toxic.turns = 0;
-    }
-
-    // Habilidades de saída
-    NaturalCure.handleNaturalCure(defender, logs as any);
-    if (defender.ability === 'regenerator' && !defender.isFainted) {
-        const heal = Math.floor(defender.maxHP / 3);
-        defender.hp = Math.min(defender.maxHP, defender.hp + heal);
-        log(logs, `${defender.name} recuperou vida ao sair (Regenerador)!`, 'text-green-500');
-    }
-
-    // 8. Atualiza o estado
-    if (isP1) {
-        state.currentPokemon1 = newPokemon;
-    } else {
-        state.currentPokemon2 = newPokemon;
-    }
-
+    // 7. Usa a transição canônica para saída, hazards, entrada e clima.
     log(logs, `${defender.name} foi arrastado para fora da batalha!`, 'text-orange-600 font-bold');
     log(logs, `${newPokemon.name} foi arrastado para o campo!`, 'text-orange-600 font-bold');
-
-    // 9. Habilidades de entrada do novo Pokémon
-    const opponent = isP1 ? state.currentPokemon2 : state.currentPokemon1;
-    // O último Pokémon (defender) é passado para lógica de cópia (Costar, Receiver)
-    const entryRes = EntryAbilities.handleEntryAbilities(newPokemon, opponent, true, logs as any, state, defender);
-
-    // Atualiza clima se mudou na entrada
-    if (entryRes.weather) {
-        state.weather = entryRes.weather;
-        state.weatherTurns = 5;
-    }
+    const result = performSwitch(state, newPokemon, isP1 ? 1 : 2, true);
+    Object.assign(state, result.newState);
+    logs.push(...result.logs);
 }

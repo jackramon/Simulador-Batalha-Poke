@@ -1,5 +1,5 @@
 
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import { Action, Pokemon, BattleState, BattleConfig, BattleReplay, BattleReplayEvent } from '../types';
 import * as BattleEngine from '../services/engine';
 import { decideAIAction, chooseBestSwitch } from '../services/aiLogic';
@@ -44,6 +44,7 @@ export const useTurnManager = ({
 }: TurnManagerProps) => {
     
     const { p1Action, setP1Action, p2Action, setP2Action } = uiActions;
+    const forcedSwitchResolverRef = useRef<((action: Action) => void) | null>(null);
 
     const recordAction = (player: 1 | 2, type: 'move' | 'switch' | 'item', data: any, shouldTerastallize?: boolean, shouldMegaEvolve?: boolean, isForcedSwitch?: boolean, isBatonPass?: boolean) => {
         // FIX: construir o event DENTRO do functional updater garante que `prev`
@@ -91,6 +92,13 @@ export const useTurnManager = ({
         };
 
         recordAction(player, type, data, shouldTerastallize, shouldMegaEvolve, isForcedSwitch, isBatonPass);
+
+        const resumeForcedSwitch = type === 'switch' ? forcedSwitchResolverRef.current : null;
+        if (resumeForcedSwitch) {
+            forcedSwitchResolverRef.current = null;
+            resumeForcedSwitch(act);
+            return;
+        }
 
         if (player === 1) {
             setP1Action(act);
@@ -360,9 +368,11 @@ export const useTurnManager = ({
     const resolveTurn = async () => {
         try {
             const coordinator = BattleCoordinator.runTurn(stateRef.current, p1Action!, p2Action!, configRef.current);
-            let switchPromptReceived = false;
+            let nextResult = coordinator.next();
 
-            for (const step of coordinator) {
+            while (true) {
+                if (nextResult.done === true) break;
+                const step = nextResult.value;
                 if (step.state) {
                     updateStateWithLogs(step.state, step.logs);
                 }
@@ -370,53 +380,42 @@ export const useTurnManager = ({
                 await TurnAnimator.processStep(step, uiActions);
 
                 if (step.phase === 'switch-forced' && step.switchPrompt) {
-                    switchPromptReceived = true;
                     const { player, isBatonPass, canCancel } = step.switchPrompt;
-                    
-                    if (player === 1) {
-                        if (configRef.current.p1AutoMode) {
-                            const currentState = step.state;
-                            const team = currentState.team1;
-                            const active = currentState.currentPokemon1;
-                            const healthy = team.filter(p => !p.isFainted && p.id !== active?.id);
-                            if (healthy.length > 0) {
-                                const next = healthy[0]; // Removed Math.random() to prevent PRNG desync
-                                recordAction(1, 'switch', next, undefined, undefined, !isBatonPass, isBatonPass);
-                                const sRes = BattleEngine.performSwitch(currentState, next, 1, configRef.current.weatherEnabled, isBatonPass);
-                                updateStateWithLogs(sRes.newState, sRes.logs);
-                                await new Promise(r => setTimeout(r, 1000));
-                            }
-                            setState(prev => ({...prev, waitingForAction: false}));
-                        } else {
-                            uiActions.setShowSwitchModal({ player: 1, canCancel, isBatonPass });
+                    const isAutomatic = player === 2 || configRef.current.p1AutoMode;
+                    const forcedSwitchAction = await new Promise<Action>(resolve => {
+                        forcedSwitchResolverRef.current = resolve;
+
+                        if (!isAutomatic) {
+                            uiActions.setShowSwitchModal({ player, canCancel, isBatonPass });
+                            return;
                         }
-                    } else {
+
                         const currentState = step.state;
-                        const team = currentState.team2;
-                        const active = currentState.currentPokemon2;
-                        const healthy = team.filter(p => !p.isFainted && p.id !== active?.id);
-                        if (healthy.length > 0) {
-                            const next = healthy[0]; // Removed Math.random() to prevent PRNG desync
-                            recordAction(2, 'switch', next, undefined, undefined, !isBatonPass, isBatonPass);
-                            const sRes = BattleEngine.performSwitch(currentState, next, 2, configRef.current.weatherEnabled, isBatonPass);
-                            updateStateWithLogs(sRes.newState, sRes.logs);
-                            await new Promise(r => setTimeout(r, 1000));
-                        }
-                        setState(prev => ({...prev, waitingForAction: false}));
-                    }
-                    break;
+                        const team = player === 1 ? currentState.team1 : currentState.team2;
+                        const active = player === 1 ? currentState.currentPokemon1 : currentState.currentPokemon2;
+                        const healthy = team.filter(p => !p.isFainted && p !== active);
+                        const next = healthy[0]; // Sem Math.random para preservar o PRNG do replay.
+                        if (next) handlePlayerAction(player, 'switch', next, !isBatonPass, isBatonPass);
+                    });
+
+                    uiActions.setShowSwitchModal(null);
+                    if (isAutomatic) await new Promise(r => setTimeout(r, 1000));
+                    nextResult = coordinator.next(forcedSwitchAction);
+                    continue;
                 }
-                else if (step.phase === 'faint-switch') {
-                     checkFaintedSwitch(step.state);
+
+                if (step.phase === 'faint-switch') {
+                    checkFaintedSwitch(step.state);
                 }
+                nextResult = coordinator.next();
             }
 
-            setP1Action(null); 
+            setP1Action(null);
             setP2Action(null);
-            uiActions.setIsTeraToggled(false); 
+            uiActions.setIsTeraToggled(false);
             uiActions.setIsMegaToggled(false); // Reset Mega Toggle
-            
-            if (!uiActions.showSwitchModal && !switchPromptReceived) {
+
+            if (!uiActions.showSwitchModal) {
                 setState(prev => ({...prev, waitingForAction: false}));
             }
         } catch (error) {

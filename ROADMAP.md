@@ -8,7 +8,7 @@
 - Mantenha `PROJECT_CONTEXT.md` atualizado a cada alteração.
 - Para economizar tokens: inspecione somente os arquivos da tarefa e suas dependências diretas, reutilize a baseline registrada, use testes focados durante a iteração e rode a suíte completa na validação final. Não refaça auditorias globais já concluídas.
 
-**Próximo item:** 2.2 — Unificar o fluxo de trocas, incluindo trocas forçadas.
+**Próximo item:** 2.3 — Guiar roteadores por registro e testar o wiring dos golpes marcados como implementados.
 
 ## Etapa 0 — Restaurar uma baseline confiável
 
@@ -88,7 +88,13 @@
   - `tests/integration/turnEndTicks.test.ts` adiciona 14 testes pelo coordenador público, cobrindo decremento/expiração, timing de Wish/Yawn, tick único, efeitos anteriores e identidade da reexportação.
   - Validação: 14/14 testes focados novos; suíte completa com 34 arquivos, 123 testes aprovados e 8 `it.todo` (131 registrados); `npm run lint`, `npm run build` e `git diff --check` aprovados. Todos os todos anteriores foram preservados.
   - Commit: informado no resumo final após o push verificado em `origin/main`.
-- [ ] **2.2 — Unificar o fluxo de trocas, incluindo trocas forçadas.**
+- [x] **2.2 — Unificar o fluxo de trocas, incluindo trocas forçadas.**
+  - `performSwitch` é o caminho compartilhado de saída, hazards, habilidades de entrada e clima; Roar/Whirlwind, Dragon Tail/Circle Throw e Red Card delegam suas transições a ele sem novos draws de PRNG.
+  - O generator do coordenador recebe a escolha da UI após `switch-forced`, aplica uma única troca e retoma as ações pendentes do mesmo turno; `useTurnManager` somente encaminha essa escolha. `turnEnd` e incremento ocorrem uma única vez, sem reiniciar o turno.
+  - Golpes de Pokémon que já saíram são eliminados da fila por identidade referencial e sinais de troca já consumidos não emitem prompt duplicado. Trocas voluntárias, Baton Pass, desmaio/`faint-switch`, vitória e identidade ativo/equipe permanecem cobertos.
+  - Os três `it.todo` de switching viraram testes em ciclos RED→GREEN; aliases, golpe adversário no substituto, entrada/hazards únicos e replay com mesma seed/ações também foram verificados.
+  - Validação: 2 arquivos focados, 18 testes aprovados e 2 `it.todo` de outros itens; suíte completa com 34 arquivos, 132 testes aprovados e 5 `it.todo` (137 registrados); `npm run lint`, `npm run build` e `git diff --check` aprovados.
+  - Commit: informado no resumo final após o push verificado em `origin/main`.
 - [ ] **2.3 — Guiar roteadores por registro e testar o wiring dos golpes marcados como implementados.**
 - [ ] **2.4 — Introduzir `instanceId` único, separado do ID da espécie.**
 - [ ] **2.5 — Definir estado transacional, evitando snapshots com objetos mutáveis compartilhados.**
@@ -113,8 +119,8 @@
 
 ## Registro resumido da baseline
 
-- Última suíte integral informada: **34 arquivos, 123 testes aprovados e 8 `it.todo`** (131 registrados); os todos são lacunas e não contam como cobertura aprovada.
+- Última suíte integral informada: **34 arquivos, 132 testes aprovados e 5 `it.todo`** (137 registrados); os todos são lacunas de outros itens e não contam como cobertura aprovada.
 - `npm run lint`, `npm run build` e `git diff --check`: aprovados.
 - Auditoria do item 0.5: **17 → 0** ocorrências no total e **6 → 0** em produção; instalação por `npm ci` reproduzida sem alterações nos manifestos.
-- SHA dos itens 1.1 a 1.7 e do item 2.1 informados somente no resumo final após o push; último SHA registrado no roadmap: `baae8a606c37495f30810e2c646dbb234c75ac86` (item 0.4).
+- SHA dos itens 1.1 a 1.7 e dos itens 2.1/2.2 informados somente nos respectivos resumos finais após o push; último SHA registrado no roadmap: `baae8a606c37495f30810e2c646dbb234c75ac86` (item 0.4).
 - Pendência não bloqueante: aviso de chunk acima de 500 kB, planejado no item 4.5.

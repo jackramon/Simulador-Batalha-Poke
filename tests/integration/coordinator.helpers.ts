@@ -16,6 +16,7 @@ interface RunCoordinatorTurnOptions {
   p1Action?: Action;
   p2Action?: Action;
   config: BattleConfig;
+  chooseForcedSwitch?: (step: TurnStepResult) => Action | undefined;
 }
 
 export const createBattleConfig = (overrides: Partial<BattleConfig> = {}): BattleConfig => ({
@@ -76,6 +77,7 @@ export const runCoordinatorTurn = ({
   p1Action,
   p2Action,
   config,
+  chooseForcedSwitch,
 }: RunCoordinatorTurnOptions): CompletedTurn => {
   const steps: TurnStepResult[] = [];
   const stateSnapshots: BattleState[] = [];
@@ -85,8 +87,8 @@ export const runCoordinatorTurn = ({
   try {
     const generator = BattleCoordinator.runTurn(initialState, p1Action, p2Action, config);
 
+    let next = generator.next();
     while (true) {
-      const next = generator.next();
       if (next.done === true) {
         completed = true;
         break;
@@ -96,6 +98,10 @@ export const runCoordinatorTurn = ({
       steps.push(step);
       // O motor reutiliza objetos entre yields; a cópia preserva o estado daquela fase.
       stateSnapshots.push(structuredClone(step.state));
+      const forcedSwitchAction = step.phase === 'switch-forced'
+        ? chooseForcedSwitch?.(step)
+        : undefined;
+      next = generator.next(forcedSwitchAction);
     }
 
     const finalState = steps[steps.length - 1]?.state;
