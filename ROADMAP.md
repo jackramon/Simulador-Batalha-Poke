@@ -8,7 +8,7 @@
 - Mantenha `PROJECT_CONTEXT.md` atualizado a cada alteração.
 - Para economizar tokens: inspecione somente os arquivos da tarefa e suas dependências diretas, reutilize a baseline registrada, use testes focados durante a iteração e rode a suíte completa na validação final. Não refaça auditorias globais já concluídas.
 
-**Próximo item:** 1.6 — Cobrir IA em P1/P2 e batalha espelho com a mesma espécie.
+**Próximo item:** 1.7 — Manter smoke tests automatizados de desenvolvimento e produção.
 
 ## Etapa 0 — Restaurar uma baseline confiável
 
@@ -67,7 +67,11 @@
   - Dois `it.todo` mantêm como lacunas, sem congelar defeitos em assertivas: replay com LLM executando IA local indevidamente (3.1) e identidade ativo/equipe quebrada no `ReplayPlayer` (3.3). Os três `it.todo` anteriores permanecem, e a integração/correção desses fluxos pertence a 3.1/3.3.
   - Validação: 5 testes focados aprovados e 2 `it.todo`; suíte completa com 31 arquivos, 106 testes aprovados e 5 `it.todo` (111 registrados); `npm run lint`, `npm run build` e `git diff --check` aprovados. Nenhuma regra de produção foi alterada.
   - Commit: informado no resumo final após o push verificado em `origin/main`.
-- [ ] **1.6 — Cobrir IA em P1/P2 e batalha espelho com a mesma espécie.**
+- [x] **1.6 — Cobrir IA em P1/P2 e batalha espelho com a mesma espécie.**
+  - `tests/integration/aiSidesAndMirror.test.ts` adiciona duas caracterizações sem alterar produção ou criar helpers: P2 escolhe um golpe com PP disponível, mantém `playerNum: 2` e usa seed explícita com restauração do PRNG em `finally`; a batalha espelho executa um golpe simples com a mesma espécie/ID nos dois lados e ações por `playerNum`, confirmando HP, PP, ativos e vencedor sem confusão.
+  - Um `it.todo` de 3.4 registra a escolha legal de P1 com `playerNum: 1`, alvo correto e avaliação para o próprio lado. Outros dois registram Tailwind/Tera/Mega/hazards/telas e IA/LLM em espelho, cuja correção depende do `instanceId` em 2.4 e da parametrização da IA em 3.4; nenhum comportamento incorreto foi aprovado.
+  - Validação: 2 testes focados aprovados e 3 `it.todo`; suíte completa com 32 arquivos, 108 testes aprovados e 8 `it.todo` (116 registrados), preservando os cinco todos anteriores; `npm run lint`, `npm run build` e `git diff --check` aprovados. Nenhuma regra de produção foi alterada.
+  - Commit: informado no resumo final após o push verificado em `origin/main`.
 - [ ] **1.7 — Manter smoke tests automatizados de desenvolvimento e produção.**
 
 ## Etapa 2 — Consolidar o núcleo
@@ -98,8 +102,8 @@
 
 ## Registro resumido da baseline
 
-- Última suíte integral informada: **31 arquivos, 106 testes aprovados e 5 `it.todo`** (111 registrados); os todos são lacunas e não contam como cobertura aprovada.
+- Última suíte integral informada: **32 arquivos, 108 testes aprovados e 8 `it.todo`** (116 registrados); os todos são lacunas e não contam como cobertura aprovada.
 - `npm run lint`, `npm run build` e `git diff --check`: aprovados.
 - Auditoria do item 0.5: **17 → 0** ocorrências no total e **6 → 0** em produção; instalação por `npm ci` reproduzida sem alterações nos manifestos.
-- SHA dos itens 1.1 a 1.5 informados somente no resumo final após o push; último SHA registrado no roadmap: `baae8a606c37495f30810e2c646dbb234c75ac86` (item 0.4).
+- SHA dos itens 1.1 a 1.6 informados somente no resumo final após o push; último SHA registrado no roadmap: `baae8a606c37495f30810e2c646dbb234c75ac86` (item 0.4).
 - Pendência não bloqueante: aviso de chunk acima de 500 kB, planejado no item 4.5.
