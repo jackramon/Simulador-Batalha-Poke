@@ -8,7 +8,7 @@
 - Mantenha `PROJECT_CONTEXT.md` atualizado a cada alteração.
 - Para economizar tokens: inspecione somente os arquivos da tarefa e suas dependências diretas, reutilize a baseline registrada, use testes focados durante a iteração e rode a suíte completa na validação final. Não refaça auditorias globais já concluídas.
 
-**Próximo item:** 1.4 — Cobrir trocas voluntárias, forçadas e por desmaio.
+**Próximo item:** 1.5 — Cobrir replay manual, IA local e LLM mockado.
 
 ## Etapa 0 — Restaurar uma baseline confiável
 
@@ -55,7 +55,12 @@
   - A ativação/wiring de Spikes/Stealth Rock/Sticky Web e Reflect/Light Screen, assim como ticks ainda ausentes de Wish, Yawn, Gravity e efeitos semelhantes, ficam explicitamente para 2.1/2.3 e não contam como cobertura aprovada nesta rodada.
   - Validação: 7/7 testes focados; suíte completa 29 arquivos e 97/97 testes; `npm run lint`, `npm run build` e `git diff --check` aprovados. Nenhuma regra do motor foi alterada.
   - Commit: informado no resumo final após o push verificado em `origin/main`.
-- [ ] **1.4 — Cobrir trocas voluntárias, forçadas e por desmaio.**
+- [x] **1.4 — Cobrir trocas voluntárias, forçadas e por desmaio.**
+  - `tests/integration/switching.test.ts` adiciona quatro caracterizações: reset de estágios/voláteis e identidade com a equipe na troca voluntária; dano e sinalização de U-turn; `game-over` com vencedor correto sem reserva; e `faint-switch` sem vencedor prematuro, com dados do reserva e entrada separada por `performSwitch` sobre cópia profunda.
+  - A cobertura de U-turn termina na sinalização atual de `switch-forced` e nos dados para a UI (`player`, `isBatonPass`, `canCancel`, estado e equipe). Ela **não certifica o fluxo oficial completo**: continuação após a escolha, processamento de ações pendentes/`turnEnd` e incremento do turno nesse fluxo permanecem lacunas.
+  - Três `it.todo` registram a continuação da troca forçada, suas ações pendentes/`turnEnd` e a unificação de Roar, Dragon Tail e Red Card prevista para 2.2; essas lacunas não contam como cobertura aprovada e não foram convertidas em comportamento desejado.
+  - Validação: 4 testes focados aprovados e 3 `it.todo`; suíte completa com 30 arquivos, 101 testes aprovados e 3 `it.todo` (104 registrados); `npm run lint`, `npm run build` e `git diff --check` aprovados. Nenhuma regra de produção foi alterada e nenhum helper novo foi necessário.
+  - Commit: informado no resumo final após o push verificado em `origin/main`.
 - [ ] **1.5 — Cobrir replay manual, IA local e LLM mockado.**
 - [ ] **1.6 — Cobrir IA em P1/P2 e batalha espelho com a mesma espécie.**
 - [ ] **1.7 — Manter smoke tests automatizados de desenvolvimento e produção.**
@@ -88,8 +93,8 @@
 
 ## Registro resumido da baseline
 
-- Última suíte integral informada: **29 arquivos e 97/97 testes aprovados**.
+- Última suíte integral informada: **30 arquivos, 101 testes aprovados e 3 `it.todo`** (104 registrados); os todos são lacunas e não contam como cobertura aprovada.
 - `npm run lint`, `npm run build` e `git diff --check`: aprovados.
 - Auditoria do item 0.5: **17 → 0** ocorrências no total e **6 → 0** em produção; instalação por `npm ci` reproduzida sem alterações nos manifestos.
-- SHA dos itens 1.1, 1.2 e 1.3 informados somente no resumo final após o push; último SHA registrado no roadmap: `baae8a606c37495f30810e2c646dbb234c75ac86` (item 0.4).
+- SHA dos itens 1.1 a 1.4 informados somente no resumo final após o push; último SHA registrado no roadmap: `baae8a606c37495f30810e2c646dbb234c75ac86` (item 0.4).
 - Pendência não bloqueante: aviso de chunk acima de 500 kB, planejado no item 4.5.
