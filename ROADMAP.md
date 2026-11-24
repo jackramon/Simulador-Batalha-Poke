@@ -8,7 +8,7 @@
 - Mantenha `PROJECT_CONTEXT.md` atualizado a cada alteração.
 - Para economizar tokens: inspecione somente os arquivos da tarefa e suas dependências diretas, reutilize a baseline registrada, use testes focados durante a iteração e rode a suíte completa na validação final. Não refaça auditorias globais já concluídas.
 
-**Próximo item:** 1.2 — Cobrir turno completo com golpe, troca, item e estados de campo.
+**Próximo item:** 1.3 — Cobrir hazards, telas e efeitos temporários, incluindo seus ticks.
 
 ## Etapa 0 — Restaurar uma baseline confiável
 
@@ -45,7 +45,11 @@
   - Testes novos em `tests/factories.test.ts`, em ciclos RED→GREEN por builder, cobrindo defaults válidos, overrides, independência de arrays/golpes/status/hazards/inventários, identidade referencial, determinismo e ausência de rede/`Math.random`/IndexedDB.
   - Validação: 7 arquivos e 32/32 testes focados; suíte completa 27 arquivos e 86/86 testes; `npm run lint`, `npm run build` e `git diff --check` aprovados. Nenhuma regra do motor foi alterada.
   - Commit: informado no resumo final após o push verificado em `origin/main`.
-- [ ] **1.2 — Cobrir turno completo com golpe, troca, item e estados de campo.**
+- [x] **1.2 — Cobrir turno completo com golpe, troca, item e estados de campo.**
+  - `tests/integration/coordinator.test.ts` cobre o coordenador público sem React, PokeAPI ou rede, com helpers focados em `tests/integration/coordinator.helpers.ts`: `runCoordinatorTurn` consome o generator até `done` com seed explícita e restauração do PRNG em `finally`, e preserva por cópia o estado de cada fase.
+  - Cenários: golpes dos dois lados; troca voluntária antes do golpe adversário; item de cura consumido do inventário e aplicado antes do dano; clima e terreno preservados com decremento das durações.
+  - Validação: 4/4 testes focados; suíte completa 28 arquivos e 90/90 testes; `npm run lint`, `npm run build` e `git diff --check` aprovados. Nenhuma regra do motor foi alterada e nenhum defeito fora do escopo foi encontrado.
+  - Commit: informado no resumo final após o push verificado em `origin/main`.
 - [ ] **1.3 — Cobrir hazards, telas e efeitos temporários, incluindo seus ticks.**
 - [ ] **1.4 — Cobrir trocas voluntárias, forçadas e por desmaio.**
 - [ ] **1.5 — Cobrir replay manual, IA local e LLM mockado.**
@@ -80,8 +84,8 @@
 
 ## Registro resumido da baseline
 
-- Última suíte integral informada: **27 arquivos e 86/86 testes aprovados**.
+- Última suíte integral informada: **28 arquivos e 90/90 testes aprovados**.
 - `npm run lint`, `npm run build` e `git diff --check`: aprovados.
 - Auditoria do item 0.5: **17 → 0** ocorrências no total e **6 → 0** em produção; instalação por `npm ci` reproduzida sem alterações nos manifestos.
-- SHA do item 1.1 informado somente no resumo final após o push; último SHA registrado no roadmap: `baae8a606c37495f30810e2c646dbb234c75ac86` (item 0.4).
+- SHA dos itens 1.1 e 1.2 informados somente no resumo final após o push; último SHA registrado no roadmap: `baae8a606c37495f30810e2c646dbb234c75ac86` (item 0.4).
 - Pendência não bloqueante: aviso de chunk acima de 500 kB, planejado no item 4.5.
