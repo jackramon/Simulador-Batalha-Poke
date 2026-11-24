@@ -8,7 +8,7 @@
 - Mantenha `PROJECT_CONTEXT.md` atualizado a cada alteração.
 - Para economizar tokens: inspecione somente os arquivos da tarefa e suas dependências diretas, reutilize a baseline registrada, use testes focados durante a iteração e rode a suíte completa na validação final. Não refaça auditorias globais já concluídas.
 
-**Próximo item:** 1.3 — Cobrir hazards, telas e efeitos temporários, incluindo seus ticks.
+**Próximo item:** 1.4 — Cobrir trocas voluntárias, forçadas e por desmaio.
 
 ## Etapa 0 — Restaurar uma baseline confiável
 
@@ -50,7 +50,11 @@
   - Cenários: golpes dos dois lados; troca voluntária antes do golpe adversário; item de cura consumido do inventário e aplicado antes do dano; clima e terreno preservados com decremento das durações.
   - Validação: 4/4 testes focados; suíte completa 28 arquivos e 90/90 testes; `npm run lint`, `npm run build` e `git diff --check` aprovados. Nenhuma regra do motor foi alterada e nenhum defeito fora do escopo foi encontrado.
   - Commit: informado no resumo final após o push verificado em `origin/main`.
-- [ ] **1.3 — Cobrir hazards, telas e efeitos temporários, incluindo seus ticks.**
+- [x] **1.3 — Cobrir hazards, telas e efeitos temporários, incluindo seus ticks.**
+  - `tests/integration/hazardsAndFieldEffects.test.ts` adiciona sete caracterizações sobre estados injetados pelas fixtures: dano de Stealth Rock/Spikes e efeitos de Toxic Spikes/Sticky Web na troca, imunidade de voador aos hazards de chão, redução de dano por Reflect/Light Screen já ativos, e ticks de telas, Safeguard, Mist, Tailwind, Trick Room e Mud Sport, com preservação e expiração.
+  - A ativação/wiring de Spikes/Stealth Rock/Sticky Web e Reflect/Light Screen, assim como ticks ainda ausentes de Wish, Yawn, Gravity e efeitos semelhantes, ficam explicitamente para 2.1/2.3 e não contam como cobertura aprovada nesta rodada.
+  - Validação: 7/7 testes focados; suíte completa 29 arquivos e 97/97 testes; `npm run lint`, `npm run build` e `git diff --check` aprovados. Nenhuma regra do motor foi alterada.
+  - Commit: informado no resumo final após o push verificado em `origin/main`.
 - [ ] **1.4 — Cobrir trocas voluntárias, forçadas e por desmaio.**
 - [ ] **1.5 — Cobrir replay manual, IA local e LLM mockado.**
 - [ ] **1.6 — Cobrir IA em P1/P2 e batalha espelho com a mesma espécie.**
@@ -84,8 +88,8 @@
 
 ## Registro resumido da baseline
 
-- Última suíte integral informada: **28 arquivos e 90/90 testes aprovados**.
+- Última suíte integral informada: **29 arquivos e 97/97 testes aprovados**.
 - `npm run lint`, `npm run build` e `git diff --check`: aprovados.
 - Auditoria do item 0.5: **17 → 0** ocorrências no total e **6 → 0** em produção; instalação por `npm ci` reproduzida sem alterações nos manifestos.
-- SHA dos itens 1.1 e 1.2 informados somente no resumo final após o push; último SHA registrado no roadmap: `baae8a606c37495f30810e2c646dbb234c75ac86` (item 0.4).
+- SHA dos itens 1.1, 1.2 e 1.3 informados somente no resumo final após o push; último SHA registrado no roadmap: `baae8a606c37495f30810e2c646dbb234c75ac86` (item 0.4).
 - Pendência não bloqueante: aviso de chunk acima de 500 kB, planejado no item 4.5.
