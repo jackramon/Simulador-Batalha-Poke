@@ -8,7 +8,7 @@
 - Mantenha `PROJECT_CONTEXT.md` atualizado a cada alteração.
 - Para economizar tokens: inspecione somente os arquivos da tarefa e suas dependências diretas, reutilize a baseline registrada, use testes focados durante a iteração e rode a suíte completa na validação final. Não refaça auditorias globais já concluídas.
 
-**Próximo item:** 1.7 — Manter smoke tests automatizados de desenvolvimento e produção.
+**Próximo item:** 2.1 — Manter um único `processTurnEnd` ativo e conectar os ticks existentes.
 
 ## Etapa 0 — Restaurar uma baseline confiável
 
@@ -38,7 +38,9 @@
   - Depois: 0 vulnerabilidades no total e 0 em produção, sem ocorrências residuais; `npm ci` reproduzível sem alterar os manifestos e `npm ls --all` sem problemas.
   - Validação: 6 arquivos e 21/21 testes focados do servidor/produção; 26 arquivos e 69/69 testes na suíte completa; lint, build e `git diff --check` aprovados.
 
-## Etapa 1 — Criar testes de caracterização antes da refatoração
+## Etapa 1 — Criar testes de caracterização antes da refatoração — **Concluída**
+
+**Status:** concluída em 24/11/2026 com o item 1.7.
 
 - [x] **1.1 — Criar fixtures locais de batalha, sem dependência da PokeAPI.**
   - `tests/factories.ts` passou a oferecer builders tipados de `Move`, `Pokemon`, `StatStages`, `SideHazards`, `BagItem`, `PlayerInventory` e `BattleState` completo, com defaults determinísticos, overrides explícitos, independência entre instâncias e ativo inicial idêntico a `team[0]` (ou `null` em time vazio); `createDummy` permanece como alias caracterizado e sem uso de `as any`.
@@ -72,7 +74,11 @@
   - Um `it.todo` de 3.4 registra a escolha legal de P1 com `playerNum: 1`, alvo correto e avaliação para o próprio lado. Outros dois registram Tailwind/Tera/Mega/hazards/telas e IA/LLM em espelho, cuja correção depende do `instanceId` em 2.4 e da parametrização da IA em 3.4; nenhum comportamento incorreto foi aprovado.
   - Validação: 2 testes focados aprovados e 3 `it.todo`; suíte completa com 32 arquivos, 108 testes aprovados e 8 `it.todo` (116 registrados), preservando os cinco todos anteriores; `npm run lint`, `npm run build` e `git diff --check` aprovados. Nenhuma regra de produção foi alterada.
   - Commit: informado no resumo final após o push verificado em `origin/main`.
-- [ ] **1.7 — Manter smoke tests automatizados de desenvolvimento e produção.**
+- [x] **1.7 — Manter smoke tests automatizados de desenvolvimento e produção.**
+  - `tests/server/development.test.ts` executa o `npm run dev` real em porta efêmera no loopback, com ambiente de segurança isolado e bloqueio de rede externa; polling HTTP com timeout confirma a SPA e `/@vite/client`, e `/api/llm-action` responde localmente sem provedor externo.
+  - O encerramento remove a árvore `cmd`/npm/tsx/node no Windows e o grupo de processos nas demais plataformas; polling de bind comprova a liberação da porta. O smoke de produção foi preservado sem alterações e nenhum helper compartilhado novo foi necessário.
+  - Validação: smokes de desenvolvimento e produção isolados com 1/1 teste cada; suíte completa com 33 arquivos, 109 testes aprovados e 8 `it.todo` (117 registrados), preservando todos os todos anteriores; `npm run lint`, `npm run build` e `git diff --check` aprovados. Nenhuma regra de produção foi alterada.
+  - Commit: informado no resumo final após o push verificado em `origin/main`.
 
 ## Etapa 2 — Consolidar o núcleo
 
@@ -102,8 +108,8 @@
 
 ## Registro resumido da baseline
 
-- Última suíte integral informada: **32 arquivos, 108 testes aprovados e 8 `it.todo`** (116 registrados); os todos são lacunas e não contam como cobertura aprovada.
+- Última suíte integral informada: **33 arquivos, 109 testes aprovados e 8 `it.todo`** (117 registrados); os todos são lacunas e não contam como cobertura aprovada.
 - `npm run lint`, `npm run build` e `git diff --check`: aprovados.
 - Auditoria do item 0.5: **17 → 0** ocorrências no total e **6 → 0** em produção; instalação por `npm ci` reproduzida sem alterações nos manifestos.
-- SHA dos itens 1.1 a 1.6 informados somente no resumo final após o push; último SHA registrado no roadmap: `baae8a606c37495f30810e2c646dbb234c75ac86` (item 0.4).
+- SHA dos itens 1.1 a 1.7 informados somente no resumo final após o push; último SHA registrado no roadmap: `baae8a606c37495f30810e2c646dbb234c75ac86` (item 0.4).
 - Pendência não bloqueante: aviso de chunk acima de 500 kB, planejado no item 4.5.
