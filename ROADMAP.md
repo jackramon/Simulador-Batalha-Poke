@@ -8,7 +8,7 @@
 - Mantenha `PROJECT_CONTEXT.md` atualizado a cada alteração.
 - Para economizar tokens: inspecione somente os arquivos da tarefa e suas dependências diretas, reutilize a baseline registrada, use testes focados durante a iteração e rode a suíte completa na validação final. Não refaça auditorias globais já concluídas.
 
-**Próximo item:** 2.1 — Manter um único `processTurnEnd` ativo e conectar os ticks existentes.
+**Próximo item:** 2.2 — Unificar o fluxo de trocas, incluindo trocas forçadas.
 
 ## Etapa 0 — Restaurar uma baseline confiável
 
@@ -82,7 +82,12 @@
 
 ## Etapa 2 — Consolidar o núcleo
 
-- [ ] **2.1 — Manter um único `processTurnEnd` ativo e conectar os ticks existentes.**
+- [x] **2.1 — Manter um único `processTurnEnd` ativo e conectar os ticks existentes.**
+  - `services/engine/turnEnd.ts` é a fonte única; `services/engine/handlers/turnEnd.ts` reexporta a mesma função para compatibilidade.
+  - Gravity, Water Sport, Wonder Room, Magic Room, Embargo, Laser Focus, Uproar, Ingrain, Curse, Wish e Yawn foram conectados sem alterar wiring de golpes, clima, terreno ou chamadas aleatórias dos caminhos já ativos.
+  - `tests/integration/turnEndTicks.test.ts` adiciona 14 testes pelo coordenador público, cobrindo decremento/expiração, timing de Wish/Yawn, tick único, efeitos anteriores e identidade da reexportação.
+  - Validação: 14/14 testes focados novos; suíte completa com 34 arquivos, 123 testes aprovados e 8 `it.todo` (131 registrados); `npm run lint`, `npm run build` e `git diff --check` aprovados. Todos os todos anteriores foram preservados.
+  - Commit: informado no resumo final após o push verificado em `origin/main`.
 - [ ] **2.2 — Unificar o fluxo de trocas, incluindo trocas forçadas.**
 - [ ] **2.3 — Guiar roteadores por registro e testar o wiring dos golpes marcados como implementados.**
 - [ ] **2.4 — Introduzir `instanceId` único, separado do ID da espécie.**
@@ -108,8 +113,8 @@
 
 ## Registro resumido da baseline
 
-- Última suíte integral informada: **33 arquivos, 109 testes aprovados e 8 `it.todo`** (117 registrados); os todos são lacunas e não contam como cobertura aprovada.
+- Última suíte integral informada: **34 arquivos, 123 testes aprovados e 8 `it.todo`** (131 registrados); os todos são lacunas e não contam como cobertura aprovada.
 - `npm run lint`, `npm run build` e `git diff --check`: aprovados.
 - Auditoria do item 0.5: **17 → 0** ocorrências no total e **6 → 0** em produção; instalação por `npm ci` reproduzida sem alterações nos manifestos.
-- SHA dos itens 1.1 a 1.7 informados somente no resumo final após o push; último SHA registrado no roadmap: `baae8a606c37495f30810e2c646dbb234c75ac86` (item 0.4).
+- SHA dos itens 1.1 a 1.7 e do item 2.1 informados somente no resumo final após o push; último SHA registrado no roadmap: `baae8a606c37495f30810e2c646dbb234c75ac86` (item 0.4).
 - Pendência não bloqueante: aviso de chunk acima de 500 kB, planejado no item 4.5.

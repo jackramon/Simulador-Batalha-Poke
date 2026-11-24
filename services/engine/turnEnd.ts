@@ -5,6 +5,12 @@ import { BATTLE_MESSAGES } from '../../data/battleMessages';
 import * as Effects from '../effectHandlers';
 import { log } from './utils';
 import * as Forecast from './handlers/abilities/forecast';
+import * as Klutz from './handlers/abilities/klutz';
+import * as Embargo from './handlers/moves/embargo';
+import * as LaserFocus from './handlers/moves/laserFocus';
+import * as Uproar from './handlers/moves/uproar';
+import * as Wish from './handlers/moves/wish';
+import * as Yawn from './handlers/moves/yawn';
 
 function processSideHazards(hazards: SideHazards, logs: LogEntry[], sideName: string) {
     // Decrementa Reflect
@@ -69,6 +75,41 @@ export function processTurnEnd(currentState: BattleState, config: BattleConfig):
       state.mudSportTurns--;
       if (state.mudSportTurns <= 0) {
           log(logs, `Os efeitos de Esporte de Lama desapareceram.`, 'text-gray-500 italic');
+      }
+  }
+
+  // Decrementa Esporte de Água (Water Sport)
+  if (state.waterSportTurns > 0) {
+      state.waterSportTurns--;
+      if (state.waterSportTurns <= 0) {
+          log(logs, `Os efeitos de Esporte de Água desapareceram.`, 'text-gray-500 italic');
+      }
+  }
+
+  // Decrementa Gravidade (Gravity)
+  if (state.gravity) {
+      state.gravityTurns--;
+      if (state.gravityTurns <= 0) {
+          state.gravity = false;
+          log(logs, `A gravidade voltou ao normal!`, 'text-purple-600 font-bold italic');
+      }
+  }
+
+  // Decrementa Sala Maravilhosa (Wonder Room)
+  if (state.wonderRoomActive) {
+      state.wonderRoomTurns--;
+      if (state.wonderRoomTurns <= 0) {
+          state.wonderRoomActive = false;
+          log(logs, BATTLE_MESSAGES.WONDER_ROOM_END(), 'text-purple-700 font-bold italic');
+      }
+  }
+
+  // Decrementa Sala Mágica (Magic Room)
+  if (state.magicRoomActive) {
+      state.magicRoomTurns--;
+      if (state.magicRoomTurns <= 0) {
+          state.magicRoomActive = false;
+          log(logs, BATTLE_MESSAGES.MAGIC_ROOM_END(), 'text-purple-700 font-bold italic');
       }
   }
 
@@ -205,12 +246,45 @@ export function processTurnEnd(currentState: BattleState, config: BattleConfig):
         delete p.statusEffects['avalanche-tracker'];
         delete p.statusEffects['physical-damage-taken'];
         delete p.statusEffects['special-damage-taken'];
+
+        Embargo.handleEmbargoTurnEnd(p, logs);
+        LaserFocus.handleLaserFocusTurnEnd(p);
+        Uproar.handleUproarTurnEnd(p, logs);
+        Wish.handleWishEnd(p, logs);
+        Yawn.handleYawnTurnEnd(p, logs, state);
         
         if (!p.isFainted) p.turnsActive++;
     }
   });
 
   Effects.processTurnEndEffects(allActive, state.weather, config.weatherEnabled, logs, state);
+
+  // Enraizar e Maldição são processados após os efeitos padrão, preservando a ordem das mensagens.
+  allActive.forEach(p => {
+    if (p && !p.isFainted) {
+      if (p.statusEffects['ingrain'] && p.hp < p.maxHP) {
+        let healAmount = Math.floor(p.maxHP / 16) || 1;
+
+        if (p.heldItem === 'big-root' && !Klutz.isItemSuppressed(p, state)) {
+          healAmount = Math.floor(healAmount * 1.3);
+        }
+
+        p.hp = Math.min(p.maxHP, p.hp + healAmount);
+        log(logs, `${p.name} absorveu nutrientes com suas raízes!`, 'text-green-600 font-bold italic');
+      }
+
+      if (p.statusEffects['curse'] && p.ability !== 'magic-guard') {
+        const dmg = Math.floor(p.maxHP / 4) || 1;
+        p.hp = Math.max(0, p.hp - dmg);
+        log(logs, `${p.name} sofreu com a maldição!`, 'text-purple-800 font-bold italic');
+
+        if (p.hp === 0) {
+          p.isFainted = true;
+          log(logs, BATTLE_MESSAGES.FAINTED(p.name), 'text-red-900 font-bold');
+        }
+      }
+    }
+  });
 
   state.turn++;
 
