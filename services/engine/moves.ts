@@ -125,6 +125,19 @@ function executeMoveDraft(
   const logs: LogEntry[] = [];
   let state = currentState;
 
+  // Nenhuma ação nova pode atingir ou partir de um Pokémon já desmaiado.
+  if (attacker.isFainted || defender.isFainted) {
+      return {
+          newState: state,
+          logs,
+          fainted: attacker.isFainted || defender.isFainted,
+          switchRequested: false,
+          defenderSwitchRequested: false,
+          isBatonPass: false,
+          damageDealt: false,
+      };
+  }
+
   // --- MEGA EVOLUTION LOGIC (JIT Fallback) ---
   if (shouldMegaEvolve && config.megaEvolutionEnabled && !attacker.isMega && !attacker.isTerastallized) {
       const isP1 = getPokemonPlayerNum(state, attacker) === 1;
@@ -216,7 +229,7 @@ function executeMoveDraft(
 
   // 1. Executa Validações Pré-Movimento
   const validation = validateMoveExecution(
-      state, attacker, defender, move, config, defenderAction, isDancerTriggered, shouldTerastallize, isSleepTalkTriggered
+      state, attacker, defender, move, config, defenderAction, isDancerTriggered, shouldTerastallize && !shouldMegaEvolve, isSleepTalkTriggered
   );
 
   // CRITICAL FIX: Propagate state changes (Tera usage, PP deduction, Protect counters)

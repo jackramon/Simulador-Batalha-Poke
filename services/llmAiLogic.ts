@@ -28,6 +28,15 @@ function extractJson(text: string): any {
     throw new Error('Could not parse valid JSON from the LLM response: ' + text);
 }
 
+const resolveTransformationFlags = (action: any, attacker: Pokemon) => {
+    const shouldMegaEvolve = !!action.shouldMegaEvolve && !attacker.isMega && !attacker.isTerastallized;
+    const shouldTerastallize = !!action.shouldTerastallize
+        && !shouldMegaEvolve
+        && !attacker.isMega
+        && !attacker.isTerastallized;
+    return { shouldTerastallize, shouldMegaEvolve };
+};
+
 export async function decideLLMAction(
     attacker: Pokemon,
     defender: Pokemon,
@@ -117,8 +126,7 @@ Escolha a melhor ação para vencer a batalha.
                     user: attacker,
                     playerNum,
                     priority: move.priority || 0,
-                    shouldTerastallize: !!action.shouldTerastallize,
-                    shouldMegaEvolve: !!action.shouldMegaEvolve
+                    ...resolveTransformationFlags(action, attacker)
                 };
             }
             
@@ -131,8 +139,7 @@ Escolha a melhor ação para vencer a batalha.
                     user: attacker,
                     playerNum,
                     priority: fallbackMove.priority || 0,
-                    shouldTerastallize: !!action.shouldTerastallize,
-                    shouldMegaEvolve: !!action.shouldMegaEvolve
+                    ...resolveTransformationFlags(action, attacker)
                 };
             }
         } else if (action.type === 'switch' && action.data) {

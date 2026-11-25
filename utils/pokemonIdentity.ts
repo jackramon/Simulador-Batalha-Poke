@@ -58,3 +58,19 @@ export const resolvePokemonTarget = (
   const speciesMatches = team.filter(pokemon => pokemon.id === speciesId);
   return speciesMatches.length === 1 ? speciesMatches[0] : undefined;
 };
+
+export const restoreActivePokemonIdentity = (state: BattleState): BattleState => {
+  const resolveActive = (active: Pokemon | null, team: Pokemon[]): Pokemon | null => {
+    if (!active) return null;
+    return resolvePokemonTarget(team, active.instanceId, active.id) ?? active;
+  };
+
+  const currentPokemon1 = resolveActive(state.currentPokemon1, state.team1);
+  const currentPokemon2 = resolveActive(state.currentPokemon2, state.team2);
+  if (currentPokemon1 === state.currentPokemon1 && currentPokemon2 === state.currentPokemon2) {
+    return state;
+  }
+
+  // Reconecta clones de persistência/hidratação ao objeto canônico da equipe.
+  return { ...state, currentPokemon1, currentPokemon2 };
+};

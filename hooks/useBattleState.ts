@@ -6,7 +6,7 @@ import { ITEMS_DATA, POKEMON_TO_MEGA_STONES, MEGA_STONES } from '../data/items';
 import * as Effects from '../services/effectHandlers';
 import { enableDeterministicRandom, disableDeterministicRandom } from '../utils/prng';
 import { removerItem } from '../utils/safeStorage';
-import { isSamePokemonInstance, normalizeBattleTeams } from '../utils/pokemonIdentity';
+import { isSamePokemonInstance, normalizeBattleTeams, restoreActivePokemonIdentity } from '../utils/pokemonIdentity';
 
 const KEY_BATTLE_STATE = 'poke_sim_battle_state';
 const KEY_BATTLE_CONFIG = 'poke_sim_battle_config';
@@ -105,7 +105,7 @@ export const useBattleState = () => {
                       // FIX: Force waitingForAction to false to prevent "stuck" state if app crashed during processing
                       parsedState.waitingForAction = false;
 
-                      setState(parsedState);
+                      setState(restoreActivePokemonIdentity(parsedState));
                       window.dispatchEvent(new CustomEvent('show-toast', { detail: "🔄 Batalha anterior restaurada!" }));
                   }
               }
@@ -241,16 +241,13 @@ export const useBattleState = () => {
 
                               const newTeam1 = prev.team1.map(updateProfile);
                               const newTeam2 = prev.team2.map(updateProfile);
-                              const newActive1 = isSamePokemonInstance(prev.currentPokemon1, p) ? updateProfile(prev.currentPokemon1) : prev.currentPokemon1;
-                              const newActive2 = isSamePokemonInstance(prev.currentPokemon2, p) ? updateProfile(prev.currentPokemon2) : prev.currentPokemon2;
 
-                              return {
+                              // O ativo precisa continuar sendo a mesma referência da equipe atualizada.
+                              return restoreActivePokemonIdentity({
                                   ...prev,
                                   team1: newTeam1,
-                                  team2: newTeam2,
-                                  currentPokemon1: newActive1,
-                                  currentPokemon2: newActive2
-                              };
+                                  team2: newTeam2
+                              });
                           });
                       })
                       .catch(e => {
@@ -274,16 +271,12 @@ export const useBattleState = () => {
 
                   const newTeam1 = prev.team1.map(removeProfile);
                   const newTeam2 = prev.team2.map(removeProfile);
-                  const newActive1 = isSamePokemonInstance(prev.currentPokemon1, p) ? removeProfile(prev.currentPokemon1) : prev.currentPokemon1;
-                  const newActive2 = isSamePokemonInstance(prev.currentPokemon2, p) ? removeProfile(prev.currentPokemon2) : prev.currentPokemon2;
 
-                  return {
+                  return restoreActivePokemonIdentity({
                       ...prev,
                       team1: newTeam1,
-                      team2: newTeam2,
-                      currentPokemon1: newActive1,
-                      currentPokemon2: newActive2
-                  };
+                      team2: newTeam2
+                  });
               });
           }
       });

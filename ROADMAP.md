@@ -115,6 +115,12 @@
   - Cinco fronteiras seguiram RED→GREEN, com uma prova adicional para `movedThisTurn` do segundo usuário. Sete testes novos cobrem entradas profundamente congeladas, HP/PP, equipes/status/hazards, snapshots, identidade, ausência de aliases, replay duplo com a mesma seed/ações e contagens fixas de 4/4/2 draws nos cenários de espelho/U-turn/Baton Pass. Baton Pass, desmaio, vitória e os três `it.todo` anteriores foram preservados.
   - Validação: 7/7 testes focados novos; suíte completa com 40 arquivos, 166 testes aprovados e 3 `it.todo` (169 registrados); `npm run lint`, `npm run build` e `git diff --check` aprovados. O primeiro smoke integral de produção sofreu timeout sob contenção, passou isolado e a repetição integral ficou verde; permanece o aviso preexistente de chunk acima de 500 kB.
   - Dependência fora do escopo registrada para 3.4/3.5: a avaliação ótima da IA local deverá consumir explicitamente os estados transacionais retornados. A IA e o ReplayPlayer não foram editados; a caracterização existente de IA mantém legalidade, lado, PP e determinismo sem fixar a escolha do golpe de maior poder.
+- [x] **Hotfix prioritário antes de 2.6 — Corrigir identidade da Mega, impedir Mega+Tera e restaurar o pós-KO.**
+  - Causa raiz reproduzida: a hidratação de `megaProfile` separava `currentPokemon` de `team[i]`; a reidratação transacional operava na equipe enquanto o snapshot do ativo ficava base/desatualizado. A restauração de identidade agora ocorre na hidratação, na persistência e na fronteira transacional.
+  - Nome, sprites, tipos, stats, habilidade, HP e `isFainted` da Mega chegam ao mesmo objeto canônico consumido pelo card/cena. Mega tem precedência quando chega com Tera; Tera não é consumida, estados já transformados são respeitados e o LLM tem suas flags normalizadas. A guarda da IA local foi preservada.
+  - Ações com atacante/alvo desmaiado são recusadas sem PP, dano ou logs. O gerenciador aguarda a troca pós-KO; com reserva há um único `faint-switch` e entrada do substituto, e sem reserva há `game-over`. `instanceId`, PRNG, snapshots e replay determinístico permanecem cobertos.
+  - RED inicial: 8 falhas e 4 caracterizações; após a correção: 12/12 testes novos. Suítes relacionadas: 32 aprovados e 2 todos antigos. Suíte completa: 41 arquivos, 178 aprovados e 3 todos antigos (181 registrados); `npm run lint`, `npm run build` e `git diff --check` aprovados. Nenhum `it.todo` novo.
+  - Smoke real no navegador com fixture local: `Mega Swampert` e sprite MEGA no card com 48/176 HP; após o segundo turno, `Lucario` 300/300, um desmaio da Mega, uma troca, nenhum dano 0/desmaio repetido, nenhum erro de console e porta do servidor liberada. Permanece somente o aviso preexistente de chunk acima de 500 kB.
 - [ ] **2.6 — Substituir o PRNG global por contexto explícito com snapshot/restore para simulações.**
 
 ## Etapa 3 — Refazer replay e simulação da IA sobre a base consolidada
@@ -137,7 +143,7 @@
 
 ## Registro resumido da baseline
 
-- Última suíte integral informada: **40 arquivos, 166 testes aprovados e 3 `it.todo`** (169 registrados); os todos são lacunas de outros itens e não contam como cobertura aprovada.
+- Última suíte integral informada: **41 arquivos, 178 testes aprovados e 3 `it.todo`** (181 registrados); os todos são lacunas de outros itens e não contam como cobertura aprovada.
 - `npm run lint`, `npm run build` e `git diff --check`: aprovados.
 - Auditoria do item 0.5: **17 → 0** ocorrências no total e **6 → 0** em produção; instalação por `npm ci` reproduzida sem alterações nos manifestos.
 - SHA dos itens 1.1 a 1.7 e dos itens 2.1/2.2/2.3/2.4/2.5 informados somente nos respectivos resumos finais após o push; último SHA registrado no roadmap: `baae8a606c37495f30810e2c646dbb234c75ac86` (item 0.4).

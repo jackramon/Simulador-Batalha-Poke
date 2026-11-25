@@ -95,7 +95,7 @@ export function validateMoveExecution(
     }
 
     // --- LÓGICA DE TERASTALIZAÇÃO ---
-    if (shouldTerastallize && config.terastallizationEnabled && !attacker.isTerastallized) {
+    if (shouldTerastallize && config.terastallizationEnabled && !attacker.isTerastallized && !attacker.isMega) {
         const isP1 = getPokemonPlayerNum(state, attacker) === 1;
         const canTera = isP1 ? !state.p1TeraUsed : !state.p2TeraUsed;
 

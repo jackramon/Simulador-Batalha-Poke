@@ -1,8 +1,9 @@
 import type { Action, BattleState, Move, Pokemon } from '../../types';
-import { resolvePokemonTarget } from '../../utils/pokemonIdentity';
+import { resolvePokemonTarget, restoreActivePokemonIdentity } from '../../utils/pokemonIdentity';
 
-// structuredClone preserva a identidade interna entre o ativo e sua entrada na equipe.
-export const cloneBattleState = (state: BattleState): BattleState => structuredClone(state);
+// structuredClone preserva aliases válidos; a restauração repara estados externos já separados.
+export const cloneBattleState = (state: BattleState): BattleState =>
+  restoreActivePokemonIdentity(structuredClone(state));
 
 export interface BattleDraft {
   state: BattleState;

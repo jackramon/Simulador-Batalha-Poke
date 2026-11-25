@@ -391,7 +391,7 @@ export const useTurnManager = ({
                 }
 
                 if (step.phase === 'faint-switch') {
-                    checkFaintedSwitch(step.state);
+                    await checkFaintedSwitch(step.state);
                 }
                 nextResult = coordinator.next();
             }
