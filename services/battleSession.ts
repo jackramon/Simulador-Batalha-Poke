@@ -19,6 +19,7 @@ export class BattleSession {
   private currentSessionId = 0;
   private resolutionSequence = 0;
   private resolution: TurnResolutionToken | null = null;
+  private terminalResolution: TurnResolutionToken | null = null;
   private active = true;
   private abortController = new AbortController();
   private timers = new Set<TrackedTimer>();
@@ -83,6 +84,18 @@ export class BattleSession {
       : this.resolutionSequence === token.resolutionId;
   }
 
+  authorizeTerminalResolution(token: TurnResolutionToken): boolean {
+    if (!this.isResolutionCurrent(token) || this.terminalResolution) return false;
+    this.terminalResolution = token;
+    return true;
+  }
+
+  canCommitTerminalResolution(token: TurnResolutionToken): boolean {
+    return this.ownsSnapshot(token.sessionId)
+      && this.terminalResolution?.sessionId === token.sessionId
+      && this.terminalResolution.resolutionId === token.resolutionId;
+  }
+
   finishResolution(token: TurnResolutionToken): void {
     if (this.resolution?.sessionId === token.sessionId
       && this.resolution.resolutionId === token.resolutionId) {
@@ -132,6 +145,7 @@ export class BattleSession {
 
   private cancelContinuations(reason: InvalidationReason): void {
     this.resolution = null;
+    if (reason === 'invalidate') this.terminalResolution = null;
     this.abortController.abort();
     this.abortController = new AbortController();
     const timers = [...this.timers];

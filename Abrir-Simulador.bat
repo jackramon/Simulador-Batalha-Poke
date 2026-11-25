@@ -2,6 +2,7 @@
 setlocal EnableExtensions DisableDelayedExpansion
 cd /d "%~dp0"
 title Abrir Pokemon Battle Simulator
+set "NODE_ENV=development"
 
 rem Porta padrao; uma porta inicial diferente pode ser passada como argumento.
 set "PORT=3000"
@@ -22,7 +23,7 @@ if "%PORT%"=="3000" (
     if not errorlevel 1 goto open_existing
 )
 
-rem Reinstala dependencias apenas quando o hash do package-lock mudar.
+rem Reinstala quando o lockfile muda ou a instalacao esta incompleta.
 set "LOCK_HASH="
 for /f "usebackq delims=" %%H in (`powershell -NoProfile -ExecutionPolicy Bypass -Command "(Get-FileHash -Algorithm SHA256 -LiteralPath 'package-lock.json').Hash"`) do set "LOCK_HASH=%%H"
 if not defined LOCK_HASH goto hash_error
@@ -32,13 +33,21 @@ set "INSTALLED_HASH="
 if exist "%HASH_FILE%" set /p INSTALLED_HASH=<"%HASH_FILE%"
 if not exist "node_modules" goto install_dependencies
 if /i not "%LOCK_HASH%"=="%INSTALLED_HASH%" goto install_dependencies
+call npm ls --depth=0 --include=dev >nul 2>nul
+if errorlevel 1 goto install_dependencies
+if not exist "node_modules\.bin\tsx.cmd" goto install_dependencies
+if not exist "node_modules\.bin\vite.cmd" goto install_dependencies
 goto choose_port
 
 :install_dependencies
 echo Instalando ou atualizando dependencias. Aguarde...
-call npm ci --no-audit --no-fund
+call npm install --include=dev --no-audit --no-fund
 if errorlevel 1 goto install_error
 > "%HASH_FILE%" echo %LOCK_HASH%
+call npm ls --depth=0 --include=dev >nul 2>nul
+if errorlevel 1 goto dependencies_incomplete
+if not exist "node_modules\.bin\tsx.cmd" goto dependencies_incomplete
+if not exist "node_modules\.bin\vite.cmd" goto dependencies_incomplete
 
 :choose_port
 netstat -ano | findstr /R /C:":%PORT% .*LISTENING" >nul
@@ -90,6 +99,11 @@ goto fatal_error
 
 :install_error
 echo Falha ao instalar as dependencias. Veja os erros acima.
+goto fatal_error
+
+:dependencies_incomplete
+echo A instalacao terminou sem tsx/Vite ou com dependencias ausentes.
+echo Execute npm install --include=dev nesta pasta para diagnosticar o problema.
 goto fatal_error
 
 :no_port

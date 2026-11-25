@@ -128,6 +128,11 @@
   - O updater React pode rodar depois do `finally`; por isso `canCommitResolution` distingue resolução ativa de dono do último commit, evitando tanto escrita tardia quanto perda do commit final (`waitingForAction` preso).
   - RED→GREEN cobriu escrita tardia após KO residual, IA antiga sem alterar seed/estado, duplicidade por chegada de ação durante Emergency Exit, turno 25 único, clima não expirado duas vezes, Nickit sem registrar desmaio de Lilligant e desmaiado que não retorna. Testes focados: 6/6. Suíte completa: 43 arquivos, 184 aprovados e 3 `it.todo` antigos (187 registrados); lint, build e `git diff --check` aprovados; nenhum `it.todo` novo.
   - Smoke no preview de produção: fixture do turno 25, Poção em Slugma, IA usando Tempestade de Folhas, Emergency Exit manual para Nickit, turno 26 com um início/uma ação/um `turnEnd`, clima 1 e `waitingForAction: false`; fuga e segunda batalha iniciada no turno 1, sem erros de console e com portas liberadas. Permanece somente o aviso preexistente de chunk acima de 500 kB.
+- [x] **Hotfix prioritário antes de 2.6 — Entregar o commit terminal após `game-over`.**
+  - Causa raiz reproduzida no `App`: `updateStateWithLogs` recebia o passo terminal, mas `terminate()` podia invalidar a resolução antes da execução do updater React; `canCommitResolution` descartava `winner`/encerramento e deixava a UI processando.
+  - `BattleSession` reserva uma única entrega terminal antes do encerramento e a aceita após `finishResolution()` sem liberar commits comuns; invalidar/iniciar sessão revoga a reserva e bloqueia escritas antigas. Dano, PRNG, U-turn, Emergency Exit, Mega e faint-switch não foram alterados.
+  - RED→GREEN na fronteira coordinator → `useTurnManager` → React/`localStorage`: 6 testes de UI cobrem vitória de ambos os lados, KO residual, empate, commit único, ausência de ações pós-terminal e nova batalha; 2 testes adicionais cobrem concessão/revogação. Suítes relacionadas: 43/43; suíte completa: 45 arquivos, 192 aprovados e 3 `it.todo` antigos (195 registrados), sem novos todos; lint, build e `git diff --check` aprovados.
+  - Smoke real de produção com Nidoking em 1 HP e sem reservas: Folhagem causou o KO, a vitória substituiu “Processando combate...”, Nova Batalha/Exportar Replay ficaram disponíveis e não houve erros de console. Outra batalha começou limpa no turno 1 com 300/1 HP, sem restaurar o resultado anterior; porta liberada. O launcher previamente validado integra o mesmo commit.
 - [ ] **2.6 — Substituir o PRNG global por contexto explícito com snapshot/restore para simulações.**
 
 ## Etapa 3 — Refazer replay e simulação da IA sobre a base consolidada
@@ -150,7 +155,7 @@
 
 ## Registro resumido da baseline
 
-- Última suíte integral informada: **41 arquivos, 178 testes aprovados e 3 `it.todo`** (181 registrados); os todos são lacunas de outros itens e não contam como cobertura aprovada.
+- Última suíte integral informada: **45 arquivos, 192 testes aprovados e 3 `it.todo`** (195 registrados); os todos são lacunas de outros itens e não contam como cobertura aprovada.
 - `npm run lint`, `npm run build` e `git diff --check`: aprovados.
 - Auditoria do item 0.5: **17 → 0** ocorrências no total e **6 → 0** em produção; instalação por `npm ci` reproduzida sem alterações nos manifestos.
 - SHA dos itens 1.1 a 1.7 e dos itens 2.1/2.2/2.3/2.4/2.5 informados somente nos respectivos resumos finais após o push; último SHA registrado no roadmap: `baae8a606c37495f30810e2c646dbb234c75ac86` (item 0.4).

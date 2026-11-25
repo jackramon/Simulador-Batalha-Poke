@@ -296,13 +296,19 @@ export const useBattleState = () => {
 
   const sessionId = battleSession.sessionId;
   const updateStateWithLogs = (newState: BattleState, logs: any[], resolution?: TurnResolutionToken) => {
+      const isTerminal = !newState.isBattleInProgress && newState.winner !== null;
       const canWrite = () => resolution
           ? battleSession.isResolutionCurrent(resolution)
           : battleSession.isCurrent(sessionId);
-      const canCommit = () => resolution
-          ? battleSession.canCommitResolution(resolution)
-          : battleSession.isCurrent(sessionId);
+      const canCommit = () => {
+          if (!resolution) return battleSession.isCurrent(sessionId);
+          return isTerminal
+              ? battleSession.canCommitTerminalResolution(resolution)
+              : battleSession.canCommitResolution(resolution);
+      };
       if (!canWrite()) return;
+      // Reserva uma única entrega terminal antes do terminate; a invalidação troca a sessão e a revoga.
+      if (isTerminal && resolution && !battleSession.authorizeTerminalResolution(resolution)) return;
       setState(prev => canCommit()
           ? { ...newState, logs: [...prev.logs, ...logs] }
           : prev);
