@@ -56,8 +56,10 @@ describe('identidade única das instâncias de Pokémon', () => {
 
     const result = performSwitch(state, reserve, 1, false);
 
-    expect(result.newState.currentPokemon1).toBe(reserve);
+    expect(result.newState.currentPokemon1).toBe(result.newState.team1[1]);
+    expect(result.newState.currentPokemon1).not.toBe(reserve);
     expect(result.newState.currentPokemon1?.instanceId).toBe(reserveInstanceId);
+    expect(reserve.instanceId).toBe(reserveInstanceId);
     expect(result.newState.team1[0].instanceId).toBe('p1-slot-0');
     expect(result.newState.team1[1].instanceId).toBe(reserveInstanceId);
     expect(result.newState.currentPokemon2?.instanceId).toBe('p2-slot-0');

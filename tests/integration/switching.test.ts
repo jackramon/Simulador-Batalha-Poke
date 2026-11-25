@@ -57,14 +57,19 @@ describe('integração das trocas voluntárias, forçadas e por desmaio', () => 
     });
 
     expect(result.completed).toBe(true);
-    expect(result.finalState.currentPokemon1).toBe(reserve);
     expect(result.finalState.currentPokemon1).toBe(result.finalState.team1[1]);
-    expect(result.finalState.team1[0]).toBe(outgoing);
-    expect(outgoing.statStages).toEqual(createStatStages());
-    expect(outgoing.statusEffects.confusion).toBeUndefined();
-    expect(outgoing.statusEffects.encore).toBeUndefined();
-    expect(outgoing.statusEffects.toxic).toEqual({ turns: 0 });
-    expect(outgoing.isFlinched).toBe(false);
+    expect(result.finalState.currentPokemon1).not.toBe(reserve);
+    expect(result.finalState.team1[0]).not.toBe(outgoing);
+    expect(result.finalState.team1[0].statStages).toEqual(createStatStages());
+    expect(result.finalState.team1[0].statusEffects.confusion).toBeUndefined();
+    expect(result.finalState.team1[0].statusEffects.encore).toBeUndefined();
+    expect(result.finalState.team1[0].statusEffects.toxic).toEqual({ turns: 0 });
+    expect(result.finalState.team1[0].isFlinched).toBe(false);
+    expect(outgoing.statStages.attack).toBe(3);
+    expect(outgoing.statusEffects.confusion).toEqual({ turns: 2, isVolatile: true });
+    expect(outgoing.statusEffects.encore).toEqual({ turns: 3, moveName: 'tackle' });
+    expect(outgoing.statusEffects.toxic).toEqual({ turns: 4 });
+    expect(outgoing.isFlinched).toBe(true);
     expect(fetchMock).not.toHaveBeenCalled();
   });
 
@@ -105,16 +110,18 @@ describe('integração das trocas voluntárias, forçadas e por desmaio', () => 
       actionType: 'move',
       damageDealt: true,
     });
-    expect(defender.hp).toBeLessThan(500);
-    expect(defender.hp).toBeGreaterThan(0);
+    expect(defender.hp).toBe(500);
+    expect(actionStep?.state.currentPokemon2?.hp).toBeLessThan(500);
+    expect(actionStep?.state.currentPokemon2?.hp).toBeGreaterThan(0);
     expect(forcedStep?.switchPrompt).toEqual({
       player: 1,
       isBatonPass: false,
       canCancel: false,
     });
-    expect(forcedStep?.state.currentPokemon1).toBe(attacker);
-    expect(forcedStep?.state.team1[0]).toBe(attacker);
-    expect(forcedStep?.state.team1[1]).toBe(reserve);
+    expect(forcedStep?.state.currentPokemon1).toBe(forcedStep?.state.team1[0]);
+    expect(forcedStep?.state.currentPokemon1?.instanceId).toBe(attacker.instanceId);
+    expect(forcedStep?.state.team1[1].instanceId).toBe(reserve.instanceId);
+    expect(forcedStep?.state.team1[1].isFainted).toBe(false);
     expect(reserve.isFainted).toBe(false);
     expect(forcedStep?.state.winner).toBeNull();
     expect(fetchMock).not.toHaveBeenCalled();
@@ -148,8 +155,10 @@ describe('integração das trocas voluntárias, forçadas e por desmaio', () => 
     const gameOverStep = result.steps.find(step => step.phase === 'game-over');
 
     expect(result.completed).toBe(true);
-    expect(defender.hp).toBe(0);
-    expect(defender.isFainted).toBe(true);
+    expect(defender.hp).toBe(1);
+    expect(defender.isFainted).toBe(false);
+    expect(gameOverStep?.state.currentPokemon2?.hp).toBe(0);
+    expect(gameOverStep?.state.currentPokemon2?.isFainted).toBe(true);
     expect(gameOverStep?.winner).toBe(1);
     expect(gameOverStep?.state.winner).toBe(1);
     expect(gameOverStep?.state.isBattleInProgress).toBe(false);
@@ -190,26 +199,30 @@ describe('integração das trocas voluntárias, forçadas e por desmaio', () => 
     expect(result.steps.some(step => step.phase === 'game-over')).toBe(false);
     expect(faintStep?.state.winner).toBeNull();
     expect(faintStep?.state.isBattleInProgress).toBe(true);
-    expect(faintStep?.state.currentPokemon2).toBe(defender);
-    expect(defender.isFainted).toBe(true);
-    expect(faintStep?.state.team2[1]).toBe(reserve);
+    expect(faintStep?.state.currentPokemon2).toBe(faintStep?.state.team2[0]);
+    expect(faintStep?.state.currentPokemon2?.isFainted).toBe(true);
+    expect(defender.isFainted).toBe(false);
+    expect(faintStep?.state.team2[1].instanceId).toBe(reserve.instanceId);
+    expect(faintStep?.state.team2[1].isFainted).toBe(false);
     expect(reserve.isFainted).toBe(false);
 
     if (!faintStep) {
       throw new Error('O coordenador não forneceu o estado de substituição por desmaio');
     }
 
-    const replacementState = structuredClone(faintStep.state);
+    const replacementState = faintStep.state;
     const replacement = replacementState.team2[1];
     enableDeterministicRandom(1405);
     try {
       const { newState } = performSwitch(replacementState, replacement, 2, false);
 
-      expect(newState.currentPokemon2).toBe(replacement);
       expect(newState.currentPokemon2).toBe(newState.team2[1]);
+      expect(newState.currentPokemon2).not.toBe(replacement);
       expect(newState.team2[0].isFainted).toBe(true);
       expect(newState.winner).toBeNull();
       expect(newState.isBattleInProgress).toBe(true);
+      expect(replacementState.currentPokemon2).toBe(replacementState.team2[0]);
+      expect(replacement.hp).toBe(400);
       expect(fetchMock).not.toHaveBeenCalled();
     } finally {
       disableDeterministicRandom();
@@ -250,9 +263,9 @@ describe('integração das trocas voluntárias, forçadas e por desmaio', () => 
 
     expect(result.completed).toBe(true);
     expect(switchStep?.activeActorId).toBe(attacker.id);
-    expect(result.finalState.currentPokemon1).toBe(reserve);
     expect(result.finalState.currentPokemon1).toBe(result.finalState.team1[1]);
-    expect(result.finalState.team1[0]).toBe(attacker);
+    expect(result.finalState.currentPokemon1).not.toBe(reserve);
+    expect(result.finalState.team1[0].instanceId).toBe(attacker.instanceId);
     expect(result.steps.filter(step => step.phase === 'start')).toHaveLength(1);
     expect(fetchMock).not.toHaveBeenCalled();
   });
@@ -303,11 +316,13 @@ describe('integração das trocas voluntárias, forçadas e por desmaio', () => 
       [attacker.id, 'switch'],
       [defender.id, 'move'],
     ]);
-    expect(reserve.hp).toBeLessThan(400);
-    expect(reserve.hp).toBeGreaterThan(0);
-    expect(defender.moves[0].uses).toBe(11);
-    expect(result.finalState.currentPokemon1).toBe(reserve);
+    expect(reserve.hp).toBe(400);
+    expect(result.finalState.currentPokemon1?.hp).toBeLessThan(400);
+    expect(result.finalState.currentPokemon1?.hp).toBeGreaterThan(0);
+    expect(defender.moves[0].uses).toBe(12);
+    expect(result.finalState.currentPokemon2?.moves[0].uses).toBe(11);
     expect(result.finalState.currentPokemon1).toBe(result.finalState.team1[1]);
+    expect(result.finalState.currentPokemon1).not.toBe(reserve);
     expect(result.steps.filter(step => step.phase === 'turn-end')).toHaveLength(1);
     expect(result.steps.filter(step => step.phase === 'start')).toHaveLength(1);
     expect(result.finalState.turn).toBe(2);
@@ -345,10 +360,14 @@ describe('integração das trocas voluntárias, forçadas e por desmaio', () => 
 
     const prompt = result.steps.find(step => step.phase === 'switch-forced');
     expect(prompt?.switchPrompt).toEqual({ player: 1, isBatonPass: true, canCancel: false });
-    expect(result.finalState.currentPokemon1).toBe(reserve);
     expect(result.finalState.currentPokemon1).toBe(result.finalState.team1[1]);
-    expect(reserve.statStages.attack).toBe(3);
-    expect(reserve.statStages.speed).toBe(-2);
+    expect(result.finalState.currentPokemon1).not.toBe(reserve);
+    expect(result.finalState.currentPokemon1?.statStages.attack).toBe(3);
+    expect(result.finalState.currentPokemon1?.statStages.speed).toBe(-2);
+    expect(reserve.statStages.attack).toBe(0);
+    expect(reserve.statStages.speed).toBe(0);
+    expect(attacker.statStages.attack).toBe(3);
+    expect(attacker.statStages.speed).toBe(-2);
     expect(result.steps.filter(step => step.phase === 'turn-end')).toHaveLength(1);
     expect(result.finalState.turn).toBe(2);
   });
@@ -434,6 +453,7 @@ describe('integração das trocas voluntárias, forçadas e por desmaio', () => 
 
     const incoming = forcedPlayer === 1 ? attackerReserve : defenderReserve;
     const outgoing = forcedPlayer === 1 ? attacker : defender;
+    const finalOutgoing = forcedPlayer === 1 ? result.finalState.team1[0] : result.finalState.team2[0];
     const firstActionIndex = result.steps.findIndex(step => step.phase === 'after-action');
     const entrySnapshot = result.stateSnapshots[firstActionIndex];
     const activeAtEntry = forcedPlayer === 1
@@ -447,30 +467,35 @@ describe('integração das trocas voluntárias, forçadas e por desmaio', () => 
     expect(activeAtEntry?.id).toBe(incoming.id);
     expect(activeAtEntry?.hp).toBe(350);
     expect(opponentSnapshot?.statStages.attack).toBe(1);
-    expect(outgoing.statStages.attack).toBe(0);
+    expect(finalOutgoing.statStages.attack).toBe(0);
+    expect(outgoing.statStages.attack).toBe(2);
     expect(result.steps.filter(step => step.phase === 'switch-forced')).toHaveLength(0);
     expect(result.finalState.turn).toBe(2);
 
     if (forcedPlayer === 1) {
-      expect(result.finalState.currentPokemon1).toBe(attackerReserve);
       expect(result.finalState.currentPokemon1).toBe(result.finalState.team1[1]);
-      expect(result.finalState.currentPokemon2).toBe(defender);
+      expect(result.finalState.currentPokemon1).not.toBe(attackerReserve);
+      expect(result.finalState.currentPokemon2).toBe(result.finalState.team2[0]);
+      expect(result.finalState.currentPokemon2).not.toBe(defender);
       expect(result.steps
         .filter(step => step.phase === 'after-action')
         .map(step => step.activeActorId)
       ).toEqual([attacker.id, defender.id]);
-      expect(attacker.moves[0].uses).toBe(9);
-      expect(defender.moves[0].uses).toBe(11);
+      expect(attacker.moves[0].uses).toBe(10);
+      expect(result.finalState.team1[0].moves[0].uses).toBe(9);
+      expect(defender.moves[0].uses).toBe(12);
+      expect(result.finalState.currentPokemon2?.moves[0].uses).toBe(11);
     } else {
-      expect(result.finalState.currentPokemon2).toBe(defenderReserve);
       expect(result.finalState.currentPokemon2).toBe(result.finalState.team2[1]);
-      expect(result.finalState.currentPokemon1).toBe(attacker);
+      expect(result.finalState.currentPokemon2).not.toBe(defenderReserve);
+      expect(result.finalState.currentPokemon1).toBe(result.finalState.team1[0]);
+      expect(result.finalState.currentPokemon1).not.toBe(attacker);
       expect(result.steps
         .filter(step => step.phase === 'after-action')
         .map(step => step.activeActorId)
       ).toEqual([attacker.id]);
       expect(defender.moves[0].uses).toBe(12);
-      expect(defender.movedThisTurn).toBe(false);
+      expect(result.finalState.team2[0].movedThisTurn).toBe(false);
     }
 
     expect(fetchMock).not.toHaveBeenCalled();

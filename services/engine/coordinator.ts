@@ -4,6 +4,7 @@ import * as BattleEngine from './index';
 import * as AirLock from './handlers/abilities/air_lock';
 import { getSortedActions } from './actions';
 import { isSamePokemonInstance, resolvePokemonTarget } from '../../utils/pokemonIdentity';
+import { acquireBattleDraft, rehydrateAction, releaseBattleDraft } from './stateTransactions';
 
 export type TurnPhase = 
   | 'start' 
@@ -41,8 +42,31 @@ export class BattleCoordinator {
     p2Action: Action | undefined,
     config: BattleConfig
   ): Generator<TurnStepResult, void, Action | undefined> {
-    let state = { ...initialState };
+    const draft = acquireBattleDraft(initialState);
+    try {
+      const turn = BattleCoordinator.runTurnDraft(draft.state, p1Action, p2Action, config);
+      let next = turn.next();
+
+      while (next.done !== true) {
+        const resumeAction = yield structuredClone(next.value);
+        next = turn.next(resumeAction);
+      }
+    } finally {
+      releaseBattleDraft(draft);
+    }
+  }
+
+  private static *runTurnDraft(
+    initialState: BattleState,
+    p1Action: Action | undefined,
+    p2Action: Action | undefined,
+    config: BattleConfig
+  ): Generator<TurnStepResult, void, Action | undefined> {
+    let state = initialState;
     const stepLogs: LogEntry[] = [];
+    p1Action = p1Action ? rehydrateAction(state, p1Action) : undefined;
+    p2Action = p2Action ? rehydrateAction(state, p2Action) : undefined;
+    const originalActions = [p1Action, p2Action].filter((a): a is Action => !!a);
 
     // --- FASE 1: INÍCIO DO TURNO ---
     log(stepLogs, `--- Início do Turno ${state.turn} ---`, 'text-blue-900 font-bold bg-blue-100 p-1 rounded text-center mb-2 mt-4');
@@ -67,7 +91,6 @@ export class BattleCoordinator {
     stepLogs.length = 0;
 
     // --- FASE 2: ORDENAÇÃO E EXECUÇÃO DE AÇÕES ---
-    const originalActions = [p1Action, p2Action].filter((a): a is Action => !!a);
     originalActions.forEach(a => {
         if (a.tieBreaker === undefined) a.tieBreaker = Math.random();
     });
@@ -80,7 +103,7 @@ export class BattleCoordinator {
             if (act.user.isFainted && act.type !== 'item') return false;
             if (act.type !== 'move') return true;
             const active = act.playerNum === 1 ? state.currentPokemon1 : state.currentPokemon2;
-            return active === act.user;
+            return isSamePokemonInstance(active, act.user);
         });
         
         if (pendingActions.length === 0) break;
@@ -173,8 +196,8 @@ export class BattleCoordinator {
                 
                 const activeAttacker = currentAction.playerNum === 1 ? state.currentPokemon1 : state.currentPokemon2;
                 const activeDefender = currentAction.playerNum === 1 ? state.currentPokemon2 : state.currentPokemon1;
-                switchRequested = !!res.switchRequested && !res.fainted && activeAttacker === currentAction.user;
-                defenderSwitchRequested = !!res.defenderSwitchRequested && !res.fainted && activeDefender === target;
+                switchRequested = !!res.switchRequested && !res.fainted && isSamePokemonInstance(activeAttacker, currentAction.user);
+                defenderSwitchRequested = !!res.defenderSwitchRequested && !res.fainted && isSamePokemonInstance(activeDefender, target);
                 isBatonPass = !!res.isBatonPass;
                 
                 currentAction.user.movedThisTurn = true;
@@ -221,10 +244,13 @@ export class BattleCoordinator {
                     canCancel: false
                 }
             };
-            if (forcedSwitchAction?.type === 'switch' && forcedSwitchAction.playerNum === forcedSwitch.player) {
+            const draftForcedSwitchAction = forcedSwitchAction
+                ? rehydrateAction(state, forcedSwitchAction)
+                : undefined;
+            if (draftForcedSwitchAction?.type === 'switch' && draftForcedSwitchAction.playerNum === forcedSwitch.player) {
                 const res = BattleEngine.performSwitch(
                     state,
-                    forcedSwitchAction.data,
+                    draftForcedSwitchAction.data,
                     forcedSwitch.player,
                     config.weatherEnabled,
                     forcedSwitch.isBatonPass

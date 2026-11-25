@@ -8,7 +8,7 @@
 - Mantenha `PROJECT_CONTEXT.md` atualizado a cada alteração.
 - Para economizar tokens: inspecione somente os arquivos da tarefa e suas dependências diretas, reutilize a baseline registrada, use testes focados durante a iteração e rode a suíte completa na validação final. Não refaça auditorias globais já concluídas.
 
-**Próximo item:** 2.5 — Definir estado transacional, evitando snapshots com objetos mutáveis compartilhados.
+**Próximo item:** 2.6 — Substituir o PRNG global por contexto explícito com snapshot/restore para simulações.
 
 ## Etapa 0 — Restaurar uma baseline confiável
 
@@ -109,7 +109,12 @@
   - Cinco grupos RED→GREEN cobriram unicidade/estabilidade, mecânicas laterais em espelho, mochila/Tera/Mega, IA/LLM e replay novo/fallback antigo, incluindo duplicatas importadas, trocas, persistência da identidade e ausência de draws adicionais nos caminhos de identidade. Os dois `it.todo` de espelho deste item foram convertidos; os três todos de 3.1/3.3/3.4 permanecem.
   - Validação: 6 arquivos focados e 37 testes aprovados com 1 `it.todo`; suíte completa com 39 arquivos, 159 testes aprovados e 3 `it.todo` (162 registrados); `npm run lint`, `npm run build` e `git diff --check` aprovados.
   - Commit: informado no resumo final após o push verificado em `origin/main`.
-- [ ] **2.5 — Definir estado transacional, evitando snapshots com objetos mutáveis compartilhados.**
+- [x] **2.5 — Definir estado transacional, evitando snapshots com objetos mutáveis compartilhados.**
+  - `services/engine/stateTransactions.ts` centraliza clones estruturais, propriedade de drafts ativos, continuidade de resultados rasos internos e reidratação de Pokémon, golpes e ações por `instanceId`. `runTurn`, `executeMove`, `performSwitch` e `processTurnEnd` trabalham em drafts próprios; chamadas aninhadas reutilizam somente a transação já ativa e a fronteira proprietária a encerra sem congelar produção.
+  - O coordinator clona cada `TurnStepResult` no yield, preservando `currentPokemon === team[i]` dentro do snapshot e impedindo referências compartilhadas com fases futuras. Ações externas e escolhas de troca retomadas de snapshots da UI são reidratadas no draft, inclusive em espelho, U-turn e Baton Pass.
+  - Cinco fronteiras seguiram RED→GREEN, com uma prova adicional para `movedThisTurn` do segundo usuário. Sete testes novos cobrem entradas profundamente congeladas, HP/PP, equipes/status/hazards, snapshots, identidade, ausência de aliases, replay duplo com a mesma seed/ações e contagens fixas de 4/4/2 draws nos cenários de espelho/U-turn/Baton Pass. Baton Pass, desmaio, vitória e os três `it.todo` anteriores foram preservados.
+  - Validação: 7/7 testes focados novos; suíte completa com 40 arquivos, 166 testes aprovados e 3 `it.todo` (169 registrados); `npm run lint`, `npm run build` e `git diff --check` aprovados. O primeiro smoke integral de produção sofreu timeout sob contenção, passou isolado e a repetição integral ficou verde; permanece o aviso preexistente de chunk acima de 500 kB.
+  - Dependência fora do escopo registrada para 3.4/3.5: a avaliação ótima da IA local deverá consumir explicitamente os estados transacionais retornados. A IA e o ReplayPlayer não foram editados; a caracterização existente de IA mantém legalidade, lado, PP e determinismo sem fixar a escolha do golpe de maior poder.
 - [ ] **2.6 — Substituir o PRNG global por contexto explícito com snapshot/restore para simulações.**
 
 ## Etapa 3 — Refazer replay e simulação da IA sobre a base consolidada
@@ -118,6 +123,7 @@
 - [ ] **3.2 — Versionar o formato e adicionar checkpoints ou hashes de estado por turno.**
 - [ ] **3.3 — Preservar a identidade entre Pokémon ativo e entrada correspondente da equipe.**
 - [ ] **3.4 — Parametrizar a IA pelo lado controlado e corrigir sua avaliação.**
+  - Dependência de 2.5: adaptar a avaliação para consumir os `newState`/snapshots transacionais; a caracterização de 1.5 passou a fixar legalidade e determinismo, não a escolha do golpe de maior poder.
 - [ ] **3.5 — Fazer a simulação usar o mesmo coordenador, configuração e regras da batalha real.**
 
 ## Etapa 4 — Endurecimento e expansão
@@ -131,8 +137,8 @@
 
 ## Registro resumido da baseline
 
-- Última suíte integral informada: **39 arquivos, 159 testes aprovados e 3 `it.todo`** (162 registrados); os todos são lacunas de outros itens e não contam como cobertura aprovada.
+- Última suíte integral informada: **40 arquivos, 166 testes aprovados e 3 `it.todo`** (169 registrados); os todos são lacunas de outros itens e não contam como cobertura aprovada.
 - `npm run lint`, `npm run build` e `git diff --check`: aprovados.
 - Auditoria do item 0.5: **17 → 0** ocorrências no total e **6 → 0** em produção; instalação por `npm ci` reproduzida sem alterações nos manifestos.
-- SHA dos itens 1.1 a 1.7 e dos itens 2.1/2.2/2.3/2.4 informados somente nos respectivos resumos finais após o push; último SHA registrado no roadmap: `baae8a606c37495f30810e2c646dbb234c75ac86` (item 0.4).
+- SHA dos itens 1.1 a 1.7 e dos itens 2.1/2.2/2.3/2.4/2.5 informados somente nos respectivos resumos finais após o push; último SHA registrado no roadmap: `baae8a606c37495f30810e2c646dbb234c75ac86` (item 0.4).
 - Pendência não bloqueante: aviso de chunk acima de 500 kB, planejado no item 4.5.

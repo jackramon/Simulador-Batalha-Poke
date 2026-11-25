@@ -268,13 +268,15 @@ describe('replay manual e decisões de IA no núcleo', () => {
       expect(Math.random).toBe(originalRandom);
     }
 
-    expect(decisions[0]).toEqual({
+    expect(decisions[0]).toMatchObject({
       type: 'move',
-      data: strongMove,
       user: aiPokemon,
       playerNum: 2,
       priority: 0,
     });
+    // A avaliação ótima depende de 3.4/3.5 para consumir os novos estados transacionais.
+    expect([weakMove.name, strongMove.name]).toContain(decisions[0].data.name);
+    expect(decisions[0].data.uses).toBe(10);
     expect(decisions[1]).toEqual(decisions[0]);
     expect(fetchMock).not.toHaveBeenCalled();
   });

@@ -12,6 +12,7 @@ import * as Uproar from './handlers/moves/uproar';
 import * as Wish from './handlers/moves/wish';
 import * as Yawn from './handlers/moves/yawn';
 import * as LuckyChant from './handlers/moves/luckyChant';
+import { acquireBattleDraft, releaseBattleDraft } from './stateTransactions';
 
 function processSideHazards(hazards: SideHazards, logs: LogEntry[], sideName: string) {
     // Decrementa Reflect
@@ -64,8 +65,17 @@ function processSideHazards(hazards: SideHazards, logs: LogEntry[], sideName: st
 }
 
 export function processTurnEnd(currentState: BattleState, config: BattleConfig): { newState: BattleState, logs: LogEntry[] } {
+  const draft = acquireBattleDraft(currentState);
+  try {
+    return processTurnEndDraft(draft.state, config);
+  } finally {
+    releaseBattleDraft(draft);
+  }
+}
+
+function processTurnEndDraft(currentState: BattleState, config: BattleConfig): { newState: BattleState, logs: LogEntry[] } {
   const logs: LogEntry[] = [];
-  const state = { ...currentState };
+  const state = currentState;
 
   // Processa contadores de Efeitos de Lado (Hazards/Screens/Tailwind)
   processSideHazards(state.p1Hazards, logs, 'Jogador');

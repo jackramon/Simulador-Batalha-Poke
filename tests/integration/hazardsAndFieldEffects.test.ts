@@ -39,8 +39,11 @@ describe('integração de hazards, telas e efeitos temporários', () => {
 
       const { newState } = performSwitch(initialState, reserve, 1, false);
 
-      expect(newState.currentPokemon1).toBe(reserve);
-      expect(reserve.hp).toBe(250);
+      expect(newState.currentPokemon1).toBe(newState.team1[1]);
+      expect(newState.currentPokemon1).not.toBe(reserve);
+      expect(newState.currentPokemon1?.hp).toBe(250);
+      expect(newState.currentPokemon1?.isFainted).toBe(false);
+      expect(reserve.hp).toBe(400);
       expect(reserve.isFainted).toBe(false);
       expect(fetchMock).not.toHaveBeenCalled();
     } finally {
@@ -64,8 +67,12 @@ describe('integração de hazards, telas e efeitos temporários', () => {
         p1Hazards: { ...createSideHazards(), spikes: 3, toxicSpikes: 2, stickyWeb: true },
       });
 
-      performSwitch(initialState, reserve, 1, false);
+      const { newState } = performSwitch(initialState, reserve, 1, false);
 
+      expect(newState.currentPokemon1?.hp).toBe(400);
+      expect(newState.currentPokemon1?.statusEffects.poison).toBeUndefined();
+      expect(newState.currentPokemon1?.statusEffects.toxic).toBeUndefined();
+      expect(newState.currentPokemon1?.statStages.speed).toBe(0);
       expect(reserve.hp).toBe(400);
       expect(reserve.statusEffects.poison).toBeUndefined();
       expect(reserve.statusEffects.toxic).toBeUndefined();
@@ -86,12 +93,16 @@ describe('integração de hazards, telas e efeitos temporários', () => {
         p1Hazards: { ...createSideHazards(), toxicSpikes: 2, stickyWeb: true },
       });
 
-      performSwitch(initialState, reserve, 1, false);
+      const { newState } = performSwitch(initialState, reserve, 1, false);
 
+      expect(newState.currentPokemon1?.hp).toBe(400);
+      expect(newState.currentPokemon1?.statusEffects.toxic).toEqual({ turns: 0 });
+      expect(newState.currentPokemon1?.statusEffects.poison).toBeUndefined();
+      expect(newState.currentPokemon1?.statStages.speed).toBe(-1);
       expect(reserve.hp).toBe(400);
-      expect(reserve.statusEffects.toxic).toEqual({ turns: 0 });
+      expect(reserve.statusEffects.toxic).toBeUndefined();
       expect(reserve.statusEffects.poison).toBeUndefined();
-      expect(reserve.statStages.speed).toBe(-1);
+      expect(reserve.statStages.speed).toBe(0);
       expect(fetchMock).not.toHaveBeenCalled();
     } finally {
       disableDeterministicRandom();

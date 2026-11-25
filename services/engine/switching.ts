@@ -5,17 +5,33 @@ import { log } from './utils';
 import * as NaturalCure from './handlers/abilities/natural_cure';
 import * as ZeroToHero from './handlers/abilities/zero_to_hero';
 import * as Hazards from './handlers/hazards';
+import { acquireBattleDraft, rehydratePokemon, releaseBattleDraft } from './stateTransactions';
 
 export function performSwitch(
-  currentState: BattleState, 
-  newPokemon: Pokemon, 
-  playerNum: 1 | 2, 
+  currentState: BattleState,
+  requestedPokemon: Pokemon,
+  playerNum: 1 | 2,
   weatherEnabled: boolean,
   isBatonPass: boolean = false // Novo parâmetro
 ): { newState: BattleState, logs: LogEntry[] } {
-  
+  const draft = acquireBattleDraft(currentState);
+  try {
+    const newPokemon = rehydratePokemon(draft.state, requestedPokemon, playerNum);
+    return performSwitchDraft(draft.state, newPokemon, playerNum, weatherEnabled, isBatonPass);
+  } finally {
+    releaseBattleDraft(draft);
+  }
+}
+
+function performSwitchDraft(
+  currentState: BattleState,
+  newPokemon: Pokemon,
+  playerNum: 1 | 2,
+  weatherEnabled: boolean,
+  isBatonPass: boolean,
+): { newState: BattleState, logs: LogEntry[] } {
   const logs: LogEntry[] = [];
-  const state = { ...currentState };
+  const state = currentState;
   
   const oldPokemon = playerNum === 1 ? state.currentPokemon1 : state.currentPokemon2;
   let lastPokemonSnapshot: Pokemon | null = null;

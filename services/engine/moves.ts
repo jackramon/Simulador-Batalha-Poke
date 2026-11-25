@@ -21,6 +21,7 @@ import * as MeFirst from './handlers/moves/meFirst';
 import * as NaturePower from './handlers/moves/naturePower';
 import * as Pipeline from './movePipeline';
 import * as SkyDrop from './handlers/moves/skyDrop';
+import { acquireBattleDraft, preserveBattleDraftState, rehydrateAction, rehydrateMove, rehydratePokemon, releaseBattleDraft } from './stateTransactions';
 
 // --- MAPA ESTÁTICO DE SPRITES MEGA (Fallback para JIT) ---
 // Fonte da Verdade para IDs de arte oficial da PokeAPI (Formas Mega)
@@ -74,6 +75,41 @@ const STATIC_MEGA_SPRITES: Record<string, number> = {
 };
 
 export function executeMove(
+  currentState: BattleState,
+  attacker: Pokemon,
+  defender: Pokemon,
+  move: Move,
+  config: BattleConfig,
+  defenderAction?: Action,
+  isDancerTriggered: boolean = false,
+  shouldTerastallize: boolean = false,
+  isSleepTalkTriggered: boolean = false,
+  shouldMegaEvolve: boolean = false
+): ReturnType<typeof executeMoveDraft> {
+  const draft = acquireBattleDraft(currentState);
+  try {
+    const draftAttacker = rehydratePokemon(draft.state, attacker);
+    const draftDefender = rehydratePokemon(draft.state, defender);
+    const draftMove = rehydrateMove(draftAttacker, move);
+    const draftDefenderAction = defenderAction ? rehydrateAction(draft.state, defenderAction) : undefined;
+    return executeMoveDraft(
+      draft.state,
+      draftAttacker,
+      draftDefender,
+      draftMove,
+      config,
+      draftDefenderAction,
+      isDancerTriggered,
+      shouldTerastallize,
+      isSleepTalkTriggered,
+      shouldMegaEvolve,
+    );
+  } finally {
+    releaseBattleDraft(draft);
+  }
+}
+
+function executeMoveDraft(
   currentState: BattleState, 
   attacker: Pokemon, 
   defender: Pokemon, 
@@ -87,7 +123,7 @@ export function executeMove(
 ): { newState: BattleState, logs: LogEntry[], fainted: boolean, switchRequested?: boolean, defenderSwitchRequested?: boolean, isBatonPass?: boolean, damageDealt: boolean } {
   
   const logs: LogEntry[] = [];
-  let state = { ...currentState };
+  let state = currentState;
 
   // --- MEGA EVOLUTION LOGIC (JIT Fallback) ---
   if (shouldMegaEvolve && config.megaEvolutionEnabled && !attacker.isMega && !attacker.isTerastallized) {
@@ -184,7 +220,7 @@ export function executeMove(
   );
 
   // CRITICAL FIX: Propagate state changes (Tera usage, PP deduction, Protect counters)
-  state = validation.newState; 
+  state = preserveBattleDraftState(currentState, validation.newState);
 
   let fainted = validation.fainted;
   let switchRequested = false;

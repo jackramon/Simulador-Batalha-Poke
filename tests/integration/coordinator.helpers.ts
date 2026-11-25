@@ -8,6 +8,7 @@ export interface CompletedTurn {
   stateSnapshots: BattleState[];
   finalState: BattleState;
   completed: boolean;
+  randomDraws: number;
 }
 
 interface RunCoordinatorTurnOptions {
@@ -82,8 +83,14 @@ export const runCoordinatorTurn = ({
   const steps: TurnStepResult[] = [];
   const stateSnapshots: BattleState[] = [];
   let completed = false;
+  let randomDraws = 0;
 
   enableDeterministicRandom(seed);
+  const deterministicRandom = Math.random;
+  Math.random = () => {
+    randomDraws += 1;
+    return deterministicRandom();
+  };
   try {
     const generator = BattleCoordinator.runTurn(initialState, p1Action, p2Action, config);
 
@@ -96,8 +103,8 @@ export const runCoordinatorTurn = ({
 
       const step: TurnStepResult = next.value;
       steps.push(step);
-      // O motor reutiliza objetos entre yields; a cópia preserva o estado daquela fase.
-      stateSnapshots.push(structuredClone(step.state));
+      // Cada yield já é um snapshot transacional independente.
+      stateSnapshots.push(step.state);
       const forcedSwitchAction = step.phase === 'switch-forced'
         ? chooseForcedSwitch?.(step)
         : undefined;
@@ -109,7 +116,7 @@ export const runCoordinatorTurn = ({
       throw new Error('O coordenador terminou sem produzir estado');
     }
 
-    return { steps, stateSnapshots, finalState, completed };
+    return { steps, stateSnapshots, finalState, completed, randomDraws };
   } finally {
     disableDeterministicRandom();
   }

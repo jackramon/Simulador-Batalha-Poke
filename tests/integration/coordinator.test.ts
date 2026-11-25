@@ -91,8 +91,10 @@ describe('integração do coordenador de turnos', () => {
     expect(result.finalState.currentPokemon2?.hp).toBeLessThan(400);
     expect(result.finalState.currentPokemon1?.hp).toBeGreaterThan(0);
     expect(result.finalState.currentPokemon2?.hp).toBeGreaterThan(0);
-    expect(move1.uses).toBe(9);
-    expect(move2.uses).toBe(7);
+    expect(move1.uses).toBe(10);
+    expect(result.finalState.currentPokemon1?.moves[0].uses).toBe(9);
+    expect(move2.uses).toBe(8);
+    expect(result.finalState.currentPokemon2?.moves[0].uses).toBe(7);
     expectOngoingTurn(result, 8);
   });
 
@@ -145,13 +147,17 @@ describe('integração do coordenador de turnos', () => {
       [111, 'switch'],
       [222, 'move'],
     ]);
-    expect(result.finalState.currentPokemon1).toBe(reserve);
+    expect(result.finalState.currentPokemon1).toBe(result.finalState.team1[1]);
+    expect(result.finalState.currentPokemon1).not.toBe(reserve);
+    expect(result.finalState.team1[0]).not.toBe(outgoing);
     expect(outgoing.hp).toBe(400);
-    expect(reserve.hp).toBeLessThan(400);
-    expect(reserve.hp).toBeGreaterThan(0);
+    expect(reserve.hp).toBe(400);
+    expect(result.finalState.currentPokemon1?.hp).toBeLessThan(400);
+    expect(result.finalState.currentPokemon1?.hp).toBeGreaterThan(0);
     expect(opponent.hp).toBe(400);
     expect(outgoing.moves[0].uses).toBe(10);
-    expect(opponentMove.uses).toBe(11);
+    expect(opponentMove.uses).toBe(12);
+    expect(result.finalState.currentPokemon2?.moves[0].uses).toBe(11);
     expectOngoingTurn(result, 3);
   });
 
@@ -207,7 +213,8 @@ describe('integração do coordenador de turnos', () => {
     expect(result.finalState.currentPokemon1?.hp).toBeLessThan(80);
     expect(result.finalState.currentPokemon1?.hp).toBeGreaterThan(0);
     expect(result.finalState.p1Inventory.items).toEqual([]);
-    expect(opponentMove.uses).toBe(11);
+    expect(opponentMove.uses).toBe(12);
+    expect(result.finalState.currentPokemon2?.moves[0].uses).toBe(11);
     expectOngoingTurn(result, 5);
   });
 
@@ -253,8 +260,10 @@ describe('integração do coordenador de turnos', () => {
     expect(result.finalState.terrainTurns).toBe(3);
     expect(result.finalState.currentPokemon1?.isFainted).toBe(false);
     expect(result.finalState.currentPokemon2?.isFainted).toBe(false);
-    expect(move1.uses).toBe(9);
-    expect(move2.uses).toBe(9);
+    expect(move1.uses).toBe(10);
+    expect(result.finalState.currentPokemon1?.moves[0].uses).toBe(9);
+    expect(move2.uses).toBe(10);
+    expect(result.finalState.currentPokemon2?.moves[0].uses).toBe(9);
     expectOngoingTurn(result, 11);
   });
 });
