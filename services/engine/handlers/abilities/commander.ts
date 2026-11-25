@@ -1,5 +1,6 @@
 
 import { Pokemon, BattleState } from '../../../../types';
+import { getPokemonPlayerNum } from '../../../../utils/pokemonIdentity';
 import { log } from '../../utils';
 
 /**
@@ -13,7 +14,7 @@ export function handleCommander(pokemon: Pokemon, state: BattleState, logs: { me
     // Em batalhas 1v1 oficiais, a habilidade não tem efeito. 
     // No entanto, implementamos a lógica para detectar o aliado para compatibilidade e modularidade.
     
-    const isP1 = state.team1.some(p => p.id === pokemon.id);
+    const isP1 = getPokemonPlayerNum(state, pokemon) === 1;
     const ally = null; // Em 1v1 puro do simulador, o slot de aliado está vazio.
 
     // Se no futuro o motor suportar Double Battles, a lógica abaixo seria ativada:

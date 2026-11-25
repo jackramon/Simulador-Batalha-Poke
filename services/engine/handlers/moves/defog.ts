@@ -1,5 +1,6 @@
 
 import { Pokemon, BattleState } from '../../../../types';
+import { getPokemonPlayerNum } from '../../../../utils/pokemonIdentity';
 import { log } from '../../utils';
 import * as StatChanges from '../effects/statChanges';
 import * as Hazards from '../hazards';
@@ -33,7 +34,7 @@ export function handleDefog(
     Hazards.clearEntryHazards(state.p2Hazards);
 
     // 3. Remove Screens do lado do ALVO (Target's side)
-    const isP1 = state.currentPokemon1?.id === attacker.id;
+    const isP1 = getPokemonPlayerNum(state, attacker) === 1;
     const targetHazards = isP1 ? state.p2Hazards : state.p1Hazards;
     
     Hazards.clearScreens(targetHazards);

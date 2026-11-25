@@ -1,4 +1,5 @@
 import { Pokemon, Move, BattleState, PlayerInventory, Action } from '../types';
+import { getPokemonPlayerNum, isSamePokemonInstance } from '../utils/pokemonIdentity';
 
 function extractJson(text: string): any {
     // Remove DeepSeek reasoning tags if present
@@ -43,7 +44,7 @@ export async function decideLLMAction(
     provider?: 'gemini' | 'openrouter' | 'deepseek',
     model?: string
 ): Promise<Action> {
-    const playerNum = state?.currentPokemon1?.id === attacker.id ? 1 : 2;
+    const playerNum = getPokemonPlayerNum(state, attacker);
     
     const prompt = `
 Você é uma IA controlando um jogador em uma batalha Pokémon.
@@ -68,6 +69,9 @@ Status: ${Object.keys(defender.statusEffects).join(', ') || 'Nenhum'}
 
 Clima Atual: ${weather}
 
+Sua Equipe (use o instanceId ao solicitar uma troca):
+${attackerTeam.map(p => `- ${p.name}: instanceId=${p.instanceId || 'indisponível'}, espécie=${p.id}, HP=${p.hp}/${p.maxHP}`).join('\n')}
+
 Responda APENAS com um objeto JSON válido contendo a sua ação.
 Formato esperado para atacar:
 {
@@ -79,7 +83,7 @@ Formato esperado para atacar:
 Formato esperado para trocar:
 {
   "type": "switch",
-  "data": { "id": ID_DO_POKEMON_DA_EQUIPE }
+  "data": { "instanceId": "INSTANCE_ID_DO_POKEMON_DA_EQUIPE" }
 }
 
 Escolha a melhor ação para vencer a batalha.
@@ -133,10 +137,12 @@ Escolha a melhor ação para vencer a batalha.
             }
         } else if (action.type === 'switch' && action.data) {
             const requestedId = action.data.id;
+            const requestedInstanceId = typeof action.data.instanceId === 'string' ? action.data.instanceId : undefined;
             const requestedName = String(action.data.name || action.data.id || '').toLowerCase().trim();
             
             const pkmn = attackerTeam.find(p => {
-                if (p.hp <= 0 || p.id === attacker.id) return false;
+                if (p.hp <= 0 || isSamePokemonInstance(p, attacker)) return false;
+                if (requestedInstanceId) return p.instanceId === requestedInstanceId;
                 return (
                     p.id === requestedId ||
                     p.name.toLowerCase() === requestedName ||

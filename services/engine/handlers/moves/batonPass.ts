@@ -1,5 +1,6 @@
 
 import { Pokemon, BattleState } from '../../../../types';
+import { getPokemonPlayerNum, isSamePokemonInstance } from '../../../../utils/pokemonIdentity';
 import { log } from '../../utils';
 
 export function handleBatonPass(
@@ -9,11 +10,11 @@ export function handleBatonPass(
 ): { switchRequested: boolean, isBatonPass: boolean } {
     
     // Identifica o time do atacante
-    const isP1 = state.currentPokemon1?.id === attacker.id;
+    const isP1 = getPokemonPlayerNum(state, attacker) === 1;
     const team = isP1 ? state.team1 : state.team2;
 
     // Verifica se há aliados vivos para passar
-    const hasAliveMembers = team.some(p => !p.isFainted && p.id !== attacker.id);
+    const hasAliveMembers = team.some(p => !p.isFainted && !isSamePokemonInstance(p, attacker));
 
     if (!hasAliveMembers) {
         log(logs, `Mas falhou! Não há ninguém para trocar.`, 'text-gray-500 italic');

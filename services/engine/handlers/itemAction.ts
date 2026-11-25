@@ -1,6 +1,7 @@
 
 import { BattleState, Pokemon, LogEntry } from '../../../types';
 import { ITEMS_DATA } from '../../../data/items';
+import { getPokemonPlayerNum } from '../../../utils/pokemonIdentity';
 import { log } from '../utils';
 import * as StatusEffect from '../../effectHandlers';
 import * as Multitype from './abilities/multitype';
@@ -190,7 +191,7 @@ export function executeItemAction(
                 log(logs, `Mas não teve efeito...`, 'text-gray-500');
             }
         } else if (itemId === 'guard-spec') {
-            const isP1 = state.currentPokemon1?.id === target.id;
+            const isP1 = getPokemonPlayerNum(state, target) === 1;
             const hazards = isP1 ? state.p1Hazards : state.p2Hazards;
             if (hazards.safeguard === 0) {
                 hazards.safeguard = 5;

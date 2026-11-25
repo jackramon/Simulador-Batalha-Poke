@@ -6,6 +6,7 @@ import { ITEMS_DATA, POKEMON_TO_MEGA_STONES, MEGA_STONES } from '../data/items';
 import * as Effects from '../services/effectHandlers';
 import { enableDeterministicRandom, disableDeterministicRandom } from '../utils/prng';
 import { removerItem } from '../utils/safeStorage';
+import { isSamePokemonInstance, normalizeBattleTeams } from '../utils/pokemonIdentity';
 
 const KEY_BATTLE_STATE = 'poke_sim_battle_state';
 const KEY_BATTLE_CONFIG = 'poke_sim_battle_config';
@@ -64,7 +65,7 @@ export const useBattleState = () => {
   const stateRef = useRef(state);
   const configRef = useRef(config);
   
-  const fetchingIds = useRef<Set<number>>(new Set()); 
+  const fetchingIds = useRef<Set<string>>(new Set());
 
   // Sincroniza refs
   useEffect(() => { stateRef.current = state; }, [state]);
@@ -150,7 +151,7 @@ export const useBattleState = () => {
       .map(p => `${p.id}:${p.heldItem || 'null'}`)
       .join('|');
 
-  const activeIdsSignature = `${state.currentPokemon1?.id || 'null'}|${state.currentPokemon2?.id || 'null'}`;
+  const activeIdsSignature = `${state.currentPokemon1?.instanceId || state.currentPokemon1?.id || 'null'}|${state.currentPokemon2?.instanceId || state.currentPokemon2?.id || 'null'}`;
 
   const [currentReplay, setCurrentReplay] = useState<BattleReplay | null>(null);
 
@@ -160,14 +161,15 @@ export const useBattleState = () => {
       const allPokemon = [...state.team1, ...state.team2];
 
       allPokemon.forEach(p => {
+          const hydrationKey = p.instanceId || `${p.id}:${p.heldItem || 'null'}`;
           const stoneSuffix = p.heldItem ? MEGA_STONES[p.heldItem] : null;
           const isTransformed = p.statusEffects?.['transformed'] || p.statusEffects?.['imposter'];
           const alreadyMega = p.isMega;
 
           // Se tem pedra, não é mega, não está transformado e NÃO tem perfil, busca em background
           if (stoneSuffix && !p.megaProfile && !alreadyMega && !isTransformed) {
-              if (!fetchingIds.current.has(p.id)) {
-                  fetchingIds.current.add(p.id);
+              if (!fetchingIds.current.has(hydrationKey)) {
+                  fetchingIds.current.add(hydrationKey);
                   
                   // Normalização do nome para API
                   // FIX AGRESSIVO: Remover sufixos de gênero antes e depois de normalizar
@@ -231,7 +233,7 @@ export const useBattleState = () => {
                           // Atualiza o estado
                           setState(prev => {
                               const updateProfile = (target: Pokemon) => {
-                                  if (target.id === p.id) {
+                                  if (isSamePokemonInstance(target, p)) {
                                       return { ...target, megaProfile: realMegaProfile };
                                   }
                                   return target;
@@ -239,8 +241,8 @@ export const useBattleState = () => {
 
                               const newTeam1 = prev.team1.map(updateProfile);
                               const newTeam2 = prev.team2.map(updateProfile);
-                              const newActive1 = prev.currentPokemon1?.id === p.id ? updateProfile(prev.currentPokemon1) : prev.currentPokemon1;
-                              const newActive2 = prev.currentPokemon2?.id === p.id ? updateProfile(prev.currentPokemon2) : prev.currentPokemon2;
+                              const newActive1 = isSamePokemonInstance(prev.currentPokemon1, p) ? updateProfile(prev.currentPokemon1) : prev.currentPokemon1;
+                              const newActive2 = isSamePokemonInstance(prev.currentPokemon2, p) ? updateProfile(prev.currentPokemon2) : prev.currentPokemon2;
 
                               return {
                                   ...prev,
@@ -255,7 +257,7 @@ export const useBattleState = () => {
                           console.warn(`[MegaHydration] Erro ao buscar ${megaApiName}:`, e);
                       })
                       .finally(() => {
-                          fetchingIds.current.delete(p.id);
+                          fetchingIds.current.delete(hydrationKey);
                       });
               }
           }
@@ -263,7 +265,7 @@ export const useBattleState = () => {
           else if (!stoneSuffix && p.megaProfile && !alreadyMega) {
               setState(prev => {
                   const removeProfile = (target: Pokemon) => {
-                      if (target.id === p.id) {
+                      if (isSamePokemonInstance(target, p)) {
                           const { megaProfile, ...rest } = target;
                           return rest;
                       }
@@ -272,8 +274,8 @@ export const useBattleState = () => {
 
                   const newTeam1 = prev.team1.map(removeProfile);
                   const newTeam2 = prev.team2.map(removeProfile);
-                  const newActive1 = prev.currentPokemon1?.id === p.id ? removeProfile(prev.currentPokemon1) : prev.currentPokemon1;
-                  const newActive2 = prev.currentPokemon2?.id === p.id ? removeProfile(prev.currentPokemon2) : prev.currentPokemon2;
+                  const newActive1 = isSamePokemonInstance(prev.currentPokemon1, p) ? removeProfile(prev.currentPokemon1) : prev.currentPokemon1;
+                  const newActive2 = isSamePokemonInstance(prev.currentPokemon2, p) ? removeProfile(prev.currentPokemon2) : prev.currentPokemon2;
 
                   return {
                       ...prev,
@@ -346,7 +348,7 @@ export const useBattleState = () => {
               throw new Error(`Erro: Time do Jogador 1 não foi construído ou importado corretamente.`);
           }
       } else {
-          t1 = await fetchTeam(config.p1TeamSize, config.p1Mode, config.p1Input, config.randomIvs, config.randomLevels, config.megaEvolutionEnabled, config.itemsEnabled);
+          t1 = await fetchTeam(config.p1TeamSize, config.p1Mode, config.p1Input, config.randomIvs, config.randomLevels, config.megaEvolutionEnabled, config.itemsEnabled, 1);
       }
 
       if ((config.p2Mode as any) === 'builder' || config.p2Mode === 'import') {
@@ -356,12 +358,16 @@ export const useBattleState = () => {
                throw new Error(`Erro: Time do Oponente não foi construído ou importado corretamente.`);
           }
       } else {
-          t2 = await fetchTeam(config.p2TeamSize, config.p2Mode, config.p2Input, config.randomIvs, config.randomLevels, config.megaEvolutionEnabled, config.itemsEnabled);
+          t2 = await fetchTeam(config.p2TeamSize, config.p2Mode, config.p2Input, config.randomIvs, config.randomLevels, config.megaEvolutionEnabled, config.itemsEnabled, 2);
       }
 
       if (t1.length === 0 || t2.length === 0) {
           throw new Error("Equipe incompleta. Verifique se selecionou o modo correto ou completou o time no Construtor.");
       }
+
+      const normalizedTeams = normalizeBattleTeams(t1, t2);
+      t1 = normalizedTeams.team1;
+      t2 = normalizedTeams.team2;
 
       [...t1, ...t2].forEach(p => {
           p.hp = p.maxHP;

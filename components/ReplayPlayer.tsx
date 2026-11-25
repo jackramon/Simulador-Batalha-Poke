@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useRef, useCallback } from 'react';
-import { BattleReplay, BattleState, BattleReplayEvent, Action } from '../types';
+import { BattleReplay, BattleState, BattleReplayEvent } from '../types';
 import { disableDeterministicRandom, enableDeterministicRandom } from '../utils/prng';
 import { BattleCoordinator } from '../services/engine/coordinator';
 import { TurnAnimator } from '../services/animation/turnAnimator';
@@ -9,6 +9,7 @@ import * as BattleEngine from '../services/engine';
 import { decideAIAction } from '../services/aiLogic';
 import * as AirLock from '../services/engine/handlers/abilities/air_lock';
 import * as Effects from '../services/effectHandlers';
+import { buildReplayAction, normalizeReplayTeams, resolveReplaySwitchTarget } from '../services/replayLogic';
 
 // ── Tipo das velocidades de reprodução ──────────────────────────────
 //    Valores < 1 = mais lento; 1 = velocidade original dos delays
@@ -92,11 +93,12 @@ export default function ReplayPlayer({ onClose }: ReplayPlayerProps) {
         const initialLog = { message: 'Replay Carregado. Pronto para iniciar.', color: 'text-blue-600 font-bold' };
         accumulatedLogsRef.current = [initialLog];
 
+        const normalizedTeams = normalizeReplayTeams(data.initialState);
         const initialState: BattleState = {
-            team1: structuredClone(data.initialState.team1),
-            team2: structuredClone(data.initialState.team2),
-            currentPokemon1: structuredClone(data.initialState.team1[0]),
-            currentPokemon2: structuredClone(data.initialState.team2[0]),
+            team1: structuredClone(normalizedTeams.team1),
+            team2: structuredClone(normalizedTeams.team2),
+            currentPokemon1: structuredClone(normalizedTeams.team1[0]),
+            currentPokemon2: structuredClone(normalizedTeams.team2[0]),
             p1Inventory: structuredClone(data.initialState.p1Inventory),
             p2Inventory: structuredClone(data.initialState.p2Inventory),
             p1TeraUsed: false, p2TeraUsed: false,
@@ -163,9 +165,8 @@ export default function ReplayPlayer({ onClose }: ReplayPlayerProps) {
             const active = playerNum === 1 ? stateRef.current!.currentPokemon1 : stateRef.current!.currentPokemon2;
             if (active?.isFainted) {
                 const forcedEvent = turnEvents.find(e => e.actorId === playerNum && e.isForcedSwitch);
-                if (forcedEvent?.switchId) {
-                    const team = playerNum === 1 ? stateRef.current!.team1 : stateRef.current!.team2;
-                    const switchTarget = team.find(p => p.id === forcedEvent.switchId);
+                if (forcedEvent && (forcedEvent.switchInstanceId || forcedEvent.switchId !== undefined)) {
+                    const switchTarget = resolveReplaySwitchTarget(stateRef.current!, forcedEvent);
                     if (switchTarget) {
                         const res = BattleEngine.performSwitch(stateRef.current!, switchTarget, playerNum, replayData.initialState.config.weatherEnabled);
                         updateStateWithLogs(res.newState, res.logs);
@@ -177,39 +178,8 @@ export default function ReplayPlayer({ onClose }: ReplayPlayerProps) {
         const p1Event = turnEvents.find(e => e.actorId === 1 && !e.isForcedSwitch && !e.isBatonPass);
         const p2Event = turnEvents.find(e => e.actorId === 2 && !e.isForcedSwitch && !e.isBatonPass);
 
-        const buildAction = (event: BattleReplayEvent | undefined, playerNum: 1 | 2): Action | null => {
-            if (!event) return null;
-            const user = playerNum === 1 ? stateRef.current!.currentPokemon1! : stateRef.current!.currentPokemon2!;
-            let data: any = null;
-            let priority = 6;
-            if (event.actionType === 'move') {
-                data = user?.moves?.find(m => m?.name === event.moveId);
-                if (!data) {
-                    // Fallback para movimentos que não estão no set do Pokémon (ex: Struggle, Recharge, Metronome)
-                    data = {
-                        name: event.moveId,
-                        displayName: event.moveId === 'recharge' ? 'Recarregar' : (event.moveId === 'struggle' ? 'Debater' : event.moveId),
-                        priority: 0,
-                        type: 'normal',
-                        category: 'status',
-                        power: 0,
-                        accuracy: 100,
-                        pp: 1,
-                        maxPP: 1
-                    };
-                }
-                priority = data?.priority || 0;
-            } else if (event.actionType === 'switch') {
-                const team = playerNum === 1 ? stateRef.current!.team1 : stateRef.current!.team2;
-                data = team.find(p => p.id === event.switchId);
-            } else if (event.actionType === 'item') {
-                data = { itemId: event.itemId, targetId: event.targetId, isGive: event.isGive };
-            }
-            return { type: event.actionType, data, user, playerNum, priority, shouldTerastallize: event.shouldTerastallize, shouldMegaEvolve: event.shouldMegaEvolve };
-        };
-
-        let p1Action = buildAction(p1Event, 1);
-        let p2Action = buildAction(p2Event, 2);
+        let p1Action = buildReplayAction(stateRef.current!, p1Event);
+        let p2Action = buildReplayAction(stateRef.current!, p2Event);
 
         // FIX: Sempre chamar decideAIAction se o modo for auto, mesmo que a ação já esteja no JSON.
         // Isso é necessário porque decideAIAction consome números aleatórios (RNG).
@@ -283,9 +253,8 @@ export default function ReplayPlayer({ onClose }: ReplayPlayerProps) {
             if (step.switchPrompt) {
                 const playerNum = step.switchPrompt.player;
                 const forcedEvent = turnEvents.find(e => e.actorId === playerNum && (e.isForcedSwitch || e.isBatonPass));
-                if (forcedEvent?.switchId) {
-                    const team = playerNum === 1 ? stateRef.current!.team1 : stateRef.current!.team2;
-                    const switchTarget = team.find(p => p.id === forcedEvent.switchId);
+                if (forcedEvent && (forcedEvent.switchInstanceId || forcedEvent.switchId !== undefined)) {
+                    const switchTarget = resolveReplaySwitchTarget(stateRef.current!, forcedEvent);
                     if (switchTarget) {
                         const res = BattleEngine.performSwitch(stateRef.current!, switchTarget, playerNum, replayData.initialState.config.weatherEnabled, step.switchPrompt.isBatonPass);
                         updateStateWithLogs(res.newState, res.logs);
@@ -296,9 +265,8 @@ export default function ReplayPlayer({ onClose }: ReplayPlayerProps) {
                     const active = playerNum === 1 ? stateRef.current!.currentPokemon1 : stateRef.current!.currentPokemon2;
                     if (active?.isFainted) {
                         const forcedEvent = turnEvents.find(e => e.actorId === playerNum && e.isForcedSwitch);
-                        if (forcedEvent?.switchId) {
-                            const team = playerNum === 1 ? stateRef.current!.team1 : stateRef.current!.team2;
-                            const switchTarget = team.find(p => p.id === forcedEvent.switchId);
+                        if (forcedEvent && (forcedEvent.switchInstanceId || forcedEvent.switchId !== undefined)) {
+                            const switchTarget = resolveReplaySwitchTarget(stateRef.current!, forcedEvent);
                             if (switchTarget) {
                                 const res = BattleEngine.performSwitch(stateRef.current!, switchTarget, playerNum, replayData.initialState.config.weatherEnabled);
                                 updateStateWithLogs(res.newState, res.logs);

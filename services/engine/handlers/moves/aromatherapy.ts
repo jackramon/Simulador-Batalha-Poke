@@ -1,5 +1,6 @@
 
 import { Pokemon, BattleState, LogEntry } from '../../../../types';
+import { getPokemonPlayerNum } from '../../../../utils/pokemonIdentity';
 import { log } from '../../utils';
 
 /**
@@ -15,7 +16,7 @@ export function handleAromatherapy(
     if (attacker.isFainted) return;
 
     // Identifica a equipe do usuário
-    const isP1 = state.team1.some(p => p.id === attacker.id);
+    const isP1 = getPokemonPlayerNum(state, attacker) === 1;
     const team = isP1 ? state.team1 : state.team2;
 
     let curedCount = 0;

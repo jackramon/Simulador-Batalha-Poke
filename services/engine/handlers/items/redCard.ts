@@ -4,6 +4,7 @@ import { log } from '../../utils';
 import * as SuctionCups from '../abilities/suction_cups';
 import * as GuardDog from '../abilities/guard_dog';
 import { performSwitch } from '../../switching';
+import { getPokemonPlayerNum, isSamePokemonInstance } from '../../../../utils/pokemonIdentity';
 
 /**
  * Lógica para o item Cartão Vermelho (Red Card).
@@ -37,11 +38,11 @@ export function checkRedCard(
     }
 
     // 3. Identifica o time do atacante e verifica se há reservas
-    const isP1 = state.currentPokemon1?.id === attacker.id;
+    const isP1 = getPokemonPlayerNum(state, attacker) === 1;
     const attackerTeam = isP1 ? state.team1 : state.team2;
 
     // Busca candidatos válidos na reserva (Não desmaiados e não o próprio atacante)
-    const validBackups = attackerTeam.filter(p => !p.isFainted && p.id !== attacker.id);
+    const validBackups = attackerTeam.filter(p => !p.isFainted && !isSamePokemonInstance(p, attacker));
 
     // Se não houver ninguém para trocar, o item não ativa
     if (validBackups.length === 0) {

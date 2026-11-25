@@ -6,6 +6,7 @@ import { NATURES } from '../../data/natures';
 import { calculateMaxHP } from '../engine/handlers/statCalculator';
 import { fetchMoveDetails, fetchRawPokemonData } from './client';
 import { POKEMON_LIST } from '../../data/pokedex_list';
+import { normalizeTeamInstanceIds } from '../../utils/pokemonIdentity';
 
 export const MAX_POKEMON_ID = 1025;
 const MOVE_FETCH_CAP = 60; // Increased to ensure variety
@@ -494,7 +495,8 @@ export async function fetchTeam(
   randomIvs: boolean = true,
   randomLevels: boolean = false,
   megaEnabled: boolean = false,
-  itemsEnabled: boolean = true
+  itemsEnabled: boolean = true,
+  playerNum: 1 | 2 = 1
 ): Promise<Pokemon[]> {
     if (mode === 'random') {
         const promises: Promise<Pokemon>[] = [];
@@ -535,11 +537,13 @@ export async function fetchTeam(
             attempts++;
         }
         
-        return Promise.all(promises);
+        const team = await Promise.all(promises);
+        return normalizeTeamInstanceIds(team, playerNum);
     } else {
         const names = input.split(',').map(s => s.trim()).filter(s => s.length > 0);
         // If manual/builder, we fetch exactly what is asked.
         const promises = names.map(name => fetchPokemonData(name, false, randomIvs, randomLevels, megaEnabled, itemsEnabled));
-        return Promise.all(promises);
+        const team = await Promise.all(promises);
+        return normalizeTeamInstanceIds(team, playerNum);
     }
 }

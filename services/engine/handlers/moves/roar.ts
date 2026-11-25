@@ -1,5 +1,6 @@
 
 import { Pokemon, BattleState } from '../../../../types';
+import { getPokemonPlayerNum, isSamePokemonInstance } from '../../../../utils/pokemonIdentity';
 import { log } from '../../utils';
 import * as SuctionCups from '../abilities/suction_cups';
 import * as GuardDog from '../abilities/guard_dog';
@@ -39,11 +40,11 @@ export function handleRoar(
     }
 
     // 3. Identifica o time do defensor
-    const isP1 = state.currentPokemon1?.id === defender.id;
+    const isP1 = getPokemonPlayerNum(state, defender) === 1;
     const defenderTeam = isP1 ? state.team1 : state.team2;
 
     // 4. Busca candidatos válidos na reserva (Não desmaiados e não o próprio)
-    const validBackups = defenderTeam.filter(p => !p.isFainted && p.id !== defender.id);
+    const validBackups = defenderTeam.filter(p => !p.isFainted && !isSamePokemonInstance(p, defender));
 
     if (validBackups.length === 0) {
         log(logs, `Mas falhou! Não há outro Pokémon para substituir ${defender.name}!`, 'text-gray-500 italic');

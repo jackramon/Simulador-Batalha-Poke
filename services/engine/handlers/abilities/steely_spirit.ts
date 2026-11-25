@@ -1,4 +1,5 @@
 import { Pokemon, Move, BattleState } from '../../../../types';
+import { getPokemonPlayerNum, isSamePokemonInstance } from '../../../../utils/pokemonIdentity';
 import * as NeutralizingGas from './neutralizing_gas';
 
 /**
@@ -13,7 +14,7 @@ export function getSteelySpiritMultiplier(attacker: Pokemon, move: Move, state?:
     }
 
     const isGasActive = NeutralizingGas.isGasActive(state);
-    const isP1 = state.team1.some(p => p.id === attacker.id);
+    const isP1 = getPokemonPlayerNum(state, attacker) === 1;
     const team = isP1 ? state.team1 : state.team2;
 
     let multiplier = 1.0;
@@ -25,7 +26,7 @@ export function getSteelySpiritMultiplier(attacker: Pokemon, move: Move, state?:
 
     // 2. Verifica aliados saudáveis na reserva com a habilidade
     const steelyAlliesCount = team.filter(p => 
-        p.id !== attacker.id && 
+        !isSamePokemonInstance(p, attacker) &&
         !p.isFainted && 
         p.ability === 'steely-spirit' && 
         !NeutralizingGas.isAbilitySuppressed(p.ability, isGasActive)

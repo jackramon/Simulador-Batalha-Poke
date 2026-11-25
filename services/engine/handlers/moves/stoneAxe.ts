@@ -1,5 +1,6 @@
 
 import { Pokemon, BattleState, Move } from '../../../../types';
+import { getPokemonPlayerNum } from '../../../../utils/pokemonIdentity';
 import { log } from '../../utils';
 
 /**
@@ -18,8 +19,9 @@ export function handleStoneAxeEffect(
 ) {
     if (!state) return;
 
-    const targetSide = state.team1.some(p => p.id === defender.id) ? state.p1Hazards : state.p2Hazards;
-    const targetSideName = state.team1.some(p => p.id === defender.id) ? "1" : "2"; // Simplificação, idealmente usar nomes dos jogadores
+    const defenderPlayerNum = getPokemonPlayerNum(state, defender);
+    const targetSide = defenderPlayerNum === 1 ? state.p1Hazards : state.p2Hazards;
+    const targetSideName = defenderPlayerNum === 1 ? "1" : "2"; // Simplificação, idealmente usar nomes dos jogadores
 
     if (targetSide.stealthRock) {
         // Já tem pedras, não faz nada (ou falha silenciosamente quanto ao efeito)

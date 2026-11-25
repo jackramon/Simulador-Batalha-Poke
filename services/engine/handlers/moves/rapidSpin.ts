@@ -1,5 +1,6 @@
 
 import { Pokemon, BattleState } from '../../../../types';
+import { getPokemonPlayerNum } from '../../../../utils/pokemonIdentity';
 import { log } from '../../utils';
 import { BATTLE_MESSAGES } from '../../../../data/battleMessages';
 import * as StatMoves from './statChanges';
@@ -38,7 +39,7 @@ export function handleRapidSpin(attacker: Pokemon, logs: {message: string, color
 
     // 3. Remove Hazards do lado do usuário
     if (state) {
-        const isP1 = state.currentPokemon1?.id === attacker.id;
+        const isP1 = getPokemonPlayerNum(state, attacker) === 1;
         const hazards = isP1 ? state.p1Hazards : state.p2Hazards;
 
         // Verifica se há hazards para setar a flag de log

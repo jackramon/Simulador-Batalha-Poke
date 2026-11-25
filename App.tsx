@@ -848,10 +848,11 @@ export default function App() {
           <BagModal 
             inventory={currentPlayer === 1 ? state.p1Inventory : state.p2Inventory} 
             team={currentPlayer === 1 ? state.team1 : state.team2}
-            currentActiveId={currentPlayer === 1 ? state.currentPokemon1?.id : state.currentPokemon2?.id} 
+            currentActiveId={currentPlayer === 1 ? state.currentPokemon1?.id : state.currentPokemon2?.id}
+            currentActiveInstanceId={currentPlayer === 1 ? state.currentPokemon1?.instanceId : state.currentPokemon2?.instanceId}
             aiSelection={p1AiBagSelection || undefined}
-            onUseItem={(itemId, targetId, moveName) => handleBagAction('use', itemId, targetId)}
-            onGiveItem={(itemId, targetId) => handleBagAction('give', itemId, targetId)}
+            onUseItem={(itemId, targetId, moveName, targetInstanceId) => handleBagAction('use', itemId, targetId, targetInstanceId, moveName)}
+            onGiveItem={(itemId, targetId, targetInstanceId) => handleBagAction('give', itemId, targetId, targetInstanceId)}
             onCancel={() => {
                 if (!p1AiBagSelection) setShowBagModal(false);
             }} 

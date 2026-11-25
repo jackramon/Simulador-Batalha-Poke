@@ -4,6 +4,7 @@ import { STATUS_TRANSLATIONS } from '../data/translations';
 import { STAT_NAMES_PT } from '../data/pokemon';
 // FIX #2: importar getRawStat para computar valores idênticos aos do card
 import { getRawStat } from '../services/battleUtils';
+import { isPokemonOnTeam } from '../utils/pokemonIdentity';
 
 interface InteractiveLogMessageProps {
   message: string;
@@ -150,7 +151,7 @@ export const InteractiveLogMessage: React.FC<InteractiveLogMessageProps> = ({ me
             statName: part,
             pokemonName: mentionedPokemon?.name ?? 'um Pokémon',
             // FIX #4 (também aplicado aqui para colorir título do tooltip):
-            pokemonTeam: state.team1.some(p => p?.id === mentionedPokemon?.id) ? 1 : 2,
+            pokemonTeam: isPokemonOnTeam(mentionedPokemon, state.team1) ? 1 : 2,
             currentStage,
             previousStage,
             currentValue,

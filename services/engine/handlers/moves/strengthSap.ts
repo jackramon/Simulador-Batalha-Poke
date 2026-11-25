@@ -1,4 +1,5 @@
 import { Pokemon, LogEntry, BattleState } from '../../../../types';
+import { getPokemonPlayerNum } from '../../../../utils/pokemonIdentity';
 import { log } from '../../utils';
 import { applyMoveStatChange } from './statChanges';
 import { calculateStat } from '../statCalculator';
@@ -36,7 +37,7 @@ export function handleStrengthSap(
     
     // Verifica Mist
     if (state) {
-        const isP1 = state.currentPokemon1?.id === defender.id;
+        const isP1 = getPokemonPlayerNum(state, defender) === 1;
         const hazards = isP1 ? state.p1Hazards : state.p2Hazards;
         
         if (hazards.mist > 0) {

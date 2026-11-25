@@ -3,6 +3,7 @@ import { BattleState, Action, BattleConfig, LogEntry, Pokemon } from '../../type
 import * as BattleEngine from './index';
 import * as AirLock from './handlers/abilities/air_lock';
 import { getSortedActions } from './actions';
+import { isSamePokemonInstance, resolvePokemonTarget } from '../../utils/pokemonIdentity';
 
 export type TurnPhase = 
   | 'start' 
@@ -51,7 +52,7 @@ export class BattleCoordinator {
         if (p) {
             p.movedThisTurn = false;
             // Identifica qual ação pertence a este pokemon
-            const action = (p.id === p1Action?.user.id) ? p1Action : (p.id === p2Action?.user.id ? p2Action : null);
+            const action = isSamePokemonInstance(p, p1Action?.user) ? p1Action : (isSamePokemonInstance(p, p2Action?.user) ? p2Action : null);
             p.selectedMove = action?.type === 'move' ? action.data : null;
         }
     });
@@ -121,9 +122,12 @@ export class BattleCoordinator {
             executionLogs = res.logs;
         } 
         else if (currentAction.type === 'item') {
-            const target = currentAction.playerNum === 1 
-                  ? state.team1.find(p => p.id === currentAction.data.targetId) 
-                  : state.team2.find(p => p.id === currentAction.data.targetId);
+            const team = currentAction.playerNum === 1 ? state.team1 : state.team2;
+            const target = resolvePokemonTarget(
+                team,
+                currentAction.data.targetInstanceId,
+                currentAction.data.targetId
+            );
             
             if (target) {
                 const actionType = currentAction.data.isGive ? 'give' : 'use';

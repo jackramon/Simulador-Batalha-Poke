@@ -1,5 +1,6 @@
 
 import { Pokemon, BattleState } from '../../../../types';
+import { getPokemonPlayerNum } from '../../../../utils/pokemonIdentity';
 import { log } from '../../utils';
 
 export function handleTailwind(
@@ -7,7 +8,7 @@ export function handleTailwind(
     logs: {message: string, color: string}[], 
     state: BattleState
 ) {
-    const isP1 = state.currentPokemon1?.id === attacker.id;
+    const isP1 = getPokemonPlayerNum(state, attacker) === 1;
     // Tailwind afeta o lado do USUÁRIO
     const myHazards = isP1 ? state.p1Hazards : state.p2Hazards;
 

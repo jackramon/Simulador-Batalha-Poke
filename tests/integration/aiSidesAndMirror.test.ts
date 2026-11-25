@@ -1,5 +1,7 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { decideAIAction } from '../../services/aiLogic';
+import { decideLLMAction } from '../../services/llmAiLogic';
+import { getSortedActions } from '../../services/engine/actions';
 import { disableDeterministicRandom, enableDeterministicRandom } from '../../utils/prng';
 import { createBattleState, createMove, createPokemon } from '../factories';
 import { createBattleConfig, createMoveAction, runCoordinatorTurn } from './coordinator.helpers';
@@ -128,7 +130,115 @@ describe('IA por jogador e batalha espelho no núcleo', () => {
     expect(fetchMock).not.toHaveBeenCalled();
   });
 
+  it('preserva os lados com Tailwind, hazards e telas em batalha espelho', () => {
+    const runP2StatusMove = (name: string, seed: number) => {
+      const player1 = createPokemon({ id: 25, name: 'Espelho P1', speedStat: 120 });
+      const player2 = createPokemon({ id: 25, name: 'Espelho P2', speedStat: 80 });
+      const move = createMove({ name, power: 0, isStatus: true, damageClass: 'status' });
+      const initialState = createBattleState([player1], [player2]);
+      const result = runCoordinatorTurn({
+        seed,
+        initialState,
+        p2Action: createMoveAction(player2, move, 2),
+        config: createBattleConfig({ forceAccuracyOutcome: 'hit', fixedRoll: 1 }),
+      });
+      expect(result.completed).toBe(true);
+      expect(player1.instanceId).not.toBe(player2.instanceId);
+      return { player1, player2, result };
+    };
+
+    const tailwind = runP2StatusMove('tailwind', 2401);
+    const stealthRock = runP2StatusMove('stealth-rock', 2402);
+    const reflect = runP2StatusMove('reflect', 2403);
+
+    expect(tailwind.result.finalState.p1Hazards.tailwind).toBe(0);
+    expect(tailwind.result.finalState.p2Hazards.tailwind).toBe(3);
+    expect(stealthRock.result.finalState.p1Hazards.stealthRock).toBe(true);
+    expect(stealthRock.result.finalState.p2Hazards.stealthRock).toBe(false);
+    expect(reflect.result.finalState.p1Hazards.reflect).toBe(0);
+    expect(reflect.result.finalState.p2Hazards.reflect).toBe(4);
+
+    const randomSpy = vi.spyOn(Math, 'random');
+    const sorted = getSortedActions([
+      createMoveAction(tailwind.player1, createMove(), 1),
+      createMoveAction(tailwind.player2, createMove(), 2),
+    ], tailwind.result.finalState);
+
+    expect(sorted.map(action => action.playerNum)).toEqual([2, 1]);
+    expect(randomSpy).not.toHaveBeenCalled();
+  });
+
+  it('mantém P2 e os golpes da sua instância na IA local em espelho', () => {
+    const opponentMove = createMove({ name: 'sem-pp-espelho', uses: 0, maxUses: 10 });
+    const availableMove = createMove({ name: 'golpe-da-instancia', power: 80, uses: 7, maxUses: 10 });
+    const player1 = createPokemon({ id: 25, name: 'Espelho P1', moves: [opponentMove] });
+    const player2 = createPokemon({ id: 25, name: 'Espelho P2', moves: [availableMove], speedStat: 140 });
+    const state = createBattleState([player1], [player2]);
+    let action: ReturnType<typeof decideAIAction>;
+
+    enableDeterministicRandom(2404);
+    try {
+      action = decideAIAction(
+        player2,
+        player1,
+        state.team2,
+        state.team1,
+        state.weather,
+        true,
+        undefined,
+        false,
+        false,
+        state,
+        false,
+        false,
+      );
+    } finally {
+      disableDeterministicRandom();
+    }
+
+    expect(action.playerNum).toBe(2);
+    expect(action.user).toBe(player2);
+    expect(action.data).toEqual(availableMove);
+    expect(action.data).toBe(player2.moves[0]);
+    expect(action.data.uses).toBe(7);
+    expect(opponentMove.uses).toBe(0);
+  });
+
+  it('permite ao LLM trocar para uma duplicata pela instância e mantém o lado de P2', async () => {
+    const player1 = createPokemon({ id: 25, name: 'Espelho P1' });
+    const player2 = createPokemon({ id: 25, name: 'Titular P2', moves: [createMove()] });
+    const reserve = createPokemon({ id: 25, name: 'Reserva P2', moves: [createMove()] });
+    const state = createBattleState([player1], [player2, reserve]);
+    fetchMock.mockResolvedValue(new Response(JSON.stringify({
+      result: JSON.stringify({ type: 'switch', data: { instanceId: reserve.instanceId } }),
+    }), { status: 200 }));
+
+    const action = await decideLLMAction(
+      player2,
+      player1,
+      state.team2,
+      state.team1,
+      state.weather,
+      true,
+      undefined,
+      false,
+      false,
+      state,
+      false,
+      false,
+      'openrouter',
+      'modelo-local',
+    );
+
+    expect(action).toEqual({
+      type: 'switch',
+      data: reserve,
+      user: player2,
+      playerNum: 2,
+      priority: 6,
+    });
+    expect(fetchMock).toHaveBeenCalledTimes(1);
+  });
+
   it.todo('3.4: escolhe ação legal para P1 com playerNum 1, alvo correto e avaliação do próprio lado');
-  it.todo('2.4: preserva os lados com Tailwind, Tera, Mega, hazards e telas em batalha espelho');
-  it.todo('2.4/3.4: decide com IA local e LLM sem confundir instâncias da mesma espécie em espelho');
 });

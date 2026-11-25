@@ -1,5 +1,6 @@
 
 import { Pokemon, BattleState, Move } from '../../../../types';
+import { getPokemonPlayerNum } from '../../../../utils/pokemonIdentity';
 import { log } from '../../utils';
 import { BATTLE_MESSAGES } from '../../../../data/battleMessages';
 import { calculateDamage } from '../damageUtils';
@@ -46,7 +47,7 @@ export function handleDoomDesireEnd(
         
         log(logs, BATTLE_MESSAGES.DOOM_DESIRE_HIT(defender.name), 'text-gray-700 font-black text-lg');
 
-        const isP1 = state.currentPokemon1?.id === defender.id;
+        const isP1 = getPokemonPlayerNum(state, defender) === 1;
         const attacker = isP1 ? state.currentPokemon2 : state.currentPokemon1;
 
         if (!attacker) return;

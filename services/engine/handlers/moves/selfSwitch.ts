@@ -2,6 +2,7 @@
 import { Pokemon, Move } from '../../../../types';
 import { log } from '../../utils';
 import { BATTLE_MESSAGES } from '../../../../data/battleMessages';
+import { isSamePokemonInstance } from '../../../../utils/pokemonIdentity';
 
 /**
  * Lógica para movimentos que trocam o usuário após o ataque (switch-self).
@@ -16,7 +17,7 @@ export function checkSelfSwitch(
 ): boolean {
     // Adicionado suporte para parting-shot-effect
     if (move.effect?.status === 'switch-self' || move.effect?.status === 'parting-shot-effect') {
-        const hasAliveMembers = team.some(p => !p.isFainted && p.id !== attacker.id);
+        const hasAliveMembers = team.some(p => !p.isFainted && !isSamePokemonInstance(p, attacker));
         
         if (hasAliveMembers) {
             log(logs, BATTLE_MESSAGES.SWITCH_SELF(attacker.name), 'text-green-600 font-bold');

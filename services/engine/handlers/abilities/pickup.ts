@@ -1,4 +1,5 @@
 import { Pokemon, BattleState } from '../../../../types';
+import { getPokemonPlayerNum } from '../../../../utils/pokemonIdentity';
 import { log } from '../../utils';
 import { ITEMS_DATA } from '../../../../data/items';
 import * as NeutralizingGas from './neutralizing_gas';
@@ -21,7 +22,7 @@ export function handlePickup(pokemon: Pokemon, state: BattleState, logs: {messag
     }
 
     // Identifica o oponente
-    const isP1 = state.team1.some(p => p.id === pokemon.id);
+    const isP1 = getPokemonPlayerNum(state, pokemon) === 1;
     const opponent = isP1 ? state.currentPokemon2 : state.currentPokemon1;
 
     // Se o oponente consumiu um item neste turno (ou anteriormente e ainda não foi coletado)

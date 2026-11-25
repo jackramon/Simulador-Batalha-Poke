@@ -1,5 +1,6 @@
 
 import { Pokemon, BattleState } from '../../../../types';
+import { getPokemonPlayerNum, isSamePokemonInstance } from '../../../../utils/pokemonIdentity';
 
 /**
  * Lógica para o movimento Retaliação (Retaliate).
@@ -19,11 +20,11 @@ export function getRetaliatePower(attacker: Pokemon, basePower: number, state?: 
     }
 
     // 2. Determina a equipe do atacante
-    const isP1 = state.team1.some(p => p.id === attacker.id);
+    const isP1 = getPokemonPlayerNum(state, attacker) === 1;
     const team = isP1 ? state.team1 : state.team2;
 
     // 3. Verifica se há algum aliado desmaiado na equipe (que não seja o próprio atacante)
-    const hasFaintedAlly = team.some(p => p.isFainted && p.id !== attacker.id);
+    const hasFaintedAlly = team.some(p => p.isFainted && !isSamePokemonInstance(p, attacker));
 
     if (hasFaintedAlly) {
         return basePower * 2;

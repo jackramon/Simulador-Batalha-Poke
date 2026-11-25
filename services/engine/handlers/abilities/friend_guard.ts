@@ -1,4 +1,5 @@
 import { Pokemon, BattleState } from '../../../../types';
+import { getPokemonPlayerNum, isSamePokemonInstance } from '../../../../utils/pokemonIdentity';
 import * as NeutralizingGas from './neutralizing_gas';
 
 /**
@@ -12,7 +13,7 @@ export function getFriendGuardMultiplier(defender: Pokemon, state?: BattleState)
     }
 
     const isGasActive = NeutralizingGas.isGasActive(state);
-    const isP1 = state.team1.some(p => p.id === defender.id);
+    const isP1 = getPokemonPlayerNum(state, defender) === 1;
     const team = isP1 ? state.team1 : state.team2;
 
     // Procura por um aliado (teammate) que:
@@ -20,7 +21,7 @@ export function getFriendGuardMultiplier(defender: Pokemon, state?: BattleState)
     // 2. Não esteja desmaiado.
     // 3. Tenha a habilidade Guarda Amiga não suprimida.
     const hasFriendGuardAlly = team.some(p => 
-        p.id !== defender.id && 
+        !isSamePokemonInstance(p, defender) &&
         !p.isFainted && 
         p.ability === 'friend-guard' && 
         !NeutralizingGas.isAbilitySuppressed(p.ability, isGasActive)

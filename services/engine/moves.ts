@@ -2,6 +2,7 @@
 import { BattleState, Pokemon, Move, BattleConfig, Action, LogEntry } from '../../types';
 import { log } from './utils';
 import { BATTLE_MESSAGES } from '../../data/battleMessages';
+import { getPokemonPlayerNum } from '../../utils/pokemonIdentity';
 import * as MoveEffects from './handlers/moveEffects';
 import { validateMoveExecution } from './steps/preMoveValidation';
 import * as Effects from '../effectHandlers'; // For handleEntryAbilities
@@ -90,7 +91,7 @@ export function executeMove(
 
   // --- MEGA EVOLUTION LOGIC (JIT Fallback) ---
   if (shouldMegaEvolve && config.megaEvolutionEnabled && !attacker.isMega && !attacker.isTerastallized) {
-      const isP1 = attacker.id === state.currentPokemon1?.id;
+      const isP1 = getPokemonPlayerNum(state, attacker) === 1;
       const canMega = isP1 ? !state.p1MegaUsed : !state.p2MegaUsed;
 
       if (canMega) {

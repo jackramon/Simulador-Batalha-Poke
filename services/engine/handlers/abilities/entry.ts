@@ -1,5 +1,6 @@
 
 import { Pokemon, BattleState, LogEntry } from '../../../../types';
+import { getPokemonPlayerNum } from '../../../../utils/pokemonIdentity';
 import { ABILITY_EFFECTS } from '../../../../data/abilities';
 import { log } from '../../utils';
 import * as Forms from './forms';
@@ -80,7 +81,7 @@ export function handleEntryAbilities(
     RKSSystem.handleRKSSystem(pokemon, logs);
 
     // Tenta aplicar Ilusão imediatamente
-    const team = state.team1.some(p => p.id === pokemon.id) ? state.team1 : state.team2;
+    const team = getPokemonPlayerNum(state, pokemon) === 1 ? state.team1 : state.team2;
     Illusion.applyIllusion(pokemon, team, logs);
 
     // Se o Pokémon que entra tem Gás Neutralizante, anuncia imediatamente

@@ -1,5 +1,6 @@
 
 import { Pokemon, BattleState } from '../../../../types';
+import { getPokemonPlayerNum } from '../../../../utils/pokemonIdentity';
 import { log } from '../../utils';
 
 /**
@@ -13,7 +14,7 @@ import { log } from '../../utils';
 export function announceSupremeOverlord(pokemon: Pokemon, state: BattleState, logs: {message: string, color: string}[]) {
     if (pokemon.ability !== 'supreme-overlord' || pokemon.isFainted) return;
 
-    const team = state.team1.some(p => p.id === pokemon.id) ? state.team1 : state.team2;
+    const team = getPokemonPlayerNum(state, pokemon) === 1 ? state.team1 : state.team2;
     const faintedCount = team.filter(p => p.isFainted).length;
 
     if (faintedCount > 0) {
@@ -27,7 +28,7 @@ export function announceSupremeOverlord(pokemon: Pokemon, state: BattleState, lo
 export function getPowerMultiplier(pokemon: Pokemon, state?: BattleState): number {
     if (pokemon.ability !== 'supreme-overlord' || !state) return 1.0;
 
-    const team = state.team1.some(p => p.id === pokemon.id) ? state.team1 : state.team2;
+    const team = getPokemonPlayerNum(state, pokemon) === 1 ? state.team1 : state.team2;
     const faintedCount = team.filter(p => p.isFainted).length;
 
     // 10% de bônus por aliado desmaiado (1.1x, 1.2x, etc.)

@@ -1,5 +1,6 @@
 
 import { BattleState, Move, Pokemon, LogEntry } from '../../../../types';
+import { getPokemonPlayerNum } from '../../../../utils/pokemonIdentity';
 import { log } from '../../utils';
 import { BATTLE_MESSAGES } from '../../../../data/battleMessages';
 import * as Forecast from '../abilities/forecast';
@@ -58,7 +59,7 @@ export function handleFieldMove(state: BattleState, move: Move, logs: LogEntry[]
 }
 
 export function handleScreens(state: BattleState, attacker: Pokemon, move: Move, logs: LogEntry[]) {
-    const isP1 = state.currentPokemon1?.id === attacker.id;
+    const isP1 = getPokemonPlayerNum(state, attacker) === 1;
     const hazards = isP1 ? state.p1Hazards : state.p2Hazards;
     const duration = attacker.heldItem === 'light-clay' ? 8 : 5;
 

@@ -117,7 +117,6 @@ export function handleSecondaryEffects(
 ): { defenderSwitchRequested?: boolean } {
   
   if (['dragon-tail', 'circle-throw'].includes(move.name) || move.effect?.status === 'force-switch') {
-      const isP1 = state?.currentPokemon1?.id === attacker.id;
       // Note: handleForceSwitch returns true if a switch was requested
       if (!hitSubstituteOnLastHit) {
           DragonTail.handleForceSwitch(attacker, defender, logs, move.name, state);

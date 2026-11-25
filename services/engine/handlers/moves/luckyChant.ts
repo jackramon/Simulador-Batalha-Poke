@@ -1,5 +1,6 @@
 
 import { Pokemon, BattleState, LogEntry } from '../../../../types';
+import { getPokemonPlayerNum } from '../../../../utils/pokemonIdentity';
 import { log } from '../../utils';
 
 /**
@@ -14,7 +15,7 @@ export function handleLuckyChant(
     if (!state) return;
 
     // Identifica o lado do usuário
-    const isP1 = state.currentPokemon1?.id === attacker.id;
+    const isP1 = getPokemonPlayerNum(state, attacker) === 1;
     const hazards = isP1 ? state.p1Hazards : state.p2Hazards;
 
     if (hazards.luckyChant > 0) {

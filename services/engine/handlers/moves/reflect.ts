@@ -1,5 +1,6 @@
 
 import { Pokemon, Move, BattleState } from '../../../../types';
+import { getPokemonPlayerNum } from '../../../../utils/pokemonIdentity';
 import * as Infiltrator from '../abilities/infiltrator';
 import { log } from '../../utils';
 
@@ -34,7 +35,7 @@ export function getDamageMultiplier(
     }
 
     // Identifica o lado do defensor
-    const isP1 = state.currentPokemon1?.id === defender.id;
+    const isP1 = getPokemonPlayerNum(state, defender) === 1;
     const hazards = isP1 ? state.p1Hazards : state.p2Hazards;
 
     if (move.damageClass === 'physical') {

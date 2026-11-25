@@ -8,6 +8,7 @@ import * as Psyshock from './engine/handlers/moves/psyshock';
 import * as TerrainPulse from './engine/handlers/moves/terrainPulse';
 import * as Comatose from './engine/handlers/abilities/comatose';
 import * as LastResort from './engine/handlers/moves/lastResort';
+import { getPokemonPlayerNum, isPokemonOnTeam, isSamePokemonInstance, resolvePokemonTarget } from '../utils/pokemonIdentity';
 
 // --- IMPORTS DO MOTOR (Para Simulação) ---
 import { executeMove } from './engine/moves';
@@ -242,7 +243,7 @@ function getBestItemAction(
                 score: selfScore,
                 action: {
                     type: 'item',
-                    data: { itemId: bagItem.id, targetId: user.id, isGive: false },
+                    data: { itemId: bagItem.id, targetId: user.id, targetInstanceId: user.instanceId, isGive: false },
                     user: user,
                     playerNum: playerNum,
                     tieBreaker: 0
@@ -253,7 +254,7 @@ function getBestItemAction(
         // Avalia uso em aliados (ex: Revive, Potion em reserva, Equipar item em reserva)
         team.forEach(teammate => {
             // Itens de uso direto (Cura, Revive) em aliados
-            if (teammate.id !== user.id) {
+            if (!isSamePokemonInstance(teammate, user)) {
                 const allyScore = evaluateItemUse(bagItem.id, teammate, opponent, state, user);
                 if (allyScore > maxScore) {
                     maxScore = allyScore;
@@ -261,7 +262,7 @@ function getBestItemAction(
                         score: allyScore,
                         action: {
                             type: 'item',
-                            data: { itemId: bagItem.id, targetId: teammate.id, isGive: false },
+                            data: { itemId: bagItem.id, targetId: teammate.id, targetInstanceId: teammate.instanceId, isGive: false },
                             user: user,
                             playerNum: playerNum,
                             tieBreaker: 0
@@ -278,7 +279,7 @@ function getBestItemAction(
                 
                 // Prioriza equipar o Pokémon ativo se o score for bom, mas equipar reserva também é válido
                 // Aplica um pequeno desconto para equipar reservas para priorizar o ativo em caso de empate
-                const finalGiveScore = teammate.id === user.id ? giveScore : giveScore - 5;
+                const finalGiveScore = isSamePokemonInstance(teammate, user) ? giveScore : giveScore - 5;
 
                 if (finalGiveScore > maxScore) {
                     maxScore = finalGiveScore;
@@ -286,7 +287,7 @@ function getBestItemAction(
                         score: finalGiveScore,
                         action: {
                             type: 'item',
-                            data: { itemId: bagItem.id, targetId: teammate.id, isGive: true },
+                            data: { itemId: bagItem.id, targetId: teammate.id, targetInstanceId: teammate.instanceId, isGive: true },
                             user: user,
                             playerNum: playerNum,
                             tieBreaker: 0
@@ -344,7 +345,7 @@ function evaluateItemUse(itemId: string, target: Pokemon, opponent: Pokemon, sta
         else if (itemId === 'max-potion' || itemId === 'full-restore') healAmount = target.maxHP;
 
         // Se o Pokémon ativo vai morrer de qualquer jeito mesmo curando, não cura
-        if (activePokemon && target.id === activePokemon.id) {
+        if (activePokemon && isSamePokemonInstance(target, activePokemon)) {
             if (target.hp + healAmount <= estimatedIncomingDamage) {
                 return -100; // Vai morrer de qualquer jeito, melhor atacar ou trocar
             }
@@ -540,7 +541,7 @@ function getLegalActions(
 
     // Trocas
     if (!trapped) {
-        const switchCandidates = team.filter(p => !p.isFainted && p.id !== pokemon.id);
+        const switchCandidates = team.filter(p => !p.isFainted && !isSamePokemonInstance(p, pokemon));
         switchCandidates.forEach(p => {
             actions.push({ type: 'switch', data: p, user: pokemon, playerNum, priority: 6, tieBreaker: 0 });
         });
@@ -562,7 +563,7 @@ function rehydrateActionForSimulation(originalAction: Action, simulationState: B
     } else if (originalAction.type === 'switch') {
         const targetId = originalAction.data.id;
         const team = playerNum === 1 ? simulationState.team1 : simulationState.team2;
-        const simTarget = team.find(p => p.id === targetId);
+        const simTarget = resolvePokemonTarget(team, originalAction.data.instanceId, targetId);
         if (!simTarget) return null; 
         return { ...originalAction, user: simUser, data: simTarget };
     } else {
@@ -634,14 +635,14 @@ function getMostDangerousMove(attacker: Pokemon, defender: Pokemon, weather: str
 function findDefensivePivot(
     team: Pokemon[], 
     incomingMove: Move, 
-    attacker: Pokemon, 
-    activePokemonId: number
+    attacker: Pokemon,
+    activePokemon: Pokemon
 ): Pokemon | null {
     let bestPivot: Pokemon | null = null;
     let bestMultiplier = 1.0; // Procuramos resistências (< 1.0)
 
     for (const candidate of team) {
-        if (candidate.isFainted || candidate.id === activePokemonId) continue;
+        if (candidate.isFainted || isSamePokemonInstance(candidate, activePokemon)) continue;
 
         const eff = calculateTypeEffectiveness(
             incomingMove.type, 
@@ -729,26 +730,28 @@ export function decideAIAction(
         const perceivedOpponent = getPerceivedOpponent(opponentPokemon);
         const perceptionState = cloneBattleState(state);
         
-        if (perceptionState.currentPokemon1?.id === opponentPokemon.id) {
+        if (isSamePokemonInstance(perceptionState.currentPokemon1, opponentPokemon)) {
             perceptionState.currentPokemon1 = perceivedOpponent;
-        } else if (perceptionState.currentPokemon2?.id === opponentPokemon.id) {
+        } else if (isSamePokemonInstance(perceptionState.currentPokemon2, opponentPokemon)) {
             perceptionState.currentPokemon2 = perceivedOpponent;
         }
 
         let simulatedAiPokemon: Pokemon | null = null;
         let simulatedAiTeam: Pokemon[] = [];
 
-        if (perceptionState.currentPokemon1?.id === aiPokemon.id) {
+        if (isSamePokemonInstance(perceptionState.currentPokemon1, aiPokemon)) {
             simulatedAiPokemon = perceptionState.currentPokemon1;
             simulatedAiTeam = perceptionState.team1;
-        } else if (perceptionState.currentPokemon2?.id === aiPokemon.id) {
+        } else if (isSamePokemonInstance(perceptionState.currentPokemon2, aiPokemon)) {
             simulatedAiPokemon = perceptionState.currentPokemon2;
             simulatedAiTeam = perceptionState.team2;
         } else {
-            simulatedAiPokemon = perceptionState.team1.find(p => p.id === aiPokemon.id) || 
-                                 perceptionState.team2.find(p => p.id === aiPokemon.id) || 
-                                 aiPokemon; 
-            simulatedAiTeam = perceptionState.team1.some(p => p.id === simulatedAiPokemon?.id) ? perceptionState.team1 : perceptionState.team2;
+            simulatedAiPokemon = resolvePokemonTarget(
+                [...perceptionState.team1, ...perceptionState.team2],
+                aiPokemon.instanceId,
+                aiPokemon.id
+            ) || aiPokemon;
+            simulatedAiTeam = isPokemonOnTeam(simulatedAiPokemon, perceptionState.team1) ? perceptionState.team1 : perceptionState.team2;
         }
 
         // 0. DEFENSIVE PIVOT (New Layer - Switch Prediction)
@@ -765,11 +768,11 @@ export function decideAIAction(
                      
                      // Se o dano estimado for letal (>= HP atual)
                      if (estimatedDmg >= simulatedAiPokemon.hp) {
-                         const pivot = findDefensivePivot(simulatedAiTeam, dangerousMove, perceivedOpponent, simulatedAiPokemon.id);
+                         const pivot = findDefensivePivot(simulatedAiTeam, dangerousMove, perceivedOpponent, simulatedAiPokemon);
                          
                          if (pivot) {
                              // Encontra o Pokémon real na equipe original para retornar a ação correta
-                             const realPivot = aiTeam.find(p => p.id === pivot.id);
+                             const realPivot = resolvePokemonTarget(aiTeam, pivot.instanceId, pivot.id);
                              if (realPivot) {
                                 return {
                                     type: 'switch',
@@ -791,7 +794,7 @@ export function decideAIAction(
             const currentMatchupScore = evaluateSwitchMatchup(simulatedAiPokemon, perceivedOpponent);
             // Limiar negativo (-40) indica desvantagem clara (ex: tipo fraco, lento, sem golpes efetivos)
             if (currentMatchupScore < -40) {
-                const candidates = simulatedAiTeam.filter(p => !p.isFainted && p.id !== simulatedAiPokemon?.id);
+                const candidates = simulatedAiTeam.filter(p => !p.isFainted && !isSamePokemonInstance(p, simulatedAiPokemon));
                 const bestSwitch = chooseBestSwitch(candidates, perceivedOpponent);
                 
                 if (bestSwitch) {
@@ -969,7 +972,7 @@ function mapActionBackToReal(simAction: Action, realUser: Pokemon, realTeam: Pok
         mappedAction = { ...simAction, user: realUser, data: realMove };
     } else if (simAction.type === 'switch') {
         const targetId = simAction.data.id;
-        const realTarget = realTeam.find(p => p.id === targetId);
+        const realTarget = resolvePokemonTarget(realTeam, simAction.data.instanceId, targetId);
         mappedAction = { ...simAction, user: realUser, data: realTarget || simAction.data };
     } else if (simAction.type === 'item') {
         // Mapeia item de volta. O targetId já é um ID numérico, então deve bater.
@@ -1283,7 +1286,7 @@ function evaluateSpeedMatchup(aiMon: Pokemon, opponent: Pokemon, state: BattleSt
     const weather = state.weather;
     
     // Identifica se Tailwind está ativo para a IA e para o oponente
-    const aiIsP1 = state.team1.some(p => p.id === aiMon.id);
+    const aiIsP1 = getPokemonPlayerNum(state, aiMon) === 1;
     const aiTailwind = aiIsP1 ? state.p1Hazards.tailwind > 0 : state.p2Hazards.tailwind > 0;
     const oppTailwind = aiIsP1 ? state.p2Hazards.tailwind > 0 : state.p1Hazards.tailwind > 0;
 

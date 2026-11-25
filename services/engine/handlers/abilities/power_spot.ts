@@ -1,5 +1,6 @@
 
 import { Pokemon, BattleState, Move } from '../../../../types';
+import { getPokemonPlayerNum, isSamePokemonInstance } from '../../../../utils/pokemonIdentity';
 import * as NeutralizingGas from './neutralizing_gas';
 
 /**
@@ -16,7 +17,7 @@ export function getPowerSpotMultiplier(attacker: Pokemon, move: Move, state?: Ba
     const isGasActive = NeutralizingGas.isGasActive(state);
 
     // Identifica a equipe do atacante
-    const isP1 = state.team1.some(p => p.id === attacker.id);
+    const isP1 = getPokemonPlayerNum(state, attacker) === 1;
     const team = isP1 ? state.team1 : state.team2;
 
     // Procura por um aliado na equipe que:
@@ -24,7 +25,7 @@ export function getPowerSpotMultiplier(attacker: Pokemon, move: Move, state?: Ba
     // 2. Não esteja desmaiado.
     // 3. Tenha a habilidade Ponto de Energia não suprimida.
     const hasPowerSpotAlly = team.some(p => {
-        return p.id !== attacker.id && 
+        return !isSamePokemonInstance(p, attacker) &&
                !p.isFainted && 
                p.ability === 'power-spot' && 
                !NeutralizingGas.isAbilitySuppressed(p.ability, isGasActive);

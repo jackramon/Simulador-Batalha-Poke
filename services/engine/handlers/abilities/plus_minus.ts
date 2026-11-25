@@ -1,4 +1,5 @@
 import { Pokemon, BattleState } from '../../../../types';
+import { getPokemonPlayerNum, isSamePokemonInstance } from '../../../../utils/pokemonIdentity';
 import * as NeutralizingGas from './neutralizing_gas';
 
 /**
@@ -19,12 +20,12 @@ export function getMultiplier(pokemon: Pokemon, isGasActive: boolean, state?: Ba
     if (!state) return 1.0;
 
     // Identifica a equipe do Pokémon
-    const isP1 = state.team1.some(p => p.id === pokemon.id);
+    const isP1 = getPokemonPlayerNum(state, pokemon) === 1;
     const team = isP1 ? state.team1 : state.team2;
 
     // Verifica se existe algum aliado (na reserva ou ativo no futuro) com Plus ou Minus
     const hasPartner = team.some(p => 
-        p.id !== pokemon.id && 
+        !isSamePokemonInstance(p, pokemon) &&
         !p.isFainted && 
         (p.ability === 'plus' || p.ability === 'minus')
     );

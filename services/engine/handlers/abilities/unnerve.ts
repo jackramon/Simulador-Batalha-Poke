@@ -1,5 +1,6 @@
 
 import { Pokemon, BattleState } from '../../../../types';
+import { getPokemonPlayerNum } from '../../../../utils/pokemonIdentity';
 import { log } from '../../utils';
 import * as NeutralizingGas from './neutralizing_gas';
 
@@ -18,7 +19,7 @@ export function isOpponentUnnerved(pokemon: Pokemon, state?: BattleState): boole
     if (!state) return false;
 
     // Identifica o oponente
-    const isP1 = state.team1.some(p => p.id === pokemon.id);
+    const isP1 = getPokemonPlayerNum(state, pokemon) === 1;
     const opponent = isP1 ? state.currentPokemon2 : state.currentPokemon1;
 
     if (!opponent || opponent.isFainted) return false;

@@ -5,6 +5,7 @@ import { BATTLE_MESSAGES } from '../../../data/battleMessages';
 import { TWO_TURN_MOVES, RECHARGE_MOVES } from '../../../data/moves';
 import { ITEMS_DATA } from '../../../data/items';
 import { TYPE_NAMES_PT } from '../../../data/types';
+import { getPokemonPlayerNum } from '../../../utils/pokemonIdentity';
 
 import * as Restrictions from '../handlers/moves/restrictions';
 import * as ThroatChop from '../handlers/moves/throatChop';
@@ -95,7 +96,7 @@ export function validateMoveExecution(
 
     // --- LÓGICA DE TERASTALIZAÇÃO ---
     if (shouldTerastallize && config.terastallizationEnabled && !attacker.isTerastallized) {
-        const isP1 = attacker.id === state.currentPokemon1?.id;
+        const isP1 = getPokemonPlayerNum(state, attacker) === 1;
         const canTera = isP1 ? !state.p1TeraUsed : !state.p2TeraUsed;
 
         if (canTera) {

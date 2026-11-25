@@ -1,5 +1,6 @@
 
 import { Pokemon, Move, BattleState } from '../../../../types';
+import { getPokemonPlayerNum } from '../../../../utils/pokemonIdentity';
 import { HIGH_CRIT_MOVES } from '../../../../data/moves/categories';
 
 /**
@@ -15,7 +16,7 @@ export function isImmuneToCritical(defender: Pokemon, ignoresAbilities: boolean,
 
     // Verifica Lucky Chant (Canção da Sorte)
     if (state) {
-        const isP1 = state.currentPokemon1?.id === defender.id;
+        const isP1 = getPokemonPlayerNum(state, defender) === 1;
         const hazards = isP1 ? state.p1Hazards : state.p2Hazards;
         
         if (hazards && hazards.luckyChant > 0) {

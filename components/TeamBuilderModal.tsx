@@ -8,6 +8,7 @@ import { TYPE_NAMES_PT } from '../data/types';
 import { NATURES } from '../data/natures';
 import { calculateMaxHP } from '../services/engine/handlers/statCalculator';
 import { ABILITY_EFFECTS } from '../data/abilities';
+import { normalizeTeamInstanceIds } from '../utils/pokemonIdentity';
 
 interface TeamBuilderModalProps {
   onSave: (team: Pokemon[]) => void;
@@ -85,7 +86,7 @@ export const TeamBuilderModal: React.FC<TeamBuilderModalProps> = ({ onSave, onCa
     updateSlot(index, { isLoading: true, error: null, suggestions: [] });
     try {
       // Fetch usa randomLevels para setar level inicial
-      const team = await fetchTeam(1, 'manual', searchTerm.toLowerCase(), true, randomLevels);
+      const team = await fetchTeam(1, 'manual', searchTerm.toLowerCase(), true, randomLevels, false, true, playerNum);
       if (team && team.length > 0) {
         updateSlot(index, { pokemon: team[0], isLoading: false });
       } else {
@@ -180,7 +181,7 @@ export const TeamBuilderModal: React.FC<TeamBuilderModalProps> = ({ onSave, onCa
   const handleRandomSlot = async (index: number) => {
       updateSlot(index, { isLoading: true, error: null, suggestions: [] });
       try {
-          const team = await fetchTeam(1, 'random', '', true, randomLevels);
+          const team = await fetchTeam(1, 'random', '', true, randomLevels, false, true, playerNum);
           if (team && team.length > 0) {
               // Aplica randomização completa de stats ao Pokémon gerado
               const randomizedPokemon = generateRandomStats(team[0]);
@@ -565,7 +566,7 @@ export const TeamBuilderModal: React.FC<TeamBuilderModalProps> = ({ onSave, onCa
 
   const handleSave = () => {
     const fullTeam = slots.filter(s => s.pokemon !== null).map(s => s.pokemon!);
-    onSave(fullTeam);
+    onSave(normalizeTeamInstanceIds(fullTeam, playerNum));
   };
 
   const itemOptions = Object.entries(ITEMS_DATA)

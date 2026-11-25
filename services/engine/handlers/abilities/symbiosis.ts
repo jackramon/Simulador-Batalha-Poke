@@ -1,5 +1,6 @@
 
 import { Pokemon, BattleState } from '../../../../types';
+import { getPokemonPlayerNum, isSamePokemonInstance } from '../../../../utils/pokemonIdentity';
 import { ITEMS_DATA } from '../../../../data/items';
 import { log } from '../../utils';
 import * as NeutralizingGas from './neutralizing_gas';
@@ -18,7 +19,7 @@ export function handleSymbiosis(pokemon: Pokemon, logs: {message: string, color:
     const isGasActive = NeutralizingGas.isGasActive(state);
 
     // Identifica a equipe do Pokémon que consumiu o item
-    const isP1 = state.team1.some(p => p.id === pokemon.id);
+    const isP1 = getPokemonPlayerNum(state, pokemon) === 1;
     const team = isP1 ? state.team1 : state.team2;
 
     // Procura por um aliado na equipe que:
@@ -27,7 +28,7 @@ export function handleSymbiosis(pokemon: Pokemon, logs: {message: string, color:
     // 3. Tenha a habilidade Simbiose não suprimida.
     // 4. Possua um item para dar.
     const donor = team.find(p => {
-        return p.id !== pokemon.id && 
+        return !isSamePokemonInstance(p, pokemon) &&
                !p.isFainted && 
                p.ability === 'symbiosis' && 
                p.heldItem !== null &&

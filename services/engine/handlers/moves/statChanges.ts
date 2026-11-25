@@ -1,5 +1,6 @@
 
 import { Pokemon, Move, StatStages, BattleState, LogEntry } from '../../../../types';
+import { getPokemonPlayerNum } from '../../../../utils/pokemonIdentity';
 import { STAT_NAMES_PT } from '../../../../data/pokemon';
 import { SOUND_MOVES } from '../../../../data/moves/categories';
 import { log } from '../../utils';
@@ -54,7 +55,7 @@ export function applyMoveStatChange(
 
             // 1. Verificação de Névoa (Mist)
             if (state) {
-                const isP1 = state.currentPokemon1?.id === target.id;
+                const isP1 = getPokemonPlayerNum(state, target) === 1;
                 const hazards = isP1 ? state.p1Hazards : state.p2Hazards;
                 
                 if (hazards.mist > 0) {

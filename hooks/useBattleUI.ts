@@ -12,7 +12,7 @@ export const useBattleUI = (
 ) => {
   const [p1AiSelectedMove, setP1AiSelectedMove] = useState<string | null>(null);
   const [aiHighlightingMember, setAiHighlightingMember] = useState<number | null>(null);
-  const [p1AiBagSelection, setP1AiBagSelection] = useState<{ itemId: string, targetId: number, isGive: boolean } | null>(null);
+  const [p1AiBagSelection, setP1AiBagSelection] = useState<{ itemId: string, targetId: number, targetInstanceId?: string, isGive: boolean, moveName?: string } | null>(null);
   
   const [showSwitchModal, setShowSwitchModal] = useState<{player: 1|2, canCancel: boolean, isBatonPass?: boolean} | null>(null);
   const [showDetailsModal, setShowDetailsModal] = useState<{pokemon: Pokemon, player: 1|2} | null>(null);

@@ -8,7 +8,7 @@
 - Mantenha `PROJECT_CONTEXT.md` atualizado a cada alteração.
 - Para economizar tokens: inspecione somente os arquivos da tarefa e suas dependências diretas, reutilize a baseline registrada, use testes focados durante a iteração e rode a suíte completa na validação final. Não refaça auditorias globais já concluídas.
 
-**Próximo item:** 2.4 — Introduzir `instanceId` único, separado do ID da espécie.
+**Próximo item:** 2.5 — Definir estado transacional, evitando snapshots com objetos mutáveis compartilhados.
 
 ## Etapa 0 — Restaurar uma baseline confiável
 
@@ -102,7 +102,13 @@
   - O tick de Lucky Chant reside em seu handler e é executado pela fonte canônica `processTurnEnd`; o coordenador consome esse resultado sem chamada adicional. A ativação pelo registry com duração inicial 5, o wiring, switching, `instanceId`, PRNG e `secondaryEffectRouter` não foram alterados.
   - Fechamento validado por RED→GREEN: a chamada direta a `processTurnEnd` cobre 2→1→0 sem nova ativação, e o coordenador preserva a ativação em 5 com exatamente um decremento por turno até 0. Validação: 4 arquivos focados e 35 testes aprovados; suíte completa com 36 arquivos, 146 testes aprovados e 5 `it.todo` preservados (151 registrados), sem novos todos; `npm run lint`, `npm run build` e `git diff --check` aprovados.
   - Commit: informado no resumo final após o push verificado em `origin/main`.
-- [ ] **2.4 — Introduzir `instanceId` único, separado do ID da espécie.**
+- [x] **2.4 — Introduzir `instanceId` único, separado do ID da espécie.**
+  - `Pokemon.id` permanece como espécie/PokeAPI; `instanceId` é preenchido/normalizado deterministicamente por lado e slot, sem PRNG, em PokeAPI, builder, importação, fixtures e replay. IDs existentes únicos são preservados, colisões são resolvidas deterministicamente, e clones/trocas mantêm a identidade.
+  - Lados e alvos passaram a ser resolvidos por instância em Tailwind, hazards, telas, Tera, Mega, mochila/itens, trocas, efeitos de equipe, hidratação Mega e IA local/LLM. IDs de espécie usados por sprites, formas e PokeAPI foram preservados.
+  - Novos eventos gravam `actorInstanceId`, `switchInstanceId` e `targetInstanceId`; itens também transportam `targetInstanceId` nas ações. `services/replayLogic.ts` reidrata instâncias sem ambiguidade e aceita replay antigo por espécie apenas quando houver um único candidato. A normalização do replay não altera a separação ativo/equipe do ReplayPlayer, adiada para 3.3; a estratégia da IA de P1 permanece em 3.4.
+  - Cinco grupos RED→GREEN cobriram unicidade/estabilidade, mecânicas laterais em espelho, mochila/Tera/Mega, IA/LLM e replay novo/fallback antigo, incluindo duplicatas importadas, trocas, persistência da identidade e ausência de draws adicionais nos caminhos de identidade. Os dois `it.todo` de espelho deste item foram convertidos; os três todos de 3.1/3.3/3.4 permanecem.
+  - Validação: 6 arquivos focados e 37 testes aprovados com 1 `it.todo`; suíte completa com 39 arquivos, 159 testes aprovados e 3 `it.todo` (162 registrados); `npm run lint`, `npm run build` e `git diff --check` aprovados.
+  - Commit: informado no resumo final após o push verificado em `origin/main`.
 - [ ] **2.5 — Definir estado transacional, evitando snapshots com objetos mutáveis compartilhados.**
 - [ ] **2.6 — Substituir o PRNG global por contexto explícito com snapshot/restore para simulações.**
 
@@ -125,8 +131,8 @@
 
 ## Registro resumido da baseline
 
-- Última suíte integral informada: **36 arquivos, 146 testes aprovados e 5 `it.todo`** (151 registrados); os todos são lacunas de outros itens e não contam como cobertura aprovada.
+- Última suíte integral informada: **39 arquivos, 159 testes aprovados e 3 `it.todo`** (162 registrados); os todos são lacunas de outros itens e não contam como cobertura aprovada.
 - `npm run lint`, `npm run build` e `git diff --check`: aprovados.
 - Auditoria do item 0.5: **17 → 0** ocorrências no total e **6 → 0** em produção; instalação por `npm ci` reproduzida sem alterações nos manifestos.
-- SHA dos itens 1.1 a 1.7 e dos itens 2.1/2.2/2.3 informados somente nos respectivos resumos finais após o push; último SHA registrado no roadmap: `baae8a606c37495f30810e2c646dbb234c75ac86` (item 0.4).
+- SHA dos itens 1.1 a 1.7 e dos itens 2.1/2.2/2.3/2.4 informados somente nos respectivos resumos finais após o push; último SHA registrado no roadmap: `baae8a606c37495f30810e2c646dbb234c75ac86` (item 0.4).
 - Pendência não bloqueante: aviso de chunk acima de 500 kB, planejado no item 4.5.

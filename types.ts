@@ -59,6 +59,7 @@ export interface Move {
 
 export interface Pokemon {
   id: number;
+  instanceId?: string; // Identidade estável da instância na batalha; id permanece sendo a espécie/PokeAPI
   name: string;
   speciesId?: string;
   hp: number;
@@ -164,9 +165,12 @@ export interface BattleReplayEvent {
   turn: number;
   actionType: 'move' | 'switch' | 'item';
   actorId: 1 | 2;
+  actorInstanceId?: string; // Instância que executou a ação; ausente em replays antigos
   targetId?: number;
+  targetInstanceId?: string;
   moveId?: string;
   switchId?: number;
+  switchInstanceId?: string;
   itemId?: string;
   isGive?: boolean;
   shouldTerastallize?: boolean;

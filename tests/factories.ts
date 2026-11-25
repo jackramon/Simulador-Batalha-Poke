@@ -1,4 +1,5 @@
 import { Move, Pokemon, BattleState, BagItem, PlayerInventory, SideHazards, StatStages, StatusEffect } from '../types';
+import { normalizeBattleTeams } from '../utils/pokemonIdentity';
 
 export const createMove = (overrides: Partial<Move> = {}): Move => ({
     name: 'tackle',
@@ -88,8 +89,16 @@ export const createBattleState = (
     team2: Pokemon[] = [createPokemon({ id: 2, name: 'Player 2' })],
     overrides: Partial<BattleState> = {},
 ): BattleState => {
-    const resolvedTeam1 = [...(overrides.team1 ?? team1)];
-    const resolvedTeam2 = [...(overrides.team2 ?? team2)];
+    const sourceTeam1 = overrides.team1 ?? team1;
+    const sourceTeam2 = overrides.team2 ?? team2;
+    const normalizedTeams = normalizeBattleTeams(sourceTeam1, sourceTeam2);
+    const preserveReferences = (source: Pokemon[], normalized: Pokemon[]) => normalized.map((pokemon, index) => {
+        const original = source[index];
+        if (pokemon !== original) original.instanceId = pokemon.instanceId;
+        return original;
+    });
+    const resolvedTeam1 = preserveReferences(sourceTeam1, normalizedTeams.team1);
+    const resolvedTeam2 = preserveReferences(sourceTeam2, normalizedTeams.team2);
     const currentPokemon1 = overrides.currentPokemon1 === undefined ? resolvedTeam1[0] ?? null : overrides.currentPokemon1;
     const currentPokemon2 = overrides.currentPokemon2 === undefined ? resolvedTeam2[0] ?? null : overrides.currentPokemon2;
 

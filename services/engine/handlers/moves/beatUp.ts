@@ -1,12 +1,13 @@
 
 import { Pokemon, BattleState } from '../../../../types';
+import { getPokemonPlayerNum } from '../../../../utils/pokemonIdentity';
 
 /**
  * Obtém os membros da equipe elegíveis para participar da Surra.
  * Regra: Pokémon não desmaiados e sem condições de status não-voláteis.
  */
 function getParticipatingTeam(attacker: Pokemon, state: BattleState): Pokemon[] {
-    const isP1 = state.team1.some(p => p.id === attacker.id);
+    const isP1 = getPokemonPlayerNum(state, attacker) === 1;
     const team = isP1 ? state.team1 : state.team2;
 
     const majorStatus = ['burn', 'paralysis', 'poison', 'toxic', 'sleep', 'freeze'];

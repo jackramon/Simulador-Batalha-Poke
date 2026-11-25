@@ -10,6 +10,7 @@ import * as QuickDraw from './handlers/abilities/quick_draw';
 import * as Pursuit from './handlers/moves/pursuit';
 import * as GrassyGlide from './handlers/moves/grassyGlide';
 import * as PriorityItems from './handlers/items/priority';
+import { getPokemonPlayerNum } from '../../utils/pokemonIdentity';
 
 export function getSortedActions(actions: Action[], state: BattleState): Action[] {
   const isWeatherSuppressed = AirLock.isWeatherSuppressed(state);
@@ -88,10 +89,10 @@ export function getSortedActions(actions: Action[], state: BattleState): Action[
     }
     
     // Determina se Tailwind está ativo para cada lado
-    const isP1 = state.team1.some(p => p.id === a.action.user.id);
+    const isP1 = getPokemonPlayerNum(state, a.action.user) === 1;
     const tailwindA = isP1 ? state.p1Hazards.tailwind > 0 : state.p2Hazards.tailwind > 0;
     
-    const isP1B = state.team1.some(p => p.id === b.action.user.id);
+    const isP1B = getPokemonPlayerNum(state, b.action.user) === 1;
     const tailwindB = isP1B ? state.p1Hazards.tailwind > 0 : state.p2Hazards.tailwind > 0;
 
     let speedA = getEffectiveSpeed(a.action.user, effectiveWeather, tailwindA);

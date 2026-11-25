@@ -1,5 +1,6 @@
 
 import { Pokemon, BattleState } from '../../../../types';
+import { getPokemonPlayerNum } from '../../../../utils/pokemonIdentity';
 import { log } from '../../utils';
 
 export function handleSpikes(
@@ -7,7 +8,7 @@ export function handleSpikes(
     logs: {message: string, color: string}[], 
     state: BattleState
 ) {
-    const isP1 = state.currentPokemon1?.id === attacker.id;
+    const isP1 = getPokemonPlayerNum(state, attacker) === 1;
     const targetHazards = isP1 ? state.p2Hazards : state.p1Hazards;
 
     if (targetHazards.spikes >= 3) {

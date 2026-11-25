@@ -2,21 +2,23 @@
 import React, { useState, useEffect } from 'react';
 import { PlayerInventory, BagItem, Pokemon } from '../types';
 import { ITEMS_DATA } from '../data/items';
+import { resolvePokemonTarget } from '../utils/pokemonIdentity';
 
 interface BagModalProps {
   inventory: PlayerInventory;
   team: Pokemon[];
-  currentActiveId?: number; 
-  aiSelection?: { itemId: string, targetId: number, isGive: boolean, moveName?: string }; // Adicionado moveName
-  onUseItem: (itemId: string, targetId: number, moveName?: string) => void;
-  onGiveItem: (itemId: string, targetId: number) => void;
+  currentActiveId?: number;
+  currentActiveInstanceId?: string;
+  aiSelection?: { itemId: string, targetId: number, targetInstanceId?: string, isGive: boolean, moveName?: string };
+  onUseItem: (itemId: string, targetId: number, moveName?: string, targetInstanceId?: string) => void;
+  onGiveItem: (itemId: string, targetId: number, targetInstanceId?: string) => void;
   onCancel: () => void;
 }
 
 type BagCategory = 'medicine' | 'battle-item' | 'berry' | 'held';
 type BagView = 'list' | 'details' | 'target' | 'moves';
 
-export const BagModal: React.FC<BagModalProps> = ({ inventory, team, currentActiveId, aiSelection, onUseItem, onGiveItem, onCancel }) => {
+export const BagModal: React.FC<BagModalProps> = ({ inventory, team, currentActiveId, currentActiveInstanceId, aiSelection, onUseItem, onGiveItem, onCancel }) => {
   const [activeCategory, setActiveCategory] = useState<BagCategory>('medicine');
   const [selectedItem, setSelectedItem] = useState<BagItem | null>(null);
   const [selectedTargetPokemon, setSelectedTargetPokemon] = useState<Pokemon | null>(null); // Novo estado
@@ -45,7 +47,7 @@ export const BagModal: React.FC<BagModalProps> = ({ inventory, team, currentActi
 
               // 3. Define o tipo de ação e alvo
               setActionType(aiSelection.isGive ? 'give' : 'use');
-              const targetP = team.find(p => p.id === aiSelection.targetId);
+              const targetP = resolvePokemonTarget(team, aiSelection.targetInstanceId, aiSelection.targetId);
               if (targetP) setSelectedTargetPokemon(targetP);
 
               // 4. Fluxo Visual: Detalhes -> Alvo -> (Movimentos)
@@ -121,11 +123,11 @@ export const BagModal: React.FC<BagModalProps> = ({ inventory, team, currentActi
           return;
       }
 
-      onUseItem(selectedItem.id, pokemon.id);
+      onUseItem(selectedItem.id, pokemon.id, undefined, pokemon.instanceId);
     } else {
       // Dar item
       if (pokemon.isFainted) return; 
-      onGiveItem(selectedItem.id, pokemon.id);
+      onGiveItem(selectedItem.id, pokemon.id, pokemon.instanceId);
     }
   };
 
@@ -137,7 +139,7 @@ export const BagModal: React.FC<BagModalProps> = ({ inventory, team, currentActi
       const move = selectedTargetPokemon?.moves?.find(m => m?.name === moveName);
       if (move && move.uses >= move.maxUses) return; // PP Cheio
 
-      onUseItem(selectedItem.id, selectedTargetPokemon.id, moveName);
+      onUseItem(selectedItem.id, selectedTargetPokemon.id, moveName, selectedTargetPokemon.instanceId);
   };
 
   const renderTabs = () => (
@@ -260,7 +262,7 @@ export const BagModal: React.FC<BagModalProps> = ({ inventory, team, currentActi
             {actionType === 'use' ? 'Usar em quem?' : 'Dar para quem?'}
         </h3>
         <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 max-h-[300px] overflow-y-auto mb-4">
-            {team.map(p => {
+            {team.map((p, index) => {
                 const data = selectedItem ? ITEMS_DATA[selectedItem.id] : null;
                 let disabled = false;
                 let reason = "";
@@ -280,15 +282,17 @@ export const BagModal: React.FC<BagModalProps> = ({ inventory, team, currentActi
                     disabled = true; reason = "Desmaiado";
                 }
 
-                const isAiTarget = aiSelection?.targetId === p?.id;
-                const isActive = p?.id === currentActiveId;
+                const isAiTarget = aiSelection?.targetInstanceId
+                    ? aiSelection.targetInstanceId === p.instanceId
+                    : aiSelection?.targetId === p?.id;
+                const isActive = currentActiveInstanceId ? p.instanceId === currentActiveInstanceId : p?.id === currentActiveId;
                 const highlightClass = isAiTarget 
                     ? 'border-yellow-400 bg-yellow-50 ring-2 ring-yellow-400 scale-[1.02]' 
                     : 'border-indigo-200 hover:bg-indigo-50 hover:border-indigo-400';
 
                 return (
                     <div 
-                        key={p?.id} 
+                        key={p?.instanceId ?? `${p?.id}-${index}`}
                         className={`border-2 rounded-lg p-2 flex items-center gap-2 transition-all ${disabled ? 'opacity-50 border-gray-200 cursor-not-allowed bg-gray-100' : `cursor-pointer ${highlightClass}`}`}
                         onClick={() => !disabled && handleTargetSelect(p)}
                     >

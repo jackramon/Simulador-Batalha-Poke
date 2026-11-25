@@ -2,6 +2,7 @@
 import { Pokemon, BattleState } from '../../../../types';
 import { log } from '../../utils';
 import * as Klutz from '../abilities/klutz';
+import { getPokemonPlayerNum, isSamePokemonInstance } from '../../../../utils/pokemonIdentity';
 
 /**
  * Lógica para o item Botão de Ejeção (Eject Button).
@@ -24,9 +25,9 @@ export function handleEjectButton(
     }
 
     // 3. Verifica se há aliados vivos para trocar
-    const isP1 = state.currentPokemon1?.id === holder.id;
+    const isP1 = getPokemonPlayerNum(state, holder) === 1;
     const team = isP1 ? state.team1 : state.team2;
-    const hasBackups = team.some(p => !p.isFainted && p.id !== holder.id);
+    const hasBackups = team.some(p => !p.isFainted && !isSamePokemonInstance(p, holder));
 
     if (!hasBackups) {
         return false;

@@ -7,6 +7,7 @@ import * as Refrigerate from '../services/engine/handlers/abilities/refrigerate'
 import * as LiquidVoice from '../services/engine/handlers/abilities/liquid_voice';
 import { ITEMS_DATA } from '../data/items';
 import { ABILITY_EFFECTS } from '../data/abilities';
+import { isSamePokemonInstance } from '../utils/pokemonIdentity';
 
 interface SwitchModalProps {
   player: 1 | 2;
@@ -29,9 +30,9 @@ export const SwitchModal: React.FC<SwitchModalProps> = ({ player, team, currentA
           {aiHighlightId && <span className="text-xs bg-amber-100 text-amber-700 px-2 py-1 rounded border border-amber-300 animate-pulse">IA escolhendo...</span>}
         </h3>
         <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-          {team.map((p) => {
+          {team.map((p, index) => {
             if (!p) return null;
-            const isCurrent = currentActive?.id === p.id;
+            const isCurrent = isSamePokemonInstance(currentActive, p);
             const isAiHighlighted = aiHighlightId === p.id;
             let matchup = null;
             if (opponent && !p.isFainted) {
@@ -44,7 +45,7 @@ export const SwitchModal: React.FC<SwitchModalProps> = ({ player, team, currentA
             }
 
             return (
-              <div key={p.id} className={`border-2 rounded-xl p-3 flex items-center gap-3 transition-all ${isAiHighlighted ? 'btn-ai-selected scale-105' : isCurrent ? 'border-indigo-500 bg-indigo-50' : p.isFainted ? 'opacity-50 grayscale border-gray-200' : 'cursor-pointer hover:border-indigo-300 hover:bg-gray-50'}`} onClick={() => !isCurrent && !p.isFainted && !aiHighlightId && onSelect(p)}>
+              <div key={p.instanceId ?? `${p.id}-${index}`} className={`border-2 rounded-xl p-3 flex items-center gap-3 transition-all ${isAiHighlighted ? 'btn-ai-selected scale-105' : isCurrent ? 'border-indigo-500 bg-indigo-50' : p.isFainted ? 'opacity-50 grayscale border-gray-200' : 'cursor-pointer hover:border-indigo-300 hover:bg-gray-50'}`} onClick={() => !isCurrent && !p.isFainted && !aiHighlightId && onSelect(p)}>
                 <div className="relative">
                   <img src={p.spriteUrl} alt={p.name ?? 'Pokémon'} className="w-16 h-16 bg-gray-100 rounded-full object-contain" />
                   {isCurrent && <span className="absolute -top-1 -right-1 bg-indigo-600 text-white text-[10px] px-1 rounded-full shadow-sm">Ativo</span>}

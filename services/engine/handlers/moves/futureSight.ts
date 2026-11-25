@@ -1,5 +1,6 @@
 
 import { Pokemon, BattleState, Move } from '../../../../types';
+import { getPokemonPlayerNum } from '../../../../utils/pokemonIdentity';
 import { log } from '../../utils';
 import { BATTLE_MESSAGES } from '../../../../data/battleMessages';
 import { calculateDamage } from '../damageUtils';
@@ -57,7 +58,7 @@ export function handleFutureSightEnd(
 
         // Precisamos encontrar quem usou o golpe para calcular o dano.
         // No 1v1, é o oponente do defensor.
-        const isP1 = state.currentPokemon1?.id === defender.id;
+        const isP1 = getPokemonPlayerNum(state, defender) === 1;
         const attacker = isP1 ? state.currentPokemon2 : state.currentPokemon1;
 
         if (!attacker) return; // Se não houver atacante (ex: batalha acabou), aborta.

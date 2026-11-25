@@ -1,6 +1,6 @@
 
 import React, { useState, useEffect, useRef } from 'react';
-import { Action, Pokemon, BattleState, BattleConfig, BattleReplay, BattleReplayEvent } from '../types';
+import { Action, Pokemon, BattleState, BattleConfig, BattleReplay } from '../types';
 import * as BattleEngine from '../services/engine';
 import { decideAIAction, chooseBestSwitch } from '../services/aiLogic';
 import * as AirLock from '../services/engine/handlers/abilities/air_lock';
@@ -8,6 +8,8 @@ import { BattleCoordinator } from '../services/engine/coordinator';
 import { calculateTypeEffectiveness } from '../services/battleUtils';
 import { TurnAnimator } from '../services/animation/turnAnimator';
 import { removerItem } from '../utils/safeStorage';
+import { isPokemonOnTeam, resolvePokemonTarget } from '../utils/pokemonIdentity';
+import { createBattleReplayEvent } from '../services/replayLogic';
 
 interface TurnManagerProps {
     state: BattleState;
@@ -50,28 +52,22 @@ export const useTurnManager = ({
         // FIX: construir o event DENTRO do functional updater garante que `prev`
         // é sempre o valor mais recente — elimina stale closure em AI vs AI rápido.
         const currentTurn = stateRef.current.turn;
-        const moveId   = type === 'move'   ? data?.name     : undefined;
-        const switchId = type === 'switch' ? data?.id       : undefined;
-        const itemId   = type === 'item'   ? data?.itemId   : undefined;
-        const targetId = type === 'item'   ? data?.targetId : undefined;
-        const isGive   = type === 'item'   ? data?.isGive   : undefined;
 
         setCurrentReplay(prev => {
             if (!prev) return prev;
-            const event: BattleReplayEvent = {
+            const user = player === 1 ? stateRef.current.currentPokemon1 : stateRef.current.currentPokemon2;
+            if (!user) return prev;
+            const event = createBattleReplayEvent({
                 turn: currentTurn,
-                actionType: type,
-                actorId: player,
+                player,
+                type,
+                data,
+                user,
                 shouldTerastallize,
                 shouldMegaEvolve,
                 isForcedSwitch,
                 isBatonPass,
-                moveId,
-                switchId,
-                itemId,
-                targetId,
-                isGive
-            };
+            });
             return { ...prev, events: [...prev.events, event] };
         });
     };
@@ -106,25 +102,15 @@ export const useTurnManager = ({
         } else setP2Action(act);
     };
 
-    const handleBagAction = (type: 'use' | 'give', itemId: string, targetId: number) => {
+    const handleBagAction = (type: 'use' | 'give', itemId: string, targetId: number, targetInstanceId?: string, moveName?: string) => {
         uiActions.setShowBagModal(false);
-        
-        // Infer player based on target ID
-        let playerNum: 1 | 2 = 1;
-        let target = state.team1.find(p => p.id === targetId);
-        
-        if (!target) {
-            target = state.team2.find(p => p.id === targetId);
-            playerNum = 2;
-        }
-        
+
+        const target = resolvePokemonTarget([...state.team1, ...state.team2], targetInstanceId, targetId);
         if (!target) return;
-        
-        if (type === 'use') {
-            handlePlayerAction(playerNum, 'item', { itemId, targetId });
-        } else {
-            handlePlayerAction(playerNum, 'item', { itemId, targetId, isGive: true });
-        }
+
+        const playerNum: 1 | 2 = isPokemonOnTeam(target, state.team1) ? 1 : 2;
+        const data = { itemId, targetId, targetInstanceId: target.instanceId, isGive: type === 'give', moveName };
+        handlePlayerAction(playerNum, 'item', data);
     };
 
     const handleRunAway = () => {
@@ -246,14 +232,14 @@ export const useTurnManager = ({
                     handlePlayerAction(1, 'switch', aiAction.data); 
                 }, 3000);
             } else if (aiAction.type === 'item') {
-                const { itemId, targetId, isGive } = aiAction.data;
-                uiActions.setP1AiBagSelection({ itemId, targetId, isGive });
+                const { itemId, targetId, targetInstanceId, isGive, moveName } = aiAction.data;
+                uiActions.setP1AiBagSelection({ itemId, targetId, targetInstanceId, isGive, moveName });
                 uiActions.setShowBagModal(true);
                 setState(prev => ({ ...prev, waitingForAction: true }));
                 setTimeout(() => {
                     uiActions.setShowBagModal(false);
                     uiActions.setP1AiBagSelection(null);
-                    handleBagAction(isGive ? 'give' : 'use', itemId, targetId);
+                    handleBagAction(isGive ? 'give' : 'use', itemId, targetId, targetInstanceId, moveName);
                 }, 4000); 
             }
         };
@@ -443,7 +429,7 @@ export const useTurnManager = ({
         if (config.p1AutoMode && p1 && !p1.isFainted && !uiActions.p1AiSelectedMove) {
             triggerP1AI();
         }
-    }, [state.turn, state.isBattleInProgress, state.waitingForAction, config.p1AutoMode, state.currentPokemon1?.id, p1Action, p2Action]);
+    }, [state.turn, state.isBattleInProgress, state.waitingForAction, config.p1AutoMode, state.currentPokemon1?.instanceId, p1Action, p2Action]);
 
     useEffect(() => {
       if (p1Action && p2Action && state.isBattleInProgress) resolveTurn();

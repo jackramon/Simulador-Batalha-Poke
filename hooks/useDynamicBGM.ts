@@ -67,7 +67,7 @@ export const useDynamicBGM = (state: BattleState) => {
         state.winner,
         state.weather,
         state.currentPokemon1?.hp, // Reage a dano
-        state.currentPokemon1?.id, // Reage a trocas
+        state.currentPokemon1?.instanceId, // Reage a trocas
         // Rastreia contagem de vivos para ativar Last Pokemon music
         state.team1.filter(p => !p.isFainted).length,
         state.team2.filter(p => !p.isFainted).length,

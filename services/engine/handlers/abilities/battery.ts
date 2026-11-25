@@ -1,4 +1,5 @@
 import { Pokemon, Move, BattleState } from '../../../../types';
+import { getPokemonPlayerNum, isSamePokemonInstance } from '../../../../utils/pokemonIdentity';
 import * as NeutralizingGas from './neutralizing_gas';
 
 /**
@@ -15,7 +16,7 @@ export function getBatteryMultiplier(attacker: Pokemon, move: Move, state?: Batt
     const isGasActive = NeutralizingGas.isGasActive(state);
 
     // Identifica a equipe do atacante
-    const isP1 = state.team1.some(p => p.id === attacker.id);
+    const isP1 = getPokemonPlayerNum(state, attacker) === 1;
     const team = isP1 ? state.team1 : state.team2;
 
     // Procura por um aliado na equipe que:
@@ -23,7 +24,7 @@ export function getBatteryMultiplier(attacker: Pokemon, move: Move, state?: Batt
     // 2. Não esteja desmaiado (na reserva, mas pronto para dar suporte).
     // 3. Tenha a habilidade Bateria não suprimida.
     const hasBatteryAlly = team.some(p => {
-        return p.id !== attacker.id && 
+        return !isSamePokemonInstance(p, attacker) &&
                !p.isFainted && 
                p.ability === 'battery' && 
                !NeutralizingGas.isAbilitySuppressed(p.ability, isGasActive);
