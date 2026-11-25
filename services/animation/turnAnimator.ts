@@ -13,17 +13,40 @@ export class TurnAnimator {
      * Retorna uma Promise que resolve quando a animação termina.
      * GARANTIA: Sempre resolve, nunca rejeita ou trava, para não bloquear o loop do jogo.
      */
-    static async processStep(step: TurnStepResult, uiActions: AnimationUIActions, playbackSpeed: number = 1): Promise<void> {
+    static async processStep(
+        step: TurnStepResult,
+        uiActions: AnimationUIActions,
+        playbackSpeed: number = 1,
+        signal?: AbortSignal,
+    ): Promise<void> {
+        const isActive = () => !signal?.aborted;
+        const setAnimation = (value: Parameters<AnimationUIActions['setAnimationState']>[0]) => {
+            if (isActive()) uiActions.setAnimationState(value);
+        };
+        const wait = (delay: number): Promise<boolean> => {
+            if (!isActive()) return Promise.resolve(false);
+            return new Promise(resolve => {
+                const finish = (completed: boolean) => {
+                    clearTimeout(timer);
+                    signal?.removeEventListener('abort', onAbort);
+                    resolve(completed && isActive());
+                };
+                const onAbort = () => finish(false);
+                const timer = setTimeout(() => finish(true), delay);
+                signal?.addEventListener('abort', onAbort, { once: true });
+            });
+        };
         try {
+            if (!isActive()) return;
             const active1 = step.state.currentPokemon1;
             const active2 = step.state.currentPokemon2;
 
             // --- FASE: ANTES DA AÇÃO (Animação de Ataque ou Falha por Status) ---
             if (step.phase === 'before-action' && step.actionType === 'move') {
                 if (step.activeActorId) {
-                    uiActions.setAnimationState({ id: step.activeActorId, type: 'attack' });
-                    await new Promise(r => setTimeout(r, 400 / playbackSpeed));
-                    uiActions.setAnimationState(null);
+                    setAnimation({ id: step.activeActorId, type: 'attack' });
+                    if (!await wait(400 / playbackSpeed)) return;
+                    setAnimation(null);
                 }
             }
 
@@ -78,9 +101,9 @@ export class TurnAnimator {
                      }
 
                      if (victimId) {
-                         uiActions.setAnimationState({ id: victimId, type: animType });
-                         await new Promise(r => setTimeout(r, delay / playbackSpeed)); // Tempo para animação tocar
-                         uiActions.setAnimationState(null);
+                         setAnimation({ id: victimId, type: animType });
+                         if (!await wait(delay / playbackSpeed)) return;
+                         setAnimation(null);
                          statusInterruption = true;
                          break; // Anima apenas uma vez por passo para não travar
                      }
@@ -91,12 +114,12 @@ export class TurnAnimator {
             // Só anima dano se não foi um turno de interrupção por status (evita conflito visual)
             if (step.phase === 'after-action' && !statusInterruption) {
                 if (step.damageDealt && step.targetId) {
-                    uiActions.setAnimationState({ id: step.targetId, type: 'damage' });
-                    await new Promise(r => setTimeout(r, 1200 / playbackSpeed)); 
-                    uiActions.setAnimationState(null);
+                    setAnimation({ id: step.targetId, type: 'damage' });
+                    if (!await wait(1200 / playbackSpeed)) return;
+                    setAnimation(null);
                 } else {
                     // Pequeno delay para leitura se não houver dano
-                    await new Promise(r => setTimeout(r, 800 / playbackSpeed)); 
+                    if (!await wait(800 / playbackSpeed)) return;
                 }
             }
             
@@ -123,16 +146,16 @@ export class TurnAnimator {
                      }
 
                      if (targetId && animType) {
-                         uiActions.setAnimationState({ id: targetId, type: animType });
-                         await new Promise(r => setTimeout(r, 1000 / playbackSpeed)); // Tempo para animação tocar
-                         uiActions.setAnimationState(null);
+                         setAnimation({ id: targetId, type: animType });
+                         if (!await wait(1000 / playbackSpeed)) return;
+                         setAnimation(null);
                      }
                 }
             }
         } catch (error) {
             console.error("Erro no TurnAnimator:", error);
             // Fallback: garante que o estado de animação seja limpo se algo der errado
-            uiActions.setAnimationState(null);
+            setAnimation(null);
         }
     }
 }

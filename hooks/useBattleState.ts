@@ -7,6 +7,7 @@ import * as Effects from '../services/effectHandlers';
 import { enableDeterministicRandom, disableDeterministicRandom } from '../utils/prng';
 import { removerItem } from '../utils/safeStorage';
 import { isSamePokemonInstance, normalizeBattleTeams, restoreActivePokemonIdentity } from '../utils/pokemonIdentity';
+import { BattleSession, type TurnResolutionToken } from '../services/battleSession';
 
 const KEY_BATTLE_STATE = 'poke_sim_battle_state';
 const KEY_BATTLE_CONFIG = 'poke_sim_battle_config';
@@ -59,6 +60,7 @@ export const useBattleState = () => {
   });
 
   const [isLoading, setIsLoading] = useState(false);
+  const [battleSession] = useState(() => new BattleSession());
   
   const p1CustomTeamRef = useRef<Pokemon[] | null>(null);
   const p2CustomTeamRef = useRef<Pokemon[] | null>(null);
@@ -70,6 +72,7 @@ export const useBattleState = () => {
   // Sincroniza refs
   useEffect(() => { stateRef.current = state; }, [state]);
   useEffect(() => { configRef.current = config; }, [config]);
+  useEffect(() => () => battleSession.invalidate(), [battleSession]);
 
   // --- PERSISTÊNCIA: Hidratação na Montagem ---
   useEffect(() => {
@@ -105,6 +108,7 @@ export const useBattleState = () => {
                       // FIX: Force waitingForAction to false to prevent "stuck" state if app crashed during processing
                       parsedState.waitingForAction = false;
 
+                      battleSession.beginSession();
                       setState(restoreActivePokemonIdentity(parsedState));
                       window.dispatchEvent(new CustomEvent('show-toast', { detail: "🔄 Batalha anterior restaurada!" }));
                   }
@@ -119,7 +123,9 @@ export const useBattleState = () => {
 
   // --- PERSISTÊNCIA: Salvar Estado ---
   useEffect(() => {
+      const sessionId = battleSession.sessionId;
       const saveBattleState = () => {
+          if (!battleSession.ownsSnapshot(sessionId)) return;
           try {
               if (state.isBattleInProgress || state.winner) {
                   localStorage.setItem(KEY_BATTLE_STATE, JSON.stringify(state));
@@ -128,8 +134,8 @@ export const useBattleState = () => {
               if (e.name === 'QuotaExceededError' || e.name === 'NS_ERROR_DOM_QUOTA_REACHED') {
                   console.warn("Espaço insuficiente. Tentando limpar cache...");
                   try {
-                      clearApiCache(); 
-                      if (state.isBattleInProgress || state.winner) {
+                      clearApiCache();
+                      if (battleSession.ownsSnapshot(sessionId) && (state.isBattleInProgress || state.winner)) {
                           localStorage.setItem(KEY_BATTLE_STATE, JSON.stringify(state));
                       }
                   } catch (retryError) {}
@@ -137,7 +143,7 @@ export const useBattleState = () => {
           }
       };
       saveBattleState();
-  }, [state]);
+  }, [state, battleSession]);
 
   // --- PERSISTÊNCIA: Salvar Config ---
   useEffect(() => { 
@@ -158,6 +164,7 @@ export const useBattleState = () => {
   // --- HIDRATAÇÃO SECUNDÁRIA (BACKGROUND) ---
   // Apenas busca dados se faltarem. A lógica síncrona na UI e no Engine lida com a falta de dados.
   useEffect(() => {
+      const sessionId = battleSession.sessionId;
       const allPokemon = [...state.team1, ...state.team2];
 
       allPokemon.forEach(p => {
@@ -194,6 +201,7 @@ export const useBattleState = () => {
 
                   fetchRawPokemonData(megaApiName)
                       .then(megaData => {
+                          if (!battleSession.isCurrent(sessionId)) return;
                           const getStat = (name: string) => megaData.stats.find((s: any) => s.stat.name === name)?.base_stat || 50;
                           
                           let megaSpriteUrl = megaData.sprites.other?.['official-artwork']?.front_default || megaData.sprites.front_default;
@@ -251,10 +259,14 @@ export const useBattleState = () => {
                           });
                       })
                       .catch(e => {
-                          console.warn(`[MegaHydration] Erro ao buscar ${megaApiName}:`, e);
+                          if (battleSession.isCurrent(sessionId)) {
+                              console.warn(`[MegaHydration] Erro ao buscar ${megaApiName}:`, e);
+                          }
                       })
                       .finally(() => {
-                          fetchingIds.current.delete(hydrationKey);
+                          if (battleSession.ownsSnapshot(sessionId)) {
+                              fetchingIds.current.delete(hydrationKey);
+                          }
                       });
               }
           }
@@ -282,12 +294,24 @@ export const useBattleState = () => {
       });
   }, [heldItemsSignature, activeIdsSignature]); 
 
-  const updateStateWithLogs = (newState: BattleState, logs: any[]) => {
-      setState(prev => ({ ...newState, logs: [...prev.logs, ...logs] }));
+  const sessionId = battleSession.sessionId;
+  const updateStateWithLogs = (newState: BattleState, logs: any[], resolution?: TurnResolutionToken) => {
+      const canWrite = () => resolution
+          ? battleSession.isResolutionCurrent(resolution)
+          : battleSession.isCurrent(sessionId);
+      const canCommit = () => resolution
+          ? battleSession.canCommitResolution(resolution)
+          : battleSession.isCurrent(sessionId);
+      if (!canWrite()) return;
+      setState(prev => canCommit()
+          ? { ...newState, logs: [...prev.logs, ...logs] }
+          : prev);
   };
 
   const resetBattle = () => {
-      setState({...state, isBattleInProgress: false, winner: null});
+      battleSession.invalidate();
+      setState(prev => ({...prev, isBattleInProgress: false, winner: null, waitingForAction: false}));
+      setCurrentReplay(null);
       removerItem(KEY_BATTLE_STATE);
   };
 
@@ -329,6 +353,8 @@ export const useBattleState = () => {
   };
 
   const startBattle = async () => {
+    const sessionId = battleSession.beginSession();
+    fetchingIds.current.clear();
     setIsLoading(true);
     try {
       let t1: Pokemon[] = [];
@@ -343,6 +369,7 @@ export const useBattleState = () => {
       } else {
           t1 = await fetchTeam(config.p1TeamSize, config.p1Mode, config.p1Input, config.randomIvs, config.randomLevels, config.megaEvolutionEnabled, config.itemsEnabled, 1);
       }
+      if (!battleSession.isCurrent(sessionId)) return;
 
       if ((config.p2Mode as any) === 'builder' || config.p2Mode === 'import') {
           if (p2CustomTeamRef.current && p2CustomTeamRef.current.length > 0) {
@@ -353,6 +380,7 @@ export const useBattleState = () => {
       } else {
           t2 = await fetchTeam(config.p2TeamSize, config.p2Mode, config.p2Input, config.randomIvs, config.randomLevels, config.megaEvolutionEnabled, config.itemsEnabled, 2);
       }
+      if (!battleSession.isCurrent(sessionId)) return;
 
       if (t1.length === 0 || t2.length === 0) {
           throw new Error("Equipe incompleta. Verifique se selecionou o modo correto ou completou o time no Construtor.");
@@ -434,11 +462,11 @@ export const useBattleState = () => {
       Effects.handleEntryAbilities(p1, p2, config.weatherEnabled, entryLogs, initialState);
       Effects.handleEntryAbilities(p2, p1, config.weatherEnabled, entryLogs, initialState);
       initialState.logs = [...initialState.logs, ...entryLogs];
-      setState(initialState);
+      if (battleSession.isCurrent(sessionId)) setState(initialState);
     } catch (e: any) {
-      alert(e.message);
+      if (battleSession.isCurrent(sessionId)) alert(e.message);
     } finally {
-      setIsLoading(false);
+      if (battleSession.ownsSnapshot(sessionId)) setIsLoading(false);
     }
   };
 
@@ -453,6 +481,7 @@ export const useBattleState = () => {
     p2CustomTeamRef,
     stateRef,
     configRef,
+    battleSession,
     currentReplay,
     setCurrentReplay
   };

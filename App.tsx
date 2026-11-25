@@ -826,19 +826,16 @@ export default function App() {
                 updateStateWithLogs(res.newState, res.logs);
                 checkFaintedSwitch(res.newState);
             } else if (showSwitchModal && !showSwitchModal.canCancel) {
-                recordAction(playerNum as 1 | 2, 'switch', p, undefined, undefined, true, false);
-                const res = BattleEngine.performSwitch(stateRef.current, p, playerNum as 1 | 2, configRef.current.weatherEnabled);
-                const unlockedState = { ...res.newState, waitingForAction: false };
-                updateStateWithLogs(unlockedState, res.logs);
-                checkFaintedSwitch(unlockedState);
+                // Trocas forçadas retomam o generator que emitiu o pedido, sem criar outra transição.
+                handlePlayerAction(
+                    playerNum as 1 | 2,
+                    'switch',
+                    p,
+                    !showSwitchModal.isBatonPass,
+                    !!showSwitchModal.isBatonPass
+                );
             } else {
-                if (showSwitchModal && showSwitchModal.isBatonPass) {
-                    recordAction(playerNum as 1 | 2, 'switch', p, undefined, undefined, false, true);
-                    const res = BattleEngine.performSwitch(stateRef.current, p, playerNum as 1 | 2, configRef.current.weatherEnabled, true);
-                    updateStateWithLogs(res.newState, res.logs);
-                } else {
-                    handlePlayerAction(playerNum as 1 | 2, 'switch', p);
-                }
+                handlePlayerAction(playerNum as 1 | 2, 'switch', p);
             }
             setShowDetailsModal(null); setShowSwitchModal(null);
         }} />

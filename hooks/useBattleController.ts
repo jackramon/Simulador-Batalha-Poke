@@ -13,7 +13,7 @@ export const useBattleController = () => {
   const { 
       state, setState, config, setConfig, isLoading, 
       resetBattle, startBattle, updateStateWithLogs, 
-      p1CustomTeamRef, p2CustomTeamRef, stateRef, configRef,
+      p1CustomTeamRef, p2CustomTeamRef, stateRef, configRef, battleSession,
       currentReplay, setCurrentReplay
   } = battleState;
 
@@ -26,7 +26,7 @@ export const useBattleController = () => {
 
   // 3. Logic Layer (Injection)
   const turnManager = useTurnManager({
-      state, setState, stateRef, config, configRef, updateStateWithLogs,
+      state, setState, stateRef, config, configRef, updateStateWithLogs, battleSession,
       currentReplay, setCurrentReplay,
       uiActions: {
           ...battleUI,

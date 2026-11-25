@@ -5,11 +5,13 @@ import * as BattleEngine from '../services/engine';
 import { decideAIAction, chooseBestSwitch } from '../services/aiLogic';
 import * as AirLock from '../services/engine/handlers/abilities/air_lock';
 import { BattleCoordinator } from '../services/engine/coordinator';
+import type { TurnStepResult } from '../services/engine/coordinator';
 import { calculateTypeEffectiveness } from '../services/battleUtils';
 import { TurnAnimator } from '../services/animation/turnAnimator';
 import { removerItem } from '../utils/safeStorage';
 import { isPokemonOnTeam, resolvePokemonTarget } from '../utils/pokemonIdentity';
 import { createBattleReplayEvent } from '../services/replayLogic';
+import { BattleSession, type TurnResolutionToken } from '../services/battleSession';
 
 interface TurnManagerProps {
     state: BattleState;
@@ -17,7 +19,8 @@ interface TurnManagerProps {
     stateRef: React.MutableRefObject<BattleState>;
     config: BattleConfig;
     configRef: React.MutableRefObject<BattleConfig>;
-    updateStateWithLogs: (newState: BattleState, logs: any[]) => void;
+    updateStateWithLogs: (newState: BattleState, logs: any[], resolution?: TurnResolutionToken) => void;
+    battleSession: BattleSession;
     currentReplay: BattleReplay | null;
     setCurrentReplay: React.Dispatch<React.SetStateAction<BattleReplay | null>>;
     // UI Helpers
@@ -42,19 +45,45 @@ interface TurnManagerProps {
 }
 
 export const useTurnManager = ({ 
-    state, setState, stateRef, config, configRef, updateStateWithLogs, currentReplay, setCurrentReplay, uiActions 
+    state, setState, stateRef, config, configRef, updateStateWithLogs, battleSession,
+    currentReplay, setCurrentReplay, uiActions
 }: TurnManagerProps) => {
     
     const { p1Action, setP1Action, p2Action, setP2Action } = uiActions;
-    const forcedSwitchResolverRef = useRef<((action: Action) => void) | null>(null);
+    const forcedSwitchResolverRef = useRef<((action: Action | null) => void) | null>(null);
+    const aiRequestIdsRef = useRef<Record<1 | 2, number>>({ 1: 0, 2: 0 });
 
-    const recordAction = (player: 1 | 2, type: 'move' | 'switch' | 'item', data: any, shouldTerastallize?: boolean, shouldMegaEvolve?: boolean, isForcedSwitch?: boolean, isBatonPass?: boolean) => {
-        // FIX: construir o event DENTRO do functional updater garante que `prev`
-        // é sempre o valor mais recente — elimina stale closure em AI vs AI rápido.
-        const currentTurn = stateRef.current.turn;
+    // Encerrar a sessão solta awaits, timers e intenções de qualquer geração anterior.
+    useEffect(() => battleSession.onInvalidate(reason => {
+        forcedSwitchResolverRef.current?.(null);
+        forcedSwitchResolverRef.current = null;
+        aiRequestIdsRef.current[1] += 1;
+        aiRequestIdsRef.current[2] += 1;
+        setP1Action(null);
+        setP2Action(null);
+        uiActions.setAnimationState(null);
+        uiActions.setShowSwitchModal(null);
+        uiActions.setShowBagModal(false);
+        uiActions.setAiHighlightingMember(null);
+        uiActions.setP1AiSelectedMove(null);
+        uiActions.setP1AiBagSelection(null);
+        uiActions.setIsTeraToggled(false);
+        uiActions.setIsMegaToggled(false);
+        if (reason === 'invalidate') setCurrentReplay(null);
+    }), [battleSession]);
 
+    const recordAction = (player: 1 | 2, type: 'move' | 'switch' | 'item', data: any, shouldTerastallize?: boolean, shouldMegaEvolve?: boolean, isForcedSwitch?: boolean, isBatonPass?: boolean, resolution?: TurnResolutionToken) => {
+        const sessionId = resolution?.sessionId ?? battleSession.sessionId;
+        const isCurrent = () => battleSession.isCurrent(sessionId)
+            && (!resolution || battleSession.isResolutionCurrent(resolution));
+        const canCommit = () => battleSession.isCurrent(sessionId)
+            && (!resolution || battleSession.canCommitResolution(resolution));
+        if (!isCurrent()) return;
+        // Construir o event DENTRO do functional updater garante `prev` atualizado
+        // e impede que uma resolução antiga grave no replay de outra batalha.
         setCurrentReplay(prev => {
-            if (!prev) return prev;
+            if (!prev || !canCommit()) return prev;
+            const currentTurn = stateRef.current.turn;
             const user = player === 1 ? stateRef.current.currentPokemon1 : stateRef.current.currentPokemon2;
             if (!user) return prev;
             const event = createBattleReplayEvent({
@@ -72,8 +101,15 @@ export const useTurnManager = ({
         });
     };
 
-    const handlePlayerAction = (player: 1 | 2, type: 'move' | 'switch' | 'item', data: any, isForcedSwitch?: boolean, isBatonPass?: boolean) => {
-        const user = player === 1 ? state.currentPokemon1! : state.currentPokemon2!;
+    const handlePlayerAction = (player: 1 | 2, type: 'move' | 'switch' | 'item', data: any, isForcedSwitch?: boolean, isBatonPass?: boolean, resolution?: TurnResolutionToken) => {
+        const sessionId = battleSession.sessionId;
+        if (!battleSession.isCurrent(sessionId)) return;
+        const resumeForcedSwitch = type === 'switch' ? forcedSwitchResolverRef.current : null;
+        // Uma resolução ativa só aceita a escolha que ela própria solicitou.
+        if (battleSession.activeResolution && !resumeForcedSwitch) return;
+
+        const user = player === 1 ? state.currentPokemon1 : state.currentPokemon2;
+        if (!user) return;
         const shouldTerastallize = (player === 1 && type === 'move' && uiActions.isTeraToggled) ? true : undefined;
         const shouldMegaEvolve = (player === 1 && type === 'move' && uiActions.isMegaToggled) ? true : undefined;
         
@@ -87,15 +123,16 @@ export const useTurnManager = ({
             shouldMegaEvolve 
         };
 
-        recordAction(player, type, data, shouldTerastallize, shouldMegaEvolve, isForcedSwitch, isBatonPass);
+        recordAction(player, type, data, shouldTerastallize, shouldMegaEvolve, isForcedSwitch, isBatonPass, resolution);
+        if (!battleSession.isCurrent(sessionId)) return;
 
-        const resumeForcedSwitch = type === 'switch' ? forcedSwitchResolverRef.current : null;
         if (resumeForcedSwitch) {
             forcedSwitchResolverRef.current = null;
             resumeForcedSwitch(act);
             return;
         }
 
+        aiRequestIdsRef.current[player] += 1;
         if (player === 1) {
             setP1Action(act);
             if (configRef.current.opponentMode === 'auto') triggerAI();
@@ -103,6 +140,8 @@ export const useTurnManager = ({
     };
 
     const handleBagAction = (type: 'use' | 'give', itemId: string, targetId: number, targetInstanceId?: string, moveName?: string) => {
+        const sessionId = battleSession.sessionId;
+        if (!battleSession.isCurrent(sessionId) || battleSession.activeResolution) return;
         uiActions.setShowBagModal(false);
 
         const target = resolvePokemonTarget([...state.team1, ...state.team2], targetInstanceId, targetId);
@@ -114,6 +153,7 @@ export const useTurnManager = ({
     };
 
     const handleRunAway = () => {
+        battleSession.invalidate();
         setState(prev => ({ ...prev, isBattleInProgress: false, winner: null, waitingForAction: false }));
         setP1Action(null);
         setP2Action(null);
@@ -121,8 +161,20 @@ export const useTurnManager = ({
     };
 
     const triggerAI = () => {
-        setState(prev => ({...prev, waitingForAction: true}));
-        setTimeout(async () => {
+        const sessionId = battleSession.sessionId;
+        const turn = stateRef.current.turn;
+        const actorInstanceId = stateRef.current.currentPokemon2?.instanceId;
+        const requestId = ++aiRequestIdsRef.current[2];
+        const isCurrent = () => battleSession.isCurrent(sessionId)
+            && aiRequestIdsRef.current[2] === requestId
+            && stateRef.current.isBattleInProgress
+            && !stateRef.current.winner
+            && stateRef.current.turn === turn
+            && stateRef.current.currentPokemon2?.instanceId === actorInstanceId;
+        if (!isCurrent()) return;
+        setState(prev => isCurrent() ? {...prev, waitingForAction: true} : prev);
+        battleSession.schedule(sessionId, async () => {
+            if (!isCurrent()) return;
             const currentState = stateRef.current;
             const p2 = currentState.currentPokemon2!; 
             const p1 = currentState.currentPokemon1!;
@@ -132,6 +184,7 @@ export const useTurnManager = ({
             let aiAction;
             if (configRef.current.useLLM) {
                 const { decideLLMAction } = await import('../services/llmAiLogic');
+                if (!isCurrent()) return;
                 aiAction = await decideLLMAction(
                     p2, p1, currentState.team2, currentState.team1, 
                     isSuppressed ? 'none' : currentState.weather, 
@@ -154,17 +207,30 @@ export const useTurnManager = ({
                     configRef.current.terastallizationEnabled, 
                     currentState.p2TeraUsed,
                     currentState,
-                    configRef.current.megaEvolutionEnabled, // Pass Mega Config
-                    currentState.p2MegaUsed // Pass P2 Mega Usage
+                    configRef.current.megaEvolutionEnabled,
+                    currentState.p2MegaUsed
                 );
             }
+            if (!isCurrent() || !aiAction) return;
             
             recordAction(2, aiAction.type, aiAction.data, aiAction.shouldTerastallize, aiAction.shouldMegaEvolve);
-            setP2Action(aiAction);
+            if (isCurrent()) setP2Action(aiAction);
         }, 1000);
     };
 
     const triggerP1AI = () => {
+        const sessionId = battleSession.sessionId;
+        const turn = stateRef.current.turn;
+        const actorInstanceId = stateRef.current.currentPokemon1?.instanceId;
+        const requestId = ++aiRequestIdsRef.current[1];
+        const isCurrent = () => battleSession.isCurrent(sessionId)
+            && aiRequestIdsRef.current[1] === requestId
+            && stateRef.current.isBattleInProgress
+            && !stateRef.current.winner
+            && stateRef.current.turn === turn
+            && stateRef.current.currentPokemon1?.instanceId === actorInstanceId;
+        if (!isCurrent()) return;
+
         const currentState = stateRef.current;
         const p1 = currentState.currentPokemon1; 
         const p2 = currentState.currentPokemon2;
@@ -176,6 +242,7 @@ export const useTurnManager = ({
             
             if (configRef.current.useLLM) {
                 const { decideLLMAction } = await import('../services/llmAiLogic');
+                if (!isCurrent()) return;
                 aiAction = await decideLLMAction(
                     p1, p2, currentState.team1, currentState.team2, 
                     isSuppressed ? 'none' : currentState.weather, 
@@ -198,10 +265,11 @@ export const useTurnManager = ({
                     configRef.current.terastallizationEnabled,
                     currentState.p1TeraUsed,
                     currentState,
-                    configRef.current.megaEvolutionEnabled, // Pass Mega Config
-                    currentState.p1MegaUsed // Pass P1 Mega Usage
+                    configRef.current.megaEvolutionEnabled,
+                    currentState.p1MegaUsed
                 );
             }
+            if (!isCurrent() || !aiAction) return;
             
             if (aiAction.type === 'move') {
                 uiActions.setP1AiSelectedMove(aiAction.data.name);
@@ -209,7 +277,8 @@ export const useTurnManager = ({
                 // Se a IA decidiu Mega Evoluir, ligamos o toggle visualmente (feedback)
                 if (aiAction.shouldMegaEvolve) uiActions.setIsMegaToggled(true);
                 
-                setTimeout(() => { 
+                battleSession.schedule(sessionId, () => {
+                    if (!isCurrent()) return;
                     handlePlayerAction(1, 'move', aiAction.data); 
                     // Atualiza a ação pendente com as flags corretas se não foram passadas pelo handle
                     setP1Action(prev => {
@@ -221,12 +290,13 @@ export const useTurnManager = ({
                         };
                     });
                     uiActions.setP1AiSelectedMove(null); 
-                }, 3000); 
+                }, 3000);
             } else if (aiAction.type === 'switch') {
                 uiActions.setShowSwitchModal({player: 1, canCancel: false}); 
                 uiActions.setAiHighlightingMember(aiAction.data.id);
-                setState(prev => ({ ...prev, waitingForAction: true }));
-                setTimeout(() => { 
+                setState(prev => isCurrent() ? {...prev, waitingForAction: true} : prev);
+                battleSession.schedule(sessionId, () => {
+                    if (!isCurrent()) return;
                     uiActions.setAiHighlightingMember(null); 
                     uiActions.setShowSwitchModal(null); 
                     handlePlayerAction(1, 'switch', aiAction.data); 
@@ -235,8 +305,9 @@ export const useTurnManager = ({
                 const { itemId, targetId, targetInstanceId, isGive, moveName } = aiAction.data;
                 uiActions.setP1AiBagSelection({ itemId, targetId, targetInstanceId, isGive, moveName });
                 uiActions.setShowBagModal(true);
-                setState(prev => ({ ...prev, waitingForAction: true }));
-                setTimeout(() => {
+                setState(prev => isCurrent() ? {...prev, waitingForAction: true} : prev);
+                battleSession.schedule(sessionId, () => {
+                    if (!isCurrent()) return;
                     uiActions.setShowBagModal(false);
                     uiActions.setP1AiBagSelection(null);
                     handleBagAction(isGive ? 'give' : 'use', itemId, targetId, targetInstanceId, moveName);
@@ -247,20 +318,30 @@ export const useTurnManager = ({
         executeP1AI();
     };
 
-    const checkFaintedSwitch = async (currentState: BattleState) => {
+    const checkFaintedSwitch = async (currentState: BattleState, resolution?: TurnResolutionToken) => {
+        const sessionId = resolution?.sessionId ?? battleSession.sessionId;
+        const isCurrent = () => battleSession.isCurrent(sessionId)
+            && (!resolution || battleSession.isResolutionCurrent(resolution));
+        if (!isCurrent()) return;
+
         // --- GAME OVER CHECK ---
         const p1Defeated = currentState.team1.every(p => p.isFainted);
         const p2Defeated = currentState.team2.every(p => p.isFainted);
+        const finish = (winner: number | 'draw') => {
+            if (!isCurrent()) return;
+            setState(prev => isCurrent() ? {...prev, winner, isBattleInProgress: false, waitingForAction: false} : prev);
+            battleSession.terminate();
+        };
 
-        if (p1Defeated && p2Defeated) { setState(prev => ({...prev, winner: 'draw', isBattleInProgress: false, waitingForAction: false})); return; }
-        if (p1Defeated) { setState(prev => ({...prev, winner: 2, isBattleInProgress: false, waitingForAction: false})); return; }
-        if (p2Defeated) { setState(prev => ({...prev, winner: 1, isBattleInProgress: false, waitingForAction: false})); return; }
+        if (p1Defeated && p2Defeated) { finish('draw'); return; }
+        if (p1Defeated) { finish(2); return; }
+        if (p2Defeated) { finish(1); return; }
 
         if (currentState.currentPokemon1?.isFainted || currentState.currentPokemon2?.isFainted) {
             if (currentState.currentPokemon1?.isFainted) {
                 if (configRef.current.p1AutoMode) {
-                    setState(prev => ({ ...prev, waitingForAction: true }));
-                    uiActions.setShowSwitchModal({player: 1, canCancel: false});
+                    setState(prev => isCurrent() ? {...prev, waitingForAction: true} : prev);
+                    if (isCurrent()) uiActions.setShowSwitchModal({player: 1, canCancel: false});
                     
                     const healthy = currentState.team1.filter(p => !p.isFainted);
                     if (healthy.length > 0) {
@@ -295,26 +376,31 @@ export const useTurnManager = ({
                         }
                         
                         const nextMon = bestCandidate;
-                        uiActions.setAiHighlightingMember(nextMon.id);
-                        await new Promise(r => setTimeout(r, 3000));
-                        recordAction(1, 'switch', nextMon, undefined, undefined, true, false);
+                        if (isCurrent()) uiActions.setAiHighlightingMember(nextMon.id);
+                        if (!await battleSession.wait(sessionId, 3000) || !isCurrent()) return;
+                        recordAction(1, 'switch', nextMon, undefined, undefined, true, false, resolution);
+                        if (!isCurrent()) return;
                         const sRes = BattleEngine.performSwitch(currentState, nextMon, 1, configRef.current.weatherEnabled);
+                        if (!isCurrent()) return;
                         currentState = { ...sRes.newState, waitingForAction: false };
-                        updateStateWithLogs(currentState, sRes.logs);
+                        updateStateWithLogs(currentState, sRes.logs, resolution);
                     }
+                    if (!isCurrent()) return;
                     uiActions.setAiHighlightingMember(null);
                     uiActions.setShowSwitchModal(null);
-                    setState(prev => ({...prev, waitingForAction: false}));
+                    setState(prev => isCurrent() ? {...prev, waitingForAction: false} : prev);
                 } else {
                     const healthy = currentState.team1.filter(p => !p.isFainted);
                     if (healthy.length === 1) {
-                        await new Promise(r => setTimeout(r, 1000));
-                        recordAction(1, 'switch', healthy[0], undefined, undefined, true, false);
+                        if (!await battleSession.wait(sessionId, 1000) || !isCurrent()) return;
+                        recordAction(1, 'switch', healthy[0], undefined, undefined, true, false, resolution);
+                        if (!isCurrent()) return;
                         const sRes = BattleEngine.performSwitch(currentState, healthy[0], 1, configRef.current.weatherEnabled);
+                        if (!isCurrent()) return;
                         currentState = { ...sRes.newState, waitingForAction: false };
-                        updateStateWithLogs(currentState, sRes.logs);
+                        updateStateWithLogs(currentState, sRes.logs, resolution);
                     } else if (healthy.length > 1) {
-                        uiActions.setShowSwitchModal({player: 1, canCancel: false});
+                        if (isCurrent()) uiActions.setShowSwitchModal({player: 1, canCancel: false});
                     }
                 }
             }
@@ -330,21 +416,26 @@ export const useTurnManager = ({
                     }
 
                     if(next) {
-                        recordAction(2, 'switch', next, undefined, undefined, true, false);
+                        if (!isCurrent()) return;
+                        recordAction(2, 'switch', next, undefined, undefined, true, false, resolution);
+                        if (!isCurrent()) return;
                         const res = BattleEngine.performSwitch(currentState, next, 2, configRef.current.weatherEnabled);
+                        if (!isCurrent()) return;
                         currentState = { ...res.newState, waitingForAction: false };
-                        updateStateWithLogs(currentState, res.logs);
+                        updateStateWithLogs(currentState, res.logs, resolution);
                     }
                 } else {
                     const healthy = currentState.team2.filter(p => !p.isFainted);
                     if (healthy.length === 1) {
-                        await new Promise(r => setTimeout(r, 1000));
-                        recordAction(2, 'switch', healthy[0], undefined, undefined, true, false);
+                        if (!await battleSession.wait(sessionId, 1000) || !isCurrent()) return;
+                        recordAction(2, 'switch', healthy[0], undefined, undefined, true, false, resolution);
+                        if (!isCurrent()) return;
                         const sRes = BattleEngine.performSwitch(currentState, healthy[0], 2, configRef.current.weatherEnabled);
+                        if (!isCurrent()) return;
                         currentState = { ...sRes.newState, waitingForAction: false };
-                        updateStateWithLogs(currentState, sRes.logs);
+                        updateStateWithLogs(currentState, sRes.logs, resolution);
                     } else if (healthy.length > 1) {
-                        uiActions.setShowSwitchModal({player: 2, canCancel: false});
+                        if (isCurrent()) uiActions.setShowSwitchModal({player: 2, canCancel: false});
                     }
                 }
             }
@@ -352,23 +443,37 @@ export const useTurnManager = ({
     };
 
     const resolveTurn = async () => {
+        const sessionId = battleSession.sessionId;
+        if (!p1Action || !p2Action || !state.isBattleInProgress || state.winner) return;
+        const resolution = battleSession.beginResolution(sessionId, stateRef.current.turn);
+        if (!resolution) return;
+        const isCurrent = () => battleSession.isResolutionCurrent(resolution);
+
         try {
-            const coordinator = BattleCoordinator.runTurn(stateRef.current, p1Action!, p2Action!, configRef.current);
+            const coordinator = BattleCoordinator.runTurn(stateRef.current, p1Action, p2Action, configRef.current);
             let nextResult = coordinator.next();
 
-            while (true) {
-                if (nextResult.done === true) break;
-                const step = nextResult.value;
+            while (isCurrent()) {
+                if (nextResult.done) break;
+                const step = nextResult.value as TurnStepResult;
                 if (step.state) {
-                    updateStateWithLogs(step.state, step.logs);
+                    updateStateWithLogs(step.state, step.logs, resolution);
                 }
+                if (!isCurrent()) return;
 
-                await TurnAnimator.processStep(step, uiActions);
+                await TurnAnimator.processStep(step, uiActions, 1, battleSession.signal);
+                if (!isCurrent()) return;
+
+                if (step.phase === 'game-over') {
+                    battleSession.terminate();
+                    return;
+                }
 
                 if (step.phase === 'switch-forced' && step.switchPrompt) {
                     const { player, isBatonPass, canCancel } = step.switchPrompt;
                     const isAutomatic = player === 2 || configRef.current.p1AutoMode;
-                    const forcedSwitchAction = await new Promise<Action>(resolve => {
+                    const forcedSwitchAction = await new Promise<Action | null>(resolve => {
+                        if (!isCurrent()) { resolve(null); return; }
                         forcedSwitchResolverRef.current = resolve;
 
                         if (!isAutomatic) {
@@ -381,33 +486,46 @@ export const useTurnManager = ({
                         const active = player === 1 ? currentState.currentPokemon1 : currentState.currentPokemon2;
                         const healthy = team.filter(p => !p.isFainted && p !== active);
                         const next = healthy[0]; // Sem Math.random para preservar o PRNG do replay.
-                        if (next) handlePlayerAction(player, 'switch', next, !isBatonPass, isBatonPass);
+                        if (next) {
+                            handlePlayerAction(player, 'switch', next, !isBatonPass, isBatonPass, resolution);
+                        } else {
+                            forcedSwitchResolverRef.current = null;
+                            resolve(null);
+                        }
                     });
 
+                    if (!isCurrent()) return;
                     uiActions.setShowSwitchModal(null);
-                    if (isAutomatic) await new Promise(r => setTimeout(r, 1000));
+                    if (!forcedSwitchAction) return;
+                    if (isAutomatic && !await battleSession.wait(sessionId, 1000)) return;
+                    if (!isCurrent()) return;
                     nextResult = coordinator.next(forcedSwitchAction);
                     continue;
                 }
 
                 if (step.phase === 'faint-switch') {
-                    await checkFaintedSwitch(step.state);
+                    await checkFaintedSwitch(step.state, resolution);
                 }
+                if (!isCurrent()) return;
                 nextResult = coordinator.next();
             }
 
+            if (!isCurrent()) return;
             setP1Action(null);
             setP2Action(null);
             uiActions.setIsTeraToggled(false);
             uiActions.setIsMegaToggled(false); // Reset Mega Toggle
 
             if (!uiActions.showSwitchModal) {
-                setState(prev => ({...prev, waitingForAction: false}));
+                setState(prev => battleSession.canCommitResolution(resolution) ? {...prev, waitingForAction: false} : prev);
             }
         } catch (error) {
+            if (!isCurrent()) return;
             console.error("Error resolving turn:", error);
-            setState(prev => ({...prev, waitingForAction: false}));
+            setState(prev => battleSession.canCommitResolution(resolution) ? {...prev, waitingForAction: false} : prev);
             window.dispatchEvent(new CustomEvent('show-toast', { detail: "❌ Erro crítico no turno. Estado restaurado." }));
+        } finally {
+            battleSession.finishResolution(resolution);
         }
     };
 
@@ -416,13 +534,20 @@ export const useTurnManager = ({
         if (!state.isBattleInProgress || state.winner || state.waitingForAction || p1Action || p2Action) return;
         
         const p1 = state.currentPokemon1;
+        const sessionId = battleSession.sessionId;
+        const turn = state.turn;
+        const actorInstanceId = p1?.instanceId;
         if (p1 && p1.chargingMove && !p1.isFainted) {
             const chargingMoveObj = p1.moves.find(m => m.name === p1.chargingMove);
             if (chargingMoveObj) {
-                const timer = setTimeout(() => {
-                    handlePlayerAction(1, 'move', chargingMoveObj);
+                const cancelTimer = battleSession.schedule(sessionId, () => {
+                    if (battleSession.isCurrent(sessionId)
+                        && stateRef.current.turn === turn
+                        && stateRef.current.currentPokemon1?.instanceId === actorInstanceId) {
+                        handlePlayerAction(1, 'move', chargingMoveObj);
+                    }
                 }, 600);
-                return () => clearTimeout(timer);
+                return () => { cancelTimer?.(); };
             }
         }
         
