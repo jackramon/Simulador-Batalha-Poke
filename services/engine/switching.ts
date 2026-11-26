@@ -6,18 +6,21 @@ import * as NaturalCure from './handlers/abilities/natural_cure';
 import * as ZeroToHero from './handlers/abilities/zero_to_hero';
 import * as Hazards from './handlers/hazards';
 import { acquireBattleDraft, rehydratePokemon, releaseBattleDraft } from './stateTransactions';
+import { BattlePRNG } from '../../utils/prng';
 
 export function performSwitch(
   currentState: BattleState,
   requestedPokemon: Pokemon,
   playerNum: 1 | 2,
   weatherEnabled: boolean,
-  isBatonPass: boolean = false // Novo parâmetro
+  isBatonPass: boolean = false, // Novo parâmetro
+  prng?: BattlePRNG
 ): { newState: BattleState, logs: LogEntry[] } {
   const draft = acquireBattleDraft(currentState);
   try {
+    const random = prng ? prng.attachTo(draft.state) : BattlePRNG.fromBattleState(draft.state);
     const newPokemon = rehydratePokemon(draft.state, requestedPokemon, playerNum);
-    return performSwitchDraft(draft.state, newPokemon, playerNum, weatherEnabled, isBatonPass);
+    return performSwitchDraft(draft.state, newPokemon, playerNum, weatherEnabled, isBatonPass, random);
   } finally {
     releaseBattleDraft(draft);
   }
@@ -29,6 +32,7 @@ function performSwitchDraft(
   playerNum: 1 | 2,
   weatherEnabled: boolean,
   isBatonPass: boolean,
+  prng: BattlePRNG
 ): { newState: BattleState, logs: LogEntry[] } {
   const logs: LogEntry[] = [];
   const state = currentState;
@@ -138,7 +142,7 @@ function performSwitchDraft(
   if (!newPokemon.isFainted) {
       const opponent = playerNum === 1 ? state.currentPokemon2 : state.currentPokemon1;
       
-      const effectRes = Effects.handleEntryAbilities(newPokemon, opponent, weatherEnabled, logs, state, lastPokemonSnapshot);
+      const effectRes = Effects.handleEntryAbilities(newPokemon, opponent, weatherEnabled, logs, state, lastPokemonSnapshot, prng);
       
       if (effectRes.weather && weatherEnabled) {
         state.weather = effectRes.weather;

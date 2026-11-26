@@ -7,7 +7,6 @@ import { useTurnManager } from '../../hooks/useTurnManager';
 import * as AiLogic from '../../services/aiLogic';
 import { BattleCoordinator, type TurnPhase } from '../../services/engine/coordinator';
 import type { Action, BattleState, Pokemon } from '../../types';
-import { disableDeterministicRandom } from '../../utils/prng';
 import { createMove, createPokemon } from '../factories';
 
 type BattleHook = ReturnType<typeof useBattleState>;
@@ -283,7 +282,6 @@ describe('hotfix do ciclo de vida das resoluções de turno', () => {
     if (renderer) {
       await act(async () => renderer.unmount());
     }
-    disableDeterministicRandom();
     vi.clearAllTimers();
     vi.useRealTimers();
     vi.unstubAllGlobals();
@@ -344,6 +342,7 @@ describe('hotfix do ciclo de vida das resoluções de turno', () => {
       return randomAfterNewSeed();
     };
     await advanceAnimations();
+    Math.random = randomAfterNewSeed;
 
     const persisted = JSON.parse(localStorage.getItem('poke_sim_battle_state')!) as BattleState;
     expect(harness.battle.state).toMatchObject({
@@ -386,6 +385,7 @@ describe('hotfix do ciclo de vida das resoluções de turno', () => {
       return randomAfterNewSeed();
     };
     await advanceAnimations();
+    Math.random = randomAfterNewSeed;
 
     const persisted = JSON.parse(localStorage.getItem('poke_sim_battle_state')!) as BattleState;
     expect(aiSpy).not.toHaveBeenCalled();

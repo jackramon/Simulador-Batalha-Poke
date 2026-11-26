@@ -1,4 +1,5 @@
 import { Pokemon, BattleState } from '../../../../types';
+import { BattlePRNG, nextBattleRandom } from '../../../../utils/prng';
 import { log } from '../../utils';
 import * as NeutralizingGas from './neutralizing_gas';
 
@@ -8,7 +9,7 @@ import * as NeutralizingGas from './neutralizing_gas';
  * Adaptação para Duelo (1v1): No final de cada turno, tem 30% de chance de curar 
  * uma condição de status do próprio usuário.
  */
-export function handleHealer(pokemon: Pokemon, state: BattleState, logs: {message: string, color: string}[]): boolean {
+export function handleHealer(pokemon: Pokemon, state: BattleState, logs: {message: string, color: string}[], prng?: BattlePRNG): boolean {
     // Requisitos: Ter a habilidade, estar vivo e ter um status principal
     if (pokemon.ability !== 'healer' || pokemon.isFainted) {
         return false;
@@ -27,7 +28,7 @@ export function handleHealer(pokemon: Pokemon, state: BattleState, logs: {messag
     }
 
     // 30% de chance de curar
-    if (Math.random() < 0.3) {
+    if (nextBattleRandom(state, prng) < 0.3) {
         // Limpa os status principais
         majorStatus.forEach(s => {
             if (pokemon.statusEffects[s]) {

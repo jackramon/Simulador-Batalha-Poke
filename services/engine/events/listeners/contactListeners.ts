@@ -15,6 +15,7 @@ import * as PoisonTouch from '../../handlers/abilities/poison_touch';
 import * as Gooey from '../../handlers/abilities/gooey';
 import * as TanglingHair from '../../handlers/abilities/tangling_hair';
 import * as PerishBody from '../../handlers/abilities/perish_body';
+import { nextBattleRandom } from '../../../../utils/prng';
 
 // --- Move Mechanics Listeners ---
 
@@ -41,21 +42,21 @@ export const rockyHelmetListener = (payload: ContactEventPayload) => {
 
 export const staticListener = (payload: ContactEventPayload) => {
     const { attacker, defender, logs } = payload;
-    if (!attacker.isFainted && Math.random() < 0.3) {
+    if (!attacker.isFainted && nextBattleRandom(payload.state, payload.prng) < 0.3) {
         StatusEffect.applyStatus(attacker, 'paralysis', logs, defender);
     }
 };
 
 export const poisonPointListener = (payload: ContactEventPayload) => {
     const { attacker, defender, logs } = payload;
-    if (!attacker.isFainted && Math.random() < 0.3) {
+    if (!attacker.isFainted && nextBattleRandom(payload.state, payload.prng) < 0.3) {
         StatusEffect.applyStatus(attacker, 'poison', logs, defender);
     }
 };
 
 export const flameBodyListener = (payload: ContactEventPayload) => {
     const { attacker, defender, logs } = payload;
-    if (!attacker.isFainted && Math.random() < 0.3) {
+    if (!attacker.isFainted && nextBattleRandom(payload.state, payload.prng) < 0.3) {
         StatusEffect.applyStatus(attacker, 'burn', logs, defender);
     }
 };
@@ -63,14 +64,14 @@ export const flameBodyListener = (payload: ContactEventPayload) => {
 export const cuteCharmListener = (payload: ContactEventPayload) => {
     const { attacker, defender, logs } = payload;
     if (!attacker.isFainted) {
-        CuteCharm.handleCuteCharm(attacker, defender, logs);
+        CuteCharm.handleCuteCharm(attacker, defender, logs, payload.prng);
     }
 };
 
 export const effectSporeListener = (payload: ContactEventPayload) => {
     const { attacker, defender, logs } = payload;
     if (!attacker.isFainted) {
-        EffectSpore.handleEffectSpore(attacker, defender, logs);
+        EffectSpore.handleEffectSpore(attacker, defender, logs, payload.prng);
     }
 };
 
@@ -128,7 +129,7 @@ export const pickpocketListener = (payload: ContactEventPayload) => {
 export const poisonTouchListener = (payload: ContactEventPayload) => {
     const { attacker, defender, hitsLanded, logs } = payload;
     if (!attacker.isFainted) {
-        PoisonTouch.handlePoisonTouch(attacker, defender, hitsLanded, true, logs);
+        PoisonTouch.handlePoisonTouch(attacker, defender, hitsLanded, true, logs, payload.prng);
     }
 };
 

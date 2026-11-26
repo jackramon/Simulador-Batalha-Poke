@@ -1,5 +1,6 @@
 
 import { Pokemon, BattleState } from '../../../../types';
+import { BattlePRNG } from '../../../../utils/prng';
 import * as LongReach from './long_reach';
 import { BattleEventBus } from '../../events/BattleEventBus';
 import { 
@@ -15,8 +16,11 @@ export function checkContactEffects(
     hitsLanded: number, 
     isContact: boolean, 
     logs: {message: string, color: string}[],
-    state?: BattleState
+    state?: BattleState,
+    prng?: BattlePRNG
 ) {
+    const random = prng ?? (state ? BattlePRNG.fromBattleState(state) : undefined);
+
     // Long Reach prevents all contact effects
     if (!isContact || defender.isFainted || LongReach.isContactSuppressed(attacker)) return;
     
@@ -50,6 +54,7 @@ export function checkContactEffects(
         defender,
         hitsLanded,
         logs,
-        state
+        state,
+        prng: random
     });
 }

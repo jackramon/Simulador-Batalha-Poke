@@ -7,6 +7,7 @@ import * as GuardDog from '../abilities/guard_dog';
 import * as SheerForce from '../abilities/sheer_force';
 import { performSwitch } from '../../switching';
 import * as Ingrain from './ingrain';
+import { BattlePRNG, nextBattleRandom } from '../../../../utils/prng';
 
 /**
  * Lógica para Cauda do Dragão (Dragon Tail) e Arremesso Circular (Circle Throw).
@@ -17,7 +18,8 @@ export function handleForceSwitch(
     defender: Pokemon,
     logs: {message: string, color: string}[],
     moveName: string,
-    state?: BattleState
+    state?: BattleState,
+    prng?: BattlePRNG
 ) {
     if (!state) return;
 
@@ -57,7 +59,7 @@ export function handleForceSwitch(
     }
 
     // 6. Seleciona aleatoriamente
-    const newPokemon = validBackups[Math.floor(Math.random() * validBackups.length)];
+    const newPokemon = validBackups[Math.floor(nextBattleRandom(state, prng) * validBackups.length)];
 
     // 7. Usa a transição canônica para saída, hazards, entrada e clima.
     log(logs, `${defender.name} foi arrastado para fora da batalha!`, 'text-orange-600 font-bold');

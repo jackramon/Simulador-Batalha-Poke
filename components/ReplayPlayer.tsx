@@ -1,6 +1,6 @@
 import React, { useState, useEffect, useRef, useCallback } from 'react';
 import { BattleReplay, BattleState, BattleReplayEvent } from '../types';
-import { disableDeterministicRandom, enableDeterministicRandom } from '../utils/prng';
+import { createBattlePRNGState } from '../utils/prng';
 import { BattleCoordinator } from '../services/engine/coordinator';
 import { TurnAnimator } from '../services/animation/turnAnimator';
 import { PokemonCard } from './PokemonCard';
@@ -55,11 +55,6 @@ export default function ReplayPlayer({ onClose }: ReplayPlayerProps) {
         }
     }, [replayState?.logs.length]);
 
-    // Cleanup ao desmontar
-    useEffect(() => {
-        return () => { disableDeterministicRandom(); };
-    }, []);
-
     // ── Agrupamento de turnos ──────────────────────────────────────────
     const turns = replayData
         ? Array.from(new Set(replayData.events.map(e => e.turn))).sort((a, b) => Number(a) - Number(b))
@@ -95,6 +90,7 @@ export default function ReplayPlayer({ onClose }: ReplayPlayerProps) {
 
         const normalizedTeams = normalizeReplayTeams(data.initialState);
         const initialState: BattleState = {
+            prngState: createBattlePRNGState(data.seed),
             team1: structuredClone(normalizedTeams.team1),
             team2: structuredClone(normalizedTeams.team2),
             currentPokemon1: structuredClone(normalizedTeams.team1[0]),
@@ -115,8 +111,6 @@ export default function ReplayPlayer({ onClose }: ReplayPlayerProps) {
             isBattleInProgress: true, winner: null, waitingForAction: false,
         };
 
-        enableDeterministicRandom(data.seed);
-        
         const entryLogs: any[] = [];
         Effects.handleEntryAbilities(initialState.currentPokemon1, initialState.currentPokemon2, data.initialState.config?.weatherEnabled ?? true, entryLogs, initialState);
         Effects.handleEntryAbilities(initialState.currentPokemon2, initialState.currentPokemon1, data.initialState.config?.weatherEnabled ?? true, entryLogs, initialState);
@@ -181,10 +175,8 @@ export default function ReplayPlayer({ onClose }: ReplayPlayerProps) {
         let p1Action = buildReplayAction(stateRef.current!, p1Event);
         let p2Action = buildReplayAction(stateRef.current!, p2Event);
 
-        // FIX: Sempre chamar decideAIAction se o modo for auto, mesmo que a ação já esteja no JSON.
-        // Isso é necessário porque decideAIAction consome números aleatórios (RNG).
-        // Se não chamarmos aqui, a sequência do RNG ficará dessincronizada para o resto do turno
-        // (ex: rolls de dano, críticos, efeitos secundários), quebrando o replay!
+        // Compatibilidade: a chamada legada da IA será revista em 3.1.
+        // As simulações agora usam forks e não alteram o cursor real do replay.
         
         const isSuppressed = AirLock.isWeatherSuppressed(stateRef.current!);
 

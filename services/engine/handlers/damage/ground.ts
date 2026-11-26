@@ -6,6 +6,7 @@ import * as StompingTantrum from '../moves/stompingTantrum';
 import * as Bonemerang from '../moves/bonemerang';
 import * as Earthquake from '../moves/earthquake';
 import * as Magnitude from '../moves/magnitude';
+import { BattlePRNG } from '../../../../utils/prng';
 
 export function getGroundMovePower(
     attacker: Pokemon,
@@ -13,14 +14,15 @@ export function getGroundMovePower(
     move: Move,
     state: BattleState | undefined,
     hitIndex: number,
-    logs: {message: string, color: string}[]
+    logs: {message: string, color: string}[],
+    prng?: BattlePRNG
 ): number {
     let basePower = move.power;
 
     switch (move.name) {
         case 'magnitude': {
             // Magnitude calcula seu próprio poder base aleatório
-            basePower = Magnitude.getMagnitudePower(attacker, logs);
+            basePower = Magnitude.getMagnitudePower(attacker, logs, prng);
             // Aplica boost de Earthquake se o alvo estiver enterrado (Dig)
             return Earthquake.getEarthquakePower(defender, basePower);
         }

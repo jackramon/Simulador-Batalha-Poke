@@ -1,5 +1,6 @@
 
 import { Pokemon, Move } from '../../../../types';
+import { BattlePRNG, nextBattleRandom } from '../../../../utils/prng';
 import { log } from '../../utils';
 import { PARTIAL_TRAPPING_MOVES } from '../../../../data/moves';
 import { BATTLE_MESSAGES } from '../../../../data/battleMessages';
@@ -15,18 +16,18 @@ export function isPartialTrappingMove(move: Move): boolean {
  * Aplica o efeito de aprisionamento ao defensor.
  * Dura de 4 a 5 turnos nos jogos modernos.
  */
-export function applyPartialTrapping(attacker: Pokemon, defender: Pokemon, move: Move, logs: {message: string, color: string}[]) {
+export function applyPartialTrapping(attacker: Pokemon, defender: Pokemon, move: Move, logs: {message: string, color: string}[], prng?: BattlePRNG) {
     if (!move.effect) return;
     
     // Se já estiver preso por este movimento, reseta o contador
     if (defender.statusEffects[move.effect.status]) {
-        defender.statusEffects[move.effect.status].turns = Math.floor(Math.random() * 2) + 4;
+        defender.statusEffects[move.effect.status].turns = Math.floor(nextBattleRandom(undefined, prng) * 2) + 4;
         log(logs, `${defender.name} continua preso no ataque!`, 'text-purple-600 italic');
         return;
     }
 
     // Duração padrão: 4 a 5 turnos
-    const duration = Math.floor(Math.random() * 2) + 4;
+    const duration = Math.floor(nextBattleRandom(undefined, prng) * 2) + 4;
     
     defender.statusEffects[move.effect.status] = { 
         turns: duration, 

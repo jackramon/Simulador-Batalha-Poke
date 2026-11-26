@@ -2,7 +2,7 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { decideAIAction } from '../../services/aiLogic';
 import { decideLLMAction } from '../../services/llmAiLogic';
 import type { Action, BattleReplay } from '../../types';
-import { disableDeterministicRandom, enableDeterministicRandom } from '../../utils/prng';
+import { createBattlePRNGState } from '../../utils/prng';
 import { createBattleState, createMove, createPlayerInventory, createPokemon } from '../factories';
 import {
   createBattleConfig,
@@ -22,7 +22,6 @@ describe('replay manual e decisões de IA no núcleo', () => {
   });
 
   afterEach(() => {
-    disableDeterministicRandom();
     vi.unstubAllGlobals();
     vi.restoreAllMocks();
   });
@@ -222,7 +221,7 @@ describe('replay manual e decisões de IA no núcleo', () => {
     expect(fetchMock).not.toHaveBeenCalled();
   });
 
-  it('decide pela mesma ação local para P2 ao redefinir a seed e restaura o PRNG em finally', () => {
+  it('decide pela mesma ação local para P2 ao redefinir o snapshot da seed', () => {
     const weakMove = createMove({ name: 'weak-move', power: 40, priority: 0, uses: 10, maxUses: 10 });
     const strongMove = createMove({ name: 'strong-move', power: 120, priority: 0, uses: 10, maxUses: 10 });
     const aiPokemon = createPokemon({
@@ -243,12 +242,10 @@ describe('replay manual e decisões de IA no núcleo', () => {
     });
     const state = createBattleState([opponent], [aiPokemon]);
     const decisions: Action[] = [];
-    const originalRandom = Math.random;
 
     for (let iteration = 0; iteration < 2; iteration += 1) {
-      enableDeterministicRandom(1502);
-      try {
-        decisions.push(decideAIAction(
+      state.prngState = createBattlePRNGState(1502);
+      decisions.push(decideAIAction(
           aiPokemon,
           opponent,
           state.team2,
@@ -262,10 +259,6 @@ describe('replay manual e decisões de IA no núcleo', () => {
           false,
           false,
         ));
-      } finally {
-        disableDeterministicRandom();
-      }
-      expect(Math.random).toBe(originalRandom);
     }
 
     expect(decisions[0]).toMatchObject({

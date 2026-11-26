@@ -1,5 +1,6 @@
 
 import { Pokemon, Move, LogEntry } from '../../../../types';
+import { BattlePRNG, nextBattleRandom } from '../../../../utils/prng';
 import { log } from '../../utils';
 import * as Comatose from '../abilities/comatose';
 
@@ -21,7 +22,8 @@ const BANNED_MOVES = [
  */
 export function handleSleepTalk(
     attacker: Pokemon, 
-    logs: LogEntry[]
+    logs: LogEntry[],
+    prng?: BattlePRNG
 ): Move | null {
     const isAsleep = !!attacker.statusEffects.sleep || Comatose.isTreatedAsAsleep(attacker);
 
@@ -37,7 +39,7 @@ export function handleSleepTalk(
         return null;
     }
 
-    const randomMove = validMoves[Math.floor(Math.random() * validMoves.length)];
+    const randomMove = validMoves[Math.floor(nextBattleRandom(undefined, prng) * validMoves.length)];
     
     log(logs, `${attacker.name} usou ${randomMove.displayName} sonâmbulo!`, 'text-indigo-600 font-bold');
 

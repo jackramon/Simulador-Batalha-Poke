@@ -2,7 +2,7 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { decideAIAction } from '../../services/aiLogic';
 import { decideLLMAction } from '../../services/llmAiLogic';
 import { getSortedActions } from '../../services/engine/actions';
-import { disableDeterministicRandom, enableDeterministicRandom } from '../../utils/prng';
+import { createBattlePRNGState } from '../../utils/prng';
 import { createBattleState, createMove, createPokemon } from '../factories';
 import { createBattleConfig, createMoveAction, runCoordinatorTurn } from './coordinator.helpers';
 
@@ -17,12 +17,11 @@ describe('IA por jogador e batalha espelho no núcleo', () => {
   });
 
   afterEach(() => {
-    disableDeterministicRandom();
     vi.unstubAllGlobals();
     vi.restoreAllMocks();
   });
 
-  it('escolhe para P2 um golpe com PP disponível e restaura o PRNG em finally', () => {
+  it('escolhe para P2 um golpe com PP disponível usando o snapshot da seed', () => {
     const exhaustedMove = createMove({ name: 'sem-pp', power: 120, priority: 0, uses: 0, maxUses: 10 });
     const availableMove = createMove({ name: 'com-pp', power: 40, priority: 0, uses: 7, maxUses: 10 });
     const aiPokemon = createPokemon({
@@ -42,12 +41,10 @@ describe('IA por jogador e batalha espelho no núcleo', () => {
       moves: [createMove({ uses: 10, maxUses: 10 })],
     });
     const state = createBattleState([opponent], [aiPokemon]);
-    const originalRandom = Math.random;
     let action: ReturnType<typeof decideAIAction>;
 
-    enableDeterministicRandom(1601);
-    try {
-      action = decideAIAction(
+    state.prngState = createBattlePRNGState(1601);
+    action = decideAIAction(
         aiPokemon,
         opponent,
         state.team2,
@@ -61,11 +58,7 @@ describe('IA por jogador e batalha espelho no núcleo', () => {
         false,
         false,
       );
-    } finally {
-      disableDeterministicRandom();
-    }
 
-    expect(Math.random).toBe(originalRandom);
     expect(action).toEqual({
       type: 'move',
       data: availableMove,
@@ -179,9 +172,8 @@ describe('IA por jogador e batalha espelho no núcleo', () => {
     const state = createBattleState([player1], [player2]);
     let action: ReturnType<typeof decideAIAction>;
 
-    enableDeterministicRandom(2404);
-    try {
-      action = decideAIAction(
+    state.prngState = createBattlePRNGState(2404);
+    action = decideAIAction(
         player2,
         player1,
         state.team2,
@@ -195,9 +187,6 @@ describe('IA por jogador e batalha espelho no núcleo', () => {
         false,
         false,
       );
-    } finally {
-      disableDeterministicRandom();
-    }
 
     expect(action.playerNum).toBe(2);
     expect(action.user).toBe(player2);

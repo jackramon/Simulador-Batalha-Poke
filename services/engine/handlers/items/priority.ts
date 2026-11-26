@@ -1,5 +1,6 @@
 
 import { Pokemon, BattleState, LogEntry } from '../../../../types';
+import { BattlePRNG, nextBattleRandom } from '../../../../utils/prng';
 import { log } from '../../utils';
 import * as Klutz from '../abilities/klutz';
 import { ITEMS_DATA } from '../../../../data/items';
@@ -8,7 +9,7 @@ import { ITEMS_DATA } from '../../../../data/items';
  * Calcula o modificador de prioridade baseado no item segurado.
  * Retorna um valor fracionário (ex: 0.1 ou -0.1) para desempatar na mesma bracket de prioridade.
  */
-export function getItemPriorityMod(pokemon: Pokemon, state: BattleState, logs: LogEntry[]): number {
+export function getItemPriorityMod(pokemon: Pokemon, state: BattleState, logs: LogEntry[], prng?: BattlePRNG): number {
     if (!pokemon.heldItem) return 0;
     
     // Verifica se o item está suprimido (Klutz, Magic Room, Embargo)
@@ -19,7 +20,7 @@ export function getItemPriorityMod(pokemon: Pokemon, state: BattleState, logs: L
     // 1. Quick Claw (Garra Rápida)
     // 20% de chance de agir primeiro na bracket
     if (item === 'quick-claw') {
-        if (Math.random() < 0.2) {
+        if (nextBattleRandom(state, prng) < 0.2) {
             log(logs, `A Garra Rápida de ${pokemon.name} ativou!`, 'text-yellow-600 font-bold italic');
             return 0.1;
         }

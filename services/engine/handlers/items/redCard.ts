@@ -1,5 +1,6 @@
 
 import { Pokemon, BattleState } from '../../../../types';
+import { BattlePRNG, nextBattleRandom } from '../../../../utils/prng';
 import { log } from '../../utils';
 import * as SuctionCups from '../abilities/suction_cups';
 import * as GuardDog from '../abilities/guard_dog';
@@ -16,7 +17,8 @@ export function checkRedCard(
     holder: Pokemon, 
     attacker: Pokemon, 
     state: BattleState, 
-    logs: {message: string, color: string}[]
+    logs: {message: string, color: string}[],
+    prng?: BattlePRNG
 ) {
     // 1. Verificações Básicas de Ativação
     // - Item deve ser Red Card
@@ -59,7 +61,7 @@ export function checkRedCard(
     log(logs, `O ${itemName} de ${holder.name} foi ativado!`, 'text-red-600 font-bold');
 
     // 5. Seleciona aleatoriamente um Pokémon da reserva do atacante
-    const newPokemon = validBackups[Math.floor(Math.random() * validBackups.length)];
+    const newPokemon = validBackups[Math.floor(nextBattleRandom(state, prng) * validBackups.length)];
 
     // 6. Usa a transição canônica para saída, hazards, entrada e clima.
     log(logs, `${attacker.name} foi expulso da batalha!`, 'text-orange-600 font-bold');

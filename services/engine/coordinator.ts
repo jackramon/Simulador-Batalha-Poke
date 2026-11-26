@@ -5,6 +5,7 @@ import * as AirLock from './handlers/abilities/air_lock';
 import { getSortedActions } from './actions';
 import { isSamePokemonInstance, resolvePokemonTarget } from '../../utils/pokemonIdentity';
 import { acquireBattleDraft, rehydrateAction, releaseBattleDraft } from './stateTransactions';
+import { BattlePRNG } from '../../utils/prng';
 
 export type TurnPhase = 
   | 'start' 
@@ -44,7 +45,8 @@ export class BattleCoordinator {
   ): Generator<TurnStepResult, void, Action | undefined> {
     const draft = acquireBattleDraft(initialState);
     try {
-      const turn = BattleCoordinator.runTurnDraft(draft.state, p1Action, p2Action, config);
+      const prng = BattlePRNG.fromBattleState(draft.state);
+      const turn = BattleCoordinator.runTurnDraft(draft.state, p1Action, p2Action, config, prng);
       let next = turn.next();
 
       while (next.done !== true) {
@@ -60,7 +62,8 @@ export class BattleCoordinator {
     initialState: BattleState,
     p1Action: Action | undefined,
     p2Action: Action | undefined,
-    config: BattleConfig
+    config: BattleConfig,
+    prng: BattlePRNG
   ): Generator<TurnStepResult, void, Action | undefined> {
     let state = initialState;
     const stepLogs: LogEntry[] = [];
@@ -92,7 +95,7 @@ export class BattleCoordinator {
 
     // --- FASE 2: ORDENAÇÃO E EXECUÇÃO DE AÇÕES ---
     originalActions.forEach(a => {
-        if (a.tieBreaker === undefined) a.tieBreaker = Math.random();
+        if (a.tieBreaker === undefined) a.tieBreaker = prng.next();
     });
     let pendingActions = [...originalActions];
 
@@ -109,7 +112,7 @@ export class BattleCoordinator {
         if (pendingActions.length === 0) break;
 
         // Reordena baseado na velocidade atual (dynamic speed tiers)
-        const sortedPending = getSortedActions(pendingActions, state);
+        const sortedPending = getSortedActions(pendingActions, state, prng);
         const currentAction = sortedPending[0];
         
         // Remove da fila
@@ -139,7 +142,9 @@ export class BattleCoordinator {
                 state, 
                 currentAction.data, 
                 currentAction.playerNum, 
-                config.weatherEnabled
+                config.weatherEnabled,
+                false,
+                prng
             );
             state = res.newState;
             executionLogs = res.logs;
@@ -185,7 +190,8 @@ export class BattleCoordinator {
                     false, 
                     currentAction.shouldTerastallize,
                     false, // isSleepTalkTriggered
-                    currentAction.shouldMegaEvolve // shouldMegaEvolve
+                    currentAction.shouldMegaEvolve, // shouldMegaEvolve
+                    prng
                 );
 
                 state = res.newState;
@@ -253,7 +259,8 @@ export class BattleCoordinator {
                     draftForcedSwitchAction.data,
                     forcedSwitch.player,
                     config.weatherEnabled,
-                    forcedSwitch.isBatonPass
+                    forcedSwitch.isBatonPass,
+                    prng
                 );
                 state = res.newState;
                 yield {
@@ -282,7 +289,7 @@ export class BattleCoordinator {
     // Os efeitos residuais (clima, status) aparecerão logo após o último golpe, 
     // e o separador será o "Início do Turno X" seguinte.
 
-    const endRes = BattleEngine.processTurnEnd(state, config);
+    const endRes = BattleEngine.processTurnEnd(state, config, prng);
     state = endRes.newState;
 
     // Combina logs de separador + logs de efeitos

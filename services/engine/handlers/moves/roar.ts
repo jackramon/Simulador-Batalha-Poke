@@ -1,5 +1,6 @@
 
 import { Pokemon, BattleState } from '../../../../types';
+import { BattlePRNG, nextBattleRandom } from '../../../../utils/prng';
 import { getPokemonPlayerNum, isSamePokemonInstance } from '../../../../utils/pokemonIdentity';
 import { log } from '../../utils';
 import * as SuctionCups from '../abilities/suction_cups';
@@ -19,7 +20,8 @@ export function handleRoar(
     attacker: Pokemon,
     defender: Pokemon,
     logs: {message: string, color: string}[],
-    state?: BattleState
+    state?: BattleState,
+    prng?: BattlePRNG
 ) {
     if (!state) return;
 
@@ -52,7 +54,7 @@ export function handleRoar(
     }
 
     // 5. Seleciona aleatoriamente
-    const newPokemon = validBackups[Math.floor(Math.random() * validBackups.length)];
+    const newPokemon = validBackups[Math.floor(nextBattleRandom(state, prng) * validBackups.length)];
 
     // 6. Usa a transição canônica para saída, hazards, entrada e clima.
     log(logs, `${defender.name} foi afugentado da batalha!`, 'text-orange-600 font-bold');

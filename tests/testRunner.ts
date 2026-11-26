@@ -21,6 +21,7 @@ import { handlePerishSongStart, handlePerishCount } from '../services/engine/han
 import { handleStrengthSap } from '../services/engine/handlers/moves/strengthSap';
 import { handleIonDeluge, getEffectiveMoveType } from '../services/engine/handlers/moves/ionDeluge';
 import { handleHowl } from '../services/engine/handlers/moves/howl';
+import { BattlePRNG } from '../utils/prng';
 
 export function runTests() {
   console.clear();
@@ -158,7 +159,7 @@ export function runTests() {
   const magAttacker = createDummy({ name: 'Golem' });
   const magLogs: LogEntry[] = [];
   
-  const magPower = getMagnitudePower(magAttacker, magLogs);
+  const magPower = getMagnitudePower(magAttacker, magLogs, new BattlePRNG(42));
   console.log(`✅ Poder Gerado: ${magPower}`);
   console.log(magLogs.some(l => l.message.includes('Magnitude')) ? '✅ Log de Magnitude presente' : '❌ Log ausente');
 

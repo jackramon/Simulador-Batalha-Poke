@@ -21,6 +21,7 @@ import * as Dragon from './dragon';
 import * as Steel from './steel';
 import * as Dark from './dark';
 import * as Fairy from './fairy';
+import { BattlePRNG } from '../../../../utils/prng';
 
 const typeHandlers: Record<string, any> = {
     'normal': Normal.getNormalMovePower,
@@ -51,7 +52,8 @@ export function calculateBasePower(
     state: BattleState | undefined,
     hitIndex: number,
     logs: {message: string, color: string}[],
-    defenderAction?: Action
+    defenderAction?: Action,
+    prng?: BattlePRNG
 ): number {
     if (move.name === 'terrain-pulse') {
         const terrain = state?.terrain || 'none';
@@ -65,7 +67,7 @@ export function calculateBasePower(
     const handler = typeHandlers[move.type];
 
     if (handler) {
-        return handler(attacker, defender, move, state, hitIndex, logs, defenderAction);
+        return handler(attacker, defender, move, state, hitIndex, logs, defenderAction, prng);
     }
 
     return move.power;

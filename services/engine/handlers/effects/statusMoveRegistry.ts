@@ -127,6 +127,7 @@ import * as Mist from '../moves/mist';
 import * as LuckyChant from '../moves/luckyChant';
 import * as FieldEffects from './fieldEffects';
 import * as VolatileStatus from './volatileStatus';
+import { BattlePRNG } from '../../../../utils/prng';
 
 export interface StatusMoveResult {
     switchRequested?: boolean;
@@ -141,6 +142,7 @@ export interface StatusMoveContext {
     move: Move;
     logs: LogEntry[];
     ignoresAbilities: boolean;
+    prng?: BattlePRNG;
 }
 
 export interface StatusMoveRoute {
@@ -280,16 +282,16 @@ export const STATUS_MOVE_REGISTRY: readonly StatusMoveRoute[] = [
             'crafty-shield',
         ],
         Protect.handleProtect,
-        (handler, { attacker, move, logs }) => {
-            handler(attacker, logs, move.name);
+        (handler, { attacker, move, logs, prng }) => {
+            handler(attacker, logs, move.name, prng);
         },
     ),
 
     defineStatusMoveRoute(
         ['endure'],
         Endure.handleEndure,
-        (handler, { attacker, logs }) => {
-            handler(attacker, logs);
+        (handler, { attacker, logs, prng }) => {
+            handler(attacker, logs, prng);
         },
     ),
 
@@ -465,8 +467,8 @@ export const STATUS_MOVE_REGISTRY: readonly StatusMoveRoute[] = [
     defineStatusMoveRoute(
         ['leech-seed'],
         VolatileStatus.handleVolatileStatus,
-        (handler, { state, attacker, defender, move, logs }) => {
-            handler(attacker, defender, move, 'leech-seed', logs, state);
+        (handler, { state, attacker, defender, move, logs, prng }) => {
+            handler(attacker, defender, move, 'leech-seed', logs, state, prng);
         },
     ),
 

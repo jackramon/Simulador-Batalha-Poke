@@ -13,6 +13,7 @@ import * as Wish from './handlers/moves/wish';
 import * as Yawn from './handlers/moves/yawn';
 import * as LuckyChant from './handlers/moves/luckyChant';
 import { acquireBattleDraft, releaseBattleDraft } from './stateTransactions';
+import { BattlePRNG } from '../../utils/prng';
 
 function processSideHazards(hazards: SideHazards, logs: LogEntry[], sideName: string) {
     // Decrementa Reflect
@@ -64,16 +65,17 @@ function processSideHazards(hazards: SideHazards, logs: LogEntry[], sideName: st
     }
 }
 
-export function processTurnEnd(currentState: BattleState, config: BattleConfig): { newState: BattleState, logs: LogEntry[] } {
+export function processTurnEnd(currentState: BattleState, config: BattleConfig, prng?: BattlePRNG): { newState: BattleState, logs: LogEntry[] } {
   const draft = acquireBattleDraft(currentState);
   try {
-    return processTurnEndDraft(draft.state, config);
+    const random = prng ? prng.attachTo(draft.state) : BattlePRNG.fromBattleState(draft.state);
+    return processTurnEndDraft(draft.state, config, random);
   } finally {
     releaseBattleDraft(draft);
   }
 }
 
-function processTurnEndDraft(currentState: BattleState, config: BattleConfig): { newState: BattleState, logs: LogEntry[] } {
+function processTurnEndDraft(currentState: BattleState, config: BattleConfig, prng: BattlePRNG): { newState: BattleState, logs: LogEntry[] } {
   const logs: LogEntry[] = [];
   const state = currentState;
 
@@ -143,9 +145,9 @@ function processTurnEndDraft(currentState: BattleState, config: BattleConfig): {
             if (state.currentPokemon2) Forecast.handleForecast(state.currentPokemon2, state, logs);
 
             // Chance de Rebote Climático (30%): Um novo clima começa imediatamente após o fim do anterior
-            if (Math.random() < 0.3) {
+            if (prng.next() < 0.3) {
                 const weathers = ['sun', 'rain', 'sand', 'hail'] as const;
-                const nextWeather = weathers[Math.floor(Math.random() * weathers.length)];
+                const nextWeather = weathers[Math.floor(prng.next() * weathers.length)];
                 
                 state.weather = nextWeather;
                 state.weatherTurns = 5;
@@ -158,9 +160,9 @@ function processTurnEndDraft(currentState: BattleState, config: BattleConfig): {
         }
     } else {
         // Sem Clima: Chance de Clima Espontâneo (20%)
-        if (Math.random() < 0.2) {
+        if (prng.next() < 0.2) {
             const weathers = ['sun', 'rain', 'sand', 'hail'] as const;
-            const nextWeather = weathers[Math.floor(Math.random() * weathers.length)];
+            const nextWeather = weathers[Math.floor(prng.next() * weathers.length)];
             
             state.weather = nextWeather;
             state.weatherTurns = 5;
@@ -208,14 +210,14 @@ function processTurnEndDraft(currentState: BattleState, config: BattleConfig): {
           
           if (state.terrainTurns <= 0) {
               const oldTerrain = state.terrain as typeof terrains[number];
-              const roll = Math.random();
+              const roll = prng.next();
 
               if (roll < 0.3) {
                   log(logs, `A energia do ${TERRAIN_DATA[oldTerrain].name} dissipou-se naturalmente.`, 'text-gray-500 italic');
                   state.terrain = 'none';
                   state.terrainTurns = 0;
               } else {
-                  const nextTerrain = terrains[Math.floor(Math.random() * terrains.length)];
+                  const nextTerrain = terrains[Math.floor(prng.next() * terrains.length)];
                   const isIntensifying = nextTerrain === oldTerrain;
                   state.terrain = nextTerrain;
                   state.terrainTurns = 5;
@@ -223,8 +225,8 @@ function processTurnEndDraft(currentState: BattleState, config: BattleConfig): {
               }
           }
       } else {
-          if (Math.random() < 0.15) {
-              const nextTerrain = terrains[Math.floor(Math.random() * terrains.length)];
+          if (prng.next() < 0.15) {
+              const nextTerrain = terrains[Math.floor(prng.next() * terrains.length)];
               state.terrain = nextTerrain;
               state.terrainTurns = 5;
               log(logs, getTerrainMsg(nextTerrain, true), getTerrainColor(nextTerrain) + " font-bold italic");
@@ -268,7 +270,7 @@ function processTurnEndDraft(currentState: BattleState, config: BattleConfig): {
     }
   });
 
-  Effects.processTurnEndEffects(allActive, state.weather, config.weatherEnabled, logs, state);
+  Effects.processTurnEndEffects(allActive, state.weather, config.weatherEnabled, logs, state, prng);
 
   // Enraizar e Maldição são processados após os efeitos padrão, preservando a ordem das mensagens.
   allActive.forEach(p => {

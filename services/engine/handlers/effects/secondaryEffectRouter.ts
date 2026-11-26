@@ -106,6 +106,7 @@ import * as FleurCannon from '../moves/fleurCannon';
 import * as SandsearStorm from '../moves/sandsearStorm';
 
 import { PARTIAL_TRAPPING_MOVES } from '../../../../data/moves/categories';
+import { BattlePRNG, nextBattleRandom } from '../../../../utils/prng';
 
 export function handleSecondaryEffects(
     attacker: Pokemon, 
@@ -113,13 +114,14 @@ export function handleSecondaryEffects(
     move: Move, 
     logs: LogEntry[], 
     state?: BattleState,
-    hitSubstituteOnLastHit?: boolean
+    hitSubstituteOnLastHit?: boolean,
+    prng?: BattlePRNG
 ): { defenderSwitchRequested?: boolean } {
   
   if (['dragon-tail', 'circle-throw'].includes(move.name) || move.effect?.status === 'force-switch') {
       // Note: handleForceSwitch returns true if a switch was requested
       if (!hitSubstituteOnLastHit) {
-          DragonTail.handleForceSwitch(attacker, defender, logs, move.name, state);
+          DragonTail.handleForceSwitch(attacker, defender, logs, move.name, state, prng);
       }
       return {}; 
   }
@@ -241,10 +243,10 @@ export function handleSecondaryEffects(
 
   if (move.effect?.status === 'thunder-fang-effect') {
       const sereneMult = attacker.ability === 'serene-grace' ? 2 : 1;
-      if (Math.random() < 0.1 * sereneMult) {
+      if (nextBattleRandom(state, prng) < 0.1 * sereneMult) {
           StatusConditions.applyStatus(defender, 'paralysis', logs, attacker, false, state);
       }
-      if (Math.random() < 0.1 * sereneMult) {
+      if (nextBattleRandom(state, prng) < 0.1 * sereneMult) {
           VolatileStatus.handleFlinch(defender, logs, ignoresAbilities);
       }
       return {};
@@ -252,10 +254,10 @@ export function handleSecondaryEffects(
 
   if (move.effect?.status === 'ice-fang-effect') {
       const sereneMult = attacker.ability === 'serene-grace' ? 2 : 1;
-      if (Math.random() < 0.1 * sereneMult) {
+      if (nextBattleRandom(state, prng) < 0.1 * sereneMult) {
           StatusConditions.applyStatus(defender, 'freeze', logs, attacker, false, state);
       }
-      if (Math.random() < 0.1 * sereneMult) {
+      if (nextBattleRandom(state, prng) < 0.1 * sereneMult) {
           VolatileStatus.handleFlinch(defender, logs, ignoresAbilities);
       }
       return {};
@@ -272,9 +274,9 @@ export function handleSecondaryEffects(
       return {};
   }
 
-  if (Math.random() * 100 < chance) {
+  if (nextBattleRandom(state, prng) * 100 < chance) {
       if (PARTIAL_TRAPPING_MOVES.includes(move.name) && move.name !== 'bind') {
-          PartialTrapping.applyPartialTrapping(attacker, defender, move, logs);
+          PartialTrapping.applyPartialTrapping(attacker, defender, move, logs, prng);
       }
       else if (move.name === 'ancient-power') {
           AncientPower.handleAncientPowerEffect(attacker, logs, state);
@@ -346,7 +348,7 @@ export function handleSecondaryEffects(
           Stomp.handleStompFlinch(attacker, defender, logs, ignoresAbilities);
       }
       else if (move.name === 'bind') {
-          Bind.handleBind(attacker, defender, move, logs, state);
+          Bind.handleBind(attacker, defender, move, logs, state, prng);
       }
       else if (move.effect?.status === 'burning-jealousy') {
           BurningJealousy.handleBurningJealousy(attacker, defender, logs, state);
@@ -525,10 +527,10 @@ export function handleSecondaryEffects(
       else if (move.effect?.status.includes('-')) {
           StatChanges.handleSecondaryStatChanges(attacker, defender, move, logs, state);
       } else {
-          VolatileStatus.handleVolatileStatus(attacker, defender, move, move.effect?.status || '', logs, state);
+          VolatileStatus.handleVolatileStatus(attacker, defender, move, move.effect?.status || '', logs, state, prng);
       }
   }
 
-  Stench.handleStench(attacker, defender, move, logs, isGasActive, ignoresAbilities);
+  Stench.handleStench(attacker, defender, move, logs, isGasActive, ignoresAbilities, prng);
   return {};
 }

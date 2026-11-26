@@ -1,5 +1,6 @@
 
 import { Pokemon } from '../../../../types';
+import { BattlePRNG, nextBattleRandom } from '../../../../utils/prng';
 import { log } from '../../utils';
 import * as StatusEffect from '../../../effectHandlers';
 import * as Overcoat from './overcoat';
@@ -10,7 +11,7 @@ import * as Overcoat from './overcoat';
  * ao ser atingido por um movimento de contato.
  * Pokémon do tipo Grama, com a habilidade Sobretudo ou segurando Safety Goggles são imunes.
  */
-export function handleEffectSpore(attacker: Pokemon, defender: Pokemon, logs: {message: string, color: string}[]) {
+export function handleEffectSpore(attacker: Pokemon, defender: Pokemon, logs: {message: string, color: string}[], prng?: BattlePRNG) {
     // Imunidades a esporos/pós (Geração 6+)
     const isImmuneToPowder = 
         attacker.types.includes('grass') || 
@@ -21,7 +22,7 @@ export function handleEffectSpore(attacker: Pokemon, defender: Pokemon, logs: {m
         return;
     }
 
-    const rand = Math.random();
+    const rand = nextBattleRandom(undefined, prng);
     if (rand < 0.3) {
         let status = '';
         if (rand < 0.1) status = 'sleep';

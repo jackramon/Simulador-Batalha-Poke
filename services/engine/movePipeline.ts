@@ -60,6 +60,7 @@ import * as GaleWings from './handlers/abilities/gale_wings';
 import * as Prankster from './handlers/abilities/prankster';
 import * as GrassyGlide from './handlers/moves/grassyGlide';
 import AudioManager from '../audio/AudioManager';
+import { BattlePRNG } from '../../utils/prng';
 
 export interface MovePipelineContext {
     state: BattleState;
@@ -69,6 +70,7 @@ export interface MovePipelineContext {
     config: BattleConfig;
     logs: LogEntry[];
     defenderAction?: Action;
+    prng: BattlePRNG;
     // Calculated Properties
     effectiveType: string;
     isGasActive: boolean;
@@ -90,8 +92,10 @@ export function initializeContext(
     move: Move,
     config: BattleConfig,
     logs: LogEntry[],
-    defenderAction?: Action
+    defenderAction?: Action,
+    prng?: BattlePRNG
 ): MovePipelineContext {
+    const random = prng ? prng.attachTo(state) : BattlePRNG.fromBattleState(state);
     const isWeatherSuppressed = AirLock.isWeatherSuppressed(state);
     const effectiveWeather = isWeatherSuppressed ? 'none' : state.weather;
     const isGasActive = NeutralizingGas.isGasActive(state);
@@ -101,7 +105,7 @@ export function initializeContext(
                              MyceliumMight.shouldIgnoreAbilities(attacker, move);
 
     return {
-        state, attacker, defender, move, config, logs, defenderAction,
+        state, attacker, defender, move, config, logs, defenderAction, prng: random,
         effectiveType: move.type,
         isGasActive,
         isWeatherSuppressed,
@@ -131,7 +135,7 @@ export function checkAccuracyStep(ctx: MovePipelineContext): boolean {
 
     const hitChance = calculateHitChance(move, attacker, defender, effectiveWeather, state.gravity);
     
-    if (hitChance !== '∞' && Math.random() * 100 > (hitChance as number)) {
+    if (hitChance !== '∞' && ctx.prng.next() * 100 > (hitChance as number)) {
         log(logs, BATTLE_MESSAGES.MISS(), 'text-gray-500 italic');
         
         attacker.lastMoveFailed = true;
@@ -309,7 +313,7 @@ export function executeStatusMoveStep(ctx: MovePipelineContext): void {
         // Reflected! Execute move with swapped roles
         // Note: We use move.type (base type) to avoid applying attacker's type-changing abilities to the reflected move.
         // Ideally we would recalculate type for defender, but for now base type is safer than attacker's modified type.
-        const reflectedRes = MoveEffects.handleStatusMove(state, defender, attacker, { ...move, type: move.type }, logs);
+        const reflectedRes = MoveEffects.handleStatusMove(state, defender, attacker, { ...move, type: move.type }, logs, ctx.prng);
         
         if (reflectedRes.switchRequested) ctx.defenderSwitchRequested = true;
         if (reflectedRes.defenderSwitchRequested) ctx.switchRequested = true;
@@ -319,7 +323,7 @@ export function executeStatusMoveStep(ctx: MovePipelineContext): void {
     }
     // ------------------------------
 
-    const statusRes = MoveEffects.handleStatusMove(state, attacker, defender, { ...move, type: effectiveType }, logs);
+    const statusRes = MoveEffects.handleStatusMove(state, attacker, defender, { ...move, type: effectiveType }, logs, ctx.prng);
     
     const lastLog = logs[logs.length - 1]?.message || "";
     if (lastLog.includes("Não afetou") || lastLog.includes("Imune") || lastLog.includes("refletiu")) {
@@ -421,7 +425,7 @@ export function executeDamageMoveStep(ctx: MovePipelineContext): void {
         if (i > 0 && ['population-bomb', 'triple-axel', 'triple-kick'].includes(move.name)) {
             if (attacker.ability !== 'skill-link') {
                 const subHitChance = calculateHitChance(move, attacker, defender, effectiveWeather, state.gravity);
-                if (subHitChance !== '∞' && Math.random() * 100 > (subHitChance as number)) {
+                if (subHitChance !== '∞' && ctx.prng.next() * 100 > (subHitChance as number)) {
                     break;
                 }
             }
@@ -433,7 +437,7 @@ export function executeDamageMoveStep(ctx: MovePipelineContext): void {
         else if (critStage === 2) critChance = 0.5; 
         else if (critStage >= 3) critChance = 1.0; 
 
-        let isCrit = Math.random() < critChance;
+        let isCrit = ctx.prng.next() < critChance;
         if (Merciless.isCritGuaranteed(attacker, defender)) isCrit = true;
         if (FrostBreath.isCriticalGuaranteed(move.name)) isCrit = true;
         if (attacker.statusEffects['laser-focus']) isCrit = true;
@@ -530,7 +534,7 @@ export function executeDamageMoveStep(ctx: MovePipelineContext): void {
             break;
         }
 
-        let damage = DamageUtils.calculateDamage(attacker, defender, { ...move, type: effectiveType }, state.weather, isCrit, finalMultiplier, i, logs, state, ctx.config.fixedRoll, defenderAction);
+        let damage = DamageUtils.calculateDamage(attacker, defender, { ...move, type: effectiveType }, state.weather, isCrit, finalMultiplier, i, logs, state, ctx.config.fixedRoll, defenderAction, ctx.prng);
         
         // --- STURDY CHECK (Updated with State) ---
         damage = Sturdy.applySturdy(defender, damage, ignoresAbilities, logs, state);
@@ -628,7 +632,7 @@ export function executeDamageMoveStep(ctx: MovePipelineContext): void {
         }
 
         RedCard.checkRedCard(defender, attacker, state, logs);
-        AbilityStatus.handleCursedBody(attacker, defender, move, logs);
+        AbilityStatus.handleCursedBody(attacker, defender, move, logs, ctx.prng);
         const attackerTeam = attacker === state.currentPokemon1 ? state.team1 : state.team2;
         if (MoveEffects.checkSelfSwitch(attacker, move, attackerTeam, logs)) ctx.switchRequested = true;
 
@@ -640,11 +644,11 @@ export function executeDamageMoveStep(ctx: MovePipelineContext): void {
         }
     }
 
-    const secondaryRes = MoveEffects.handleSecondaryEffects(attacker, defender, move, logs, state, hitSubstituteOnLastHit);
+    const secondaryRes = MoveEffects.handleSecondaryEffects(attacker, defender, move, logs, state, hitSubstituteOnLastHit, ctx.prng);
     if (secondaryRes.defenderSwitchRequested) ctx.defenderSwitchRequested = true;
     
     MoveEffects.handleSelfDestruct(attacker, move, logs);
-    MoveEffects.handleContactEffects(attacker, defender, move, hitsLanded, logs, state);
+    MoveEffects.handleContactEffects(attacker, defender, move, hitsLanded, logs, state, ctx.prng);
 
     GulpMissile.handleGulpMissileFormChange(attacker, move, logs);
 

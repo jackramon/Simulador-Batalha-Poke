@@ -1,5 +1,6 @@
 
 import { Pokemon } from '../../../../types';
+import { BattlePRNG, nextBattleRandom } from '../../../../utils/prng';
 import { log } from '../../utils';
 import * as StatusEffect from '../../../effectHandlers';
 
@@ -13,14 +14,15 @@ export function handlePoisonTouch(
     defender: Pokemon, 
     hits: number, 
     isContact: boolean, 
-    logs: {message: string, color: string}[]
+    logs: {message: string, color: string}[],
+    prng?: BattlePRNG
 ) {
     if (!isContact || attacker.ability !== 'poison-touch' || defender.isFainted) return;
 
     let poisoned = false;
     for (let i = 0; i < hits; i++) {
         // 30% de chance por acerto
-        if (Math.random() < 0.3) {
+        if (nextBattleRandom(undefined, prng) < 0.3) {
             // applyStatus lida com imunidades e se o alvo já tem status
             const initialStatusCount = Object.keys(defender.statusEffects).length;
             StatusEffect.applyStatus(defender, 'poison', logs as any, attacker);

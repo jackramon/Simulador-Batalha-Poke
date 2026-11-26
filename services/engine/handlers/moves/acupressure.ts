@@ -1,5 +1,6 @@
 
 import { Pokemon, BattleState, StatStages } from '../../../../types';
+import { BattlePRNG, nextBattleRandom } from '../../../../utils/prng';
 import { log } from '../../utils';
 import * as StatChanges from '../effects/statChanges';
 
@@ -11,7 +12,8 @@ import * as StatChanges from '../effects/statChanges';
 export function handleAcupressure(
     attacker: Pokemon,
     logs: {message: string, color: string}[],
-    state?: BattleState
+    state?: BattleState,
+    prng?: BattlePRNG
 ) {
     if (attacker.isFainted) return;
 
@@ -26,7 +28,7 @@ export function handleAcupressure(
     }
 
     // Escolhe um aleatório
-    const randomStat = validStats[Math.floor(Math.random() * validStats.length)];
+    const randomStat = validStats[Math.floor(nextBattleRandom(state, prng) * validStats.length)];
     
     // Converte chave do stat para o formato esperado por applyMoveStatChange (ex: 'attack' -> 'attack-up')
     const effectStatus = `${randomStat}-up`;

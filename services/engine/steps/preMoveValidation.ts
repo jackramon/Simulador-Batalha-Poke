@@ -6,6 +6,7 @@ import { TWO_TURN_MOVES, RECHARGE_MOVES } from '../../../data/moves';
 import { ITEMS_DATA } from '../../../data/items';
 import { TYPE_NAMES_PT } from '../../../data/types';
 import { getPokemonPlayerNum } from '../../../utils/pokemonIdentity';
+import { BattlePRNG, nextBattleRandom } from '../../../utils/prng';
 
 import * as Restrictions from '../handlers/moves/restrictions';
 import * as ThroatChop from '../handlers/moves/throatChop';
@@ -67,7 +68,8 @@ export function validateMoveExecution(
     defenderAction?: Action,
     isDancerTriggered: boolean = false,
     shouldTerastallize: boolean = false,
-    isSleepTalkTriggered: boolean = false
+    isSleepTalkTriggered: boolean = false,
+    prng?: BattlePRNG
 ): ValidationResult {
     
     let logs: LogEntry[] = [];
@@ -391,7 +393,7 @@ export function validateMoveExecution(
     }
   
     if (attacker.statusEffects.freeze) {
-        if (Math.random() < 0.2 || (move.type === 'fire' || move.name === 'scald' || move.name === 'steam-eruption' || move.name === 'scorching-sands') || move.name === 'burn-up' || move.name === 'double-shock') {
+        if (nextBattleRandom(state, prng) < 0.2 || (move.type === 'fire' || move.name === 'scald' || move.name === 'steam-eruption' || move.name === 'scorching-sands') || move.name === 'burn-up' || move.name === 'double-shock') {
             delete attacker.statusEffects.freeze;
             log(logs, BATTLE_MESSAGES.THAWED(attacker.name), 'text-blue-500');
         } else {
@@ -435,7 +437,7 @@ export function validateMoveExecution(
     }
 
     // Verifica condições de status que impedem movimento (Paralisia, Sono, Flinch, etc)
-    if (!StatusCheck.checkStatusBlocking(attacker, move, logs, state, isSleepTalkTriggered)) {
+    if (!StatusCheck.checkStatusBlocking(attacker, move, logs, state, isSleepTalkTriggered, prng)) {
         attacker.lastMoveFailed = true;
         // Se a Rolagem for interrompida por status, reseta
         if (move.name === 'rollout') Rollout.resetRollout(attacker);

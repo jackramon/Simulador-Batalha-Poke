@@ -1,5 +1,6 @@
 
 import { Pokemon, Move } from '../../../../types';
+import { BattlePRNG, nextBattleRandom } from '../../../../utils/prng';
 import { log } from '../../utils';
 import * as InnerFocus from './inner_focus';
 
@@ -14,7 +15,8 @@ export function handleStench(
     move: Move, 
     logs: {message: string, color: string}[], 
     isGasActive: boolean, 
-    ignoresAbilities: boolean
+    ignoresAbilities: boolean,
+    prng?: BattlePRNG
 ) {
     // 1. Verificações básicas de ativação
     if (attacker.ability !== 'stench' || isGasActive || move.damageClass === 'status' || defender.isFainted) {
@@ -27,7 +29,7 @@ export function handleStench(
     }
 
     // 3. 10% de chance fixa (não afetada por Serene Grace)
-    if (Math.random() < 0.1) {
+    if (nextBattleRandom(undefined, prng) < 0.1) {
         // Verifica imunidade a flinch (Inner Focus), a menos que o atacante quebre o molde
         if (!InnerFocus.isImmuneToFlinch(defender) || ignoresAbilities) {
             defender.isFlinched = true;

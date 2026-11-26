@@ -22,6 +22,7 @@ import * as NaturePower from './handlers/moves/naturePower';
 import * as Pipeline from './movePipeline';
 import * as SkyDrop from './handlers/moves/skyDrop';
 import { acquireBattleDraft, preserveBattleDraftState, rehydrateAction, rehydrateMove, rehydratePokemon, releaseBattleDraft } from './stateTransactions';
+import { BattlePRNG } from '../../utils/prng';
 
 // --- MAPA ESTÁTICO DE SPRITES MEGA (Fallback para JIT) ---
 // Fonte da Verdade para IDs de arte oficial da PokeAPI (Formas Mega)
@@ -84,10 +85,12 @@ export function executeMove(
   isDancerTriggered: boolean = false,
   shouldTerastallize: boolean = false,
   isSleepTalkTriggered: boolean = false,
-  shouldMegaEvolve: boolean = false
+  shouldMegaEvolve: boolean = false,
+  prng?: BattlePRNG
 ): ReturnType<typeof executeMoveDraft> {
   const draft = acquireBattleDraft(currentState);
   try {
+    const random = prng ? prng.attachTo(draft.state) : BattlePRNG.fromBattleState(draft.state);
     const draftAttacker = rehydratePokemon(draft.state, attacker);
     const draftDefender = rehydratePokemon(draft.state, defender);
     const draftMove = rehydrateMove(draftAttacker, move);
@@ -103,6 +106,7 @@ export function executeMove(
       shouldTerastallize,
       isSleepTalkTriggered,
       shouldMegaEvolve,
+      random,
     );
   } finally {
     releaseBattleDraft(draft);
@@ -119,11 +123,13 @@ function executeMoveDraft(
   isDancerTriggered: boolean = false,
   shouldTerastallize: boolean = false,
   isSleepTalkTriggered: boolean = false,
-  shouldMegaEvolve: boolean = false // Novo parâmetro para Mega Evolução
+  shouldMegaEvolve: boolean = false, // Novo parâmetro para Mega Evolução
+  prng?: BattlePRNG
 ): { newState: BattleState, logs: LogEntry[], fainted: boolean, switchRequested?: boolean, defenderSwitchRequested?: boolean, isBatonPass?: boolean, damageDealt: boolean } {
   
   const logs: LogEntry[] = [];
   let state = currentState;
+  const random = prng ?? BattlePRNG.fromBattleState(state);
 
   // Nenhuma ação nova pode atingir ou partir de um Pokémon já desmaiado.
   if (attacker.isFainted || defender.isFainted) {
@@ -229,7 +235,7 @@ function executeMoveDraft(
 
   // 1. Executa Validações Pré-Movimento
   const validation = validateMoveExecution(
-      state, attacker, defender, move, config, defenderAction, isDancerTriggered, shouldTerastallize && !shouldMegaEvolve, isSleepTalkTriggered
+      state, attacker, defender, move, config, defenderAction, isDancerTriggered, shouldTerastallize && !shouldMegaEvolve, isSleepTalkTriggered, random
   );
 
   // CRITICAL FIX: Propagate state changes (Tera usage, PP deduction, Protect counters)
@@ -257,7 +263,7 @@ function executeMoveDraft(
   // --- PREPARAÇÃO DE VARIÁVEIS COMUNS PARA EXECUÇÃO ---
   // Verifica descongelamento
   if (attacker.statusEffects.freeze) {
-    if (Math.random() < 0.2 || (move.type === 'fire' || move.name === 'scald' || move.name === 'steam-eruption' || move.name === 'scorching-sands') || move.name === 'burn-up' || move.name === 'double-shock') {
+    if (random.next() < 0.2 || (move.type === 'fire' || move.name === 'scald' || move.name === 'steam-eruption' || move.name === 'scorching-sands') || move.name === 'burn-up' || move.name === 'double-shock') {
       delete attacker.statusEffects.freeze;
       log(logs, BATTLE_MESSAGES.THAWED(attacker.name), 'text-blue-500');
     } else {
@@ -270,9 +276,9 @@ function executeMoveDraft(
   // Estas lógicas permanecem aqui pois alteram o próprio movimento sendo executado, reiniciando o fluxo.
 
   if (move.name === 'metronome') {
-      const randomMove = Metronome.getMetronomeMove(attacker, logs);
+      const randomMove = Metronome.getMetronomeMove(attacker, logs, random);
       if (randomMove) {
-          const recursiveResult = executeMove(state, attacker, defender, randomMove, config, defenderAction, false, false, true);
+          const recursiveResult = executeMove(state, attacker, defender, randomMove, config, defenderAction, false, false, true, false, random);
           return { ...recursiveResult, logs: [...logs, ...recursiveResult.logs] };
       } else {
           log(logs, 'Mas falhou!', 'text-gray-500 italic');
@@ -284,7 +290,7 @@ function executeMoveDraft(
       if (config.moveLimitEnabled && !isSleepTalkTriggered) move.uses = Math.max(0, move.uses - 1);
       const copiedMove = MeFirst.handleMeFirst(attacker, defender, defenderAction, logs);
       if (copiedMove) {
-          const recursiveResult = executeMove(state, attacker, defender, copiedMove, config, defenderAction, false, false, true);
+          const recursiveResult = executeMove(state, attacker, defender, copiedMove, config, defenderAction, false, false, true, false, random);
           return { ...recursiveResult, logs: [...logs, ...recursiveResult.logs] };
       } else {
           return { newState: state, logs, fainted: attacker.isFainted, switchRequested, defenderSwitchRequested, isBatonPass, damageDealt: false };
@@ -295,7 +301,7 @@ function executeMoveDraft(
       const newMove = NaturePower.getNaturePowerMove(state.terrain);
       log(logs, `Poder Natural transformou-se em ${newMove.displayName}!`, 'text-blue-600 font-bold italic');
       if (config.moveLimitEnabled && !isSleepTalkTriggered) move.uses = Math.max(0, move.uses - 1);
-      const recursiveResult = executeMove(state, attacker, defender, newMove, config, defenderAction, false, false, isSleepTalkTriggered);
+      const recursiveResult = executeMove(state, attacker, defender, newMove, config, defenderAction, false, false, isSleepTalkTriggered, false, random);
       return { ...recursiveResult, logs: [...logs, ...recursiveResult.logs] };
   }
 
@@ -303,7 +309,7 @@ function executeMoveDraft(
       if (config.moveLimitEnabled && !isSleepTalkTriggered) move.uses = Math.max(0, move.uses - 1);
       const copiedMove = Copycat.handleCopycat(attacker, defender, logs);
       if (copiedMove) {
-          const recursiveResult = executeMove(state, attacker, defender, copiedMove, config, defenderAction, false, false, true);
+          const recursiveResult = executeMove(state, attacker, defender, copiedMove, config, defenderAction, false, false, true, false, random);
           return { ...recursiveResult, logs: [...logs, ...recursiveResult.logs] };
       } else {
           return { newState: state, logs, fainted: attacker.isFainted, switchRequested, defenderSwitchRequested, isBatonPass, damageDealt: false };
@@ -314,7 +320,7 @@ function executeMoveDraft(
       if (config.moveLimitEnabled && !isSleepTalkTriggered) move.uses = Math.max(0, move.uses - 1);
       const copiedMove = MirrorMove.handleMirrorMove(attacker, defender, logs);
       if (copiedMove) {
-          const recursiveResult = executeMove(state, attacker, defender, copiedMove, config, defenderAction, false, false, true);
+          const recursiveResult = executeMove(state, attacker, defender, copiedMove, config, defenderAction, false, false, true, false, random);
           return { ...recursiveResult, logs: [...logs, ...recursiveResult.logs] };
       } else {
           return { newState: state, logs, fainted: attacker.isFainted, switchRequested, defenderSwitchRequested, isBatonPass, damageDealt: false };
@@ -322,9 +328,9 @@ function executeMoveDraft(
   }
 
   if (move.name === 'sleep-talk') {
-      const calledMove = SleepTalk.handleSleepTalk(attacker, logs);
+      const calledMove = SleepTalk.handleSleepTalk(attacker, logs, random);
       if (calledMove) {
-          const recursiveResult = executeMove(state, attacker, defender, calledMove, config, defenderAction, false, false, true);
+          const recursiveResult = executeMove(state, attacker, defender, calledMove, config, defenderAction, false, false, true, false, random);
           return { ...recursiveResult, logs: [...logs, ...recursiveResult.logs] };
       } else {
           return { newState: state, logs, fainted: attacker.isFainted, switchRequested, defenderSwitchRequested, isBatonPass, damageDealt: false };
@@ -345,7 +351,7 @@ function executeMoveDraft(
   // =========================================================================================
 
   // 1. Inicializa Contexto
-  let ctx = Pipeline.initializeContext(state, attacker, defender, move, config, logs, defenderAction);
+  let ctx = Pipeline.initializeContext(state, attacker, defender, move, config, logs, defenderAction, random);
 
   // 2. Resolve Tipos e Efeitos Ambientais
   ctx = Pipeline.resolveEffectiveType(ctx);
@@ -358,7 +364,7 @@ function executeMoveDraft(
 
   // 4. Future Sight Check (Exceção de Fluxo - Ocorre após Accuracy mas antes de execução normal)
   if (move.name === 'future-sight') {
-      MoveEffects.handleSecondaryEffects(attacker, defender, move, logs, state);
+      MoveEffects.handleSecondaryEffects(attacker, defender, move, logs, state, undefined, random);
       attacker.lastMoveFailed = false; 
       return { newState: state, logs, fainted: false, switchRequested, defenderSwitchRequested, isBatonPass, damageDealt: false };
   }
@@ -389,7 +395,7 @@ function executeMoveDraft(
   if (!isDancerTriggered && Dancer.isDanceMove(move) && !defender.isFainted) {
       if (Dazzling.blocksPriorityMove(attacker, defender, move, state)) { /* skip */ } else if (Dancer.canTrigger(defender, state)) {
           log(logs, BATTLE_MESSAGES.DANCER_ACTIVATED(defender.name), 'text-purple-600 font-bold italic');
-          const dancerResult = executeMove(state, defender, attacker, move, config, undefined, true);
+          const dancerResult = executeMove(state, defender, attacker, move, config, undefined, true, false, false, false, random);
           state = dancerResult.newState;
           logs.push(...dancerResult.logs);
           if (dancerResult.switchRequested) defenderSwitchRequested = true; 

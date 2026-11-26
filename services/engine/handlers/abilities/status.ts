@@ -1,10 +1,11 @@
 
 import { Pokemon, Move, LogEntry } from '../../../../types';
+import { BattlePRNG, nextBattleRandom } from '../../../../utils/prng';
 import { log } from '../../utils';
 import * as AromaVeil from './aroma_veil';
 import * as MoldBreaker from './mold_breaker';
 
-export function handleCursedBody(attacker: Pokemon, defender: Pokemon, move: Move, logs: LogEntry[]) {
+export function handleCursedBody(attacker: Pokemon, defender: Pokemon, move: Move, logs: LogEntry[], prng?: BattlePRNG) {
     if (defender.ability === 'cursed-body' && !defender.isFainted) {
         // Verifica se o atacante tem proteção de Véu de Aroma
         const ignoresAbilities = MoldBreaker.suppressesAbilities(defender.ability); // Mold Breaker do atacante? Não, Cursed Body é do defensor
@@ -16,7 +17,7 @@ export function handleCursedBody(attacker: Pokemon, defender: Pokemon, move: Mov
             return;
         }
 
-        if (!attacker.disabledMoves?.[move.name] && Math.random() < 0.3) {
+        if (!attacker.disabledMoves?.[move.name] && nextBattleRandom(undefined, prng) < 0.3) {
             if (!attacker.disabledMoves) attacker.disabledMoves = {};
             attacker.disabledMoves[move.name] = 4;
             log(logs, `O Corpo Amaldiçoado de ${defender.name} desativou o golpe ${move.displayName} de ${attacker.name}!`, 'text-purple-600 font-bold');

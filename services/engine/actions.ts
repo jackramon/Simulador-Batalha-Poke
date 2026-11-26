@@ -11,8 +11,10 @@ import * as Pursuit from './handlers/moves/pursuit';
 import * as GrassyGlide from './handlers/moves/grassyGlide';
 import * as PriorityItems from './handlers/items/priority';
 import { getPokemonPlayerNum } from '../../utils/pokemonIdentity';
+import { BattlePRNG } from '../../utils/prng';
 
-export function getSortedActions(actions: Action[], state: BattleState): Action[] {
+export function getSortedActions(actions: Action[], state: BattleState, prng?: BattlePRNG): Action[] {
+  const random = prng ? prng.attachTo(state) : BattlePRNG.fromBattleState(state);
   const isWeatherSuppressed = AirLock.isWeatherSuppressed(state);
   const effectiveWeather = isWeatherSuppressed ? 'none' : state.weather;
 
@@ -39,11 +41,11 @@ export function getSortedActions(actions: Action[], state: BattleState): Action[
         }
 
         // Saque Rápido (Quick Draw) - Adiciona prioridade fracionária para desempatar na mesma bracket
-        p += QuickDraw.getPriorityBoost(act.user, state);
+        p += QuickDraw.getPriorityBoost(act.user, state, random);
 
         // Itens de Prioridade (Quick Claw, Custap Berry, Lagging Tail)
         // Adiciona modificador fracionário (ex: +0.1 ou -0.1)
-        p += PriorityItems.getItemPriorityMod(act.user, state, state.logs);
+        p += PriorityItems.getItemPriorityMod(act.user, state, state.logs, random);
       }
 
       // Perseguição (Pursuit) interceptando troca
@@ -58,7 +60,7 @@ export function getSortedActions(actions: Action[], state: BattleState): Action[
   };
 
   // Pré-calcula prioridades e desempates para garantir estabilidade na ordenação
-  // Isso evita que Math.random() seja chamado múltiplas vezes para o mesmo par no sort()
+  // Isso evita que random.next() seja chamado múltiplas vezes para o mesmo par no sort()
   const actionsWithPriority = actions.map(action => {
       if (action.calculatedPriority === undefined) {
           action.calculatedPriority = getEffectivePriority(action);
@@ -66,7 +68,7 @@ export function getSortedActions(actions: Action[], state: BattleState): Action[
       return {
           action,
           priority: action.calculatedPriority,
-          tieBreaker: action.tieBreaker ?? Math.random() // Use pre-calculated tie-breaker from coordinator
+          tieBreaker: action.tieBreaker ?? random.next() // Use pre-calculated tie-breaker from coordinator
       };
   });
 

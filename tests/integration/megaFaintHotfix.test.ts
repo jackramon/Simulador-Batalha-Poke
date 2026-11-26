@@ -5,7 +5,7 @@ import { performSwitch } from '../../services/engine/switching';
 import { decideLLMAction } from '../../services/llmAiLogic';
 import { BATTLE_MESSAGES } from '../../data/battleMessages';
 import type { Pokemon } from '../../types';
-import { disableDeterministicRandom, enableDeterministicRandom } from '../../utils/prng';
+import { createBattlePRNGState } from '../../utils/prng';
 import { createBattleState, createMove, createPokemon } from '../factories';
 import { createBattleConfig, createMoveAction, runCoordinatorTurn } from './coordinator.helpers';
 
@@ -110,7 +110,6 @@ describe('hotfix da identidade Mega e do fluxo pós-desmaio', () => {
   });
 
   afterEach(() => {
-    disableDeterministicRandom();
     vi.unstubAllGlobals();
     vi.restoreAllMocks();
   });
@@ -273,7 +272,7 @@ describe('hotfix da identidade Mega e do fluxo pós-desmaio', () => {
     const aiPokemon = createSwampert({ hp: 40 });
     const opponent = createOpponent();
     const state = createBattleState([opponent], [aiPokemon]);
-    enableDeterministicRandom(2602);
+    state.prngState = createBattlePRNGState(2602);
     const action = decideAIAction(
       aiPokemon,
       opponent,

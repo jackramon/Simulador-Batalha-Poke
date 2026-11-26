@@ -1,5 +1,6 @@
 
 import { Pokemon, BattleState } from '../../types';
+import { BattlePRNG } from '../../utils/prng';
 import { log, LogEntry } from '../engine/utils';
 import * as EntryAbilities from '../engine/handlers/abilities/entry';
 import * as ZenMode from '../engine/handlers/abilities/zen_mode';
@@ -29,9 +30,10 @@ export const handleEntryAbilities = (
     weatherEnabled: boolean, 
     logs: LogEntry[], 
     state: BattleState,
-    lastPokemon: Pokemon | null = null
+    lastPokemon: Pokemon | null = null,
+    prng?: BattlePRNG
 ) => {
-    const res = EntryAbilities.handleEntryAbilities(pokemon, opponent, weatherEnabled, logs as any, state, lastPokemon);
+    const res = EntryAbilities.handleEntryAbilities(pokemon, opponent, weatherEnabled, logs as any, state, lastPokemon, prng);
     ZenMode.checkZenMode(pokemon, logs as any);
     OwnTempo.checkOwnTempo(pokemon, logs as any);
     return res;

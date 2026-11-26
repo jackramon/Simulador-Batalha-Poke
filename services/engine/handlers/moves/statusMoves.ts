@@ -3,8 +3,9 @@ import { Pokemon, Move, BattleState, LogEntry } from '../../../../types';
 import * as Effects from '../../../effectHandlers';
 import * as PartialTrapping from './partialTrapping';
 import { log } from '../../utils';
+import { BattlePRNG } from '../../../../utils/prng';
 
-export function handleConditionMove(attacker: Pokemon, defender: Pokemon, move: Move, logs: LogEntry[], state?: BattleState) {
+export function handleConditionMove(attacker: Pokemon, defender: Pokemon, move: Move, logs: LogEntry[], state?: BattleState, prng?: BattlePRNG) {
     if (!move.effect) return;
     
     if (move.effect.status === 'leech-seed') {
@@ -22,7 +23,7 @@ export function handleConditionMove(attacker: Pokemon, defender: Pokemon, move: 
 
         Effects.applyStatus(defender, 'leech-seed', logs, attacker, false, state);
     } else if (PartialTrapping.isPartialTrappingMove(move)) {
-        PartialTrapping.applyPartialTrapping(attacker, defender, move, logs);
+        PartialTrapping.applyPartialTrapping(attacker, defender, move, logs, prng);
     } else {
         Effects.applyStatus(defender, move.effect.status, logs, attacker, false, state);
     }

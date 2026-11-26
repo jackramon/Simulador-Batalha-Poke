@@ -1,4 +1,5 @@
 import { Pokemon } from '../../../../types';
+import { BattlePRNG, nextBattleRandom } from '../../../../utils/prng';
 import { log } from '../../utils';
 import { ITEMS_DATA } from '../../../../data/items';
 import * as Unburden from './unburden';
@@ -8,7 +9,7 @@ import * as Unburden from './unburden';
  * Regra Oficial: Ao final de cada turno, tem 50% de chance de restaurar uma Fruta (Berry) consumida.
  * Sob Sol Forte (Sunny Day), a chance é de 100%.
  */
-export function handleHarvest(pokemon: Pokemon, weather: string, logs: { message: string, color: string }[]) {
+export function handleHarvest(pokemon: Pokemon, weather: string, logs: { message: string, color: string }[], prng?: BattlePRNG) {
     // Requisitos: Ter a habilidade, estar vivo, não estar segurando item e ter consumido uma fruta
     if (pokemon.ability !== 'harvest' || pokemon.isFainted || pokemon.heldItem) return;
     
@@ -18,7 +19,7 @@ export function handleHarvest(pokemon: Pokemon, weather: string, logs: { message
     const isSun = weather === 'sun';
     const chance = isSun ? 1.0 : 0.5;
 
-    if (Math.random() < chance) {
+    if (nextBattleRandom(undefined, prng) < chance) {
         const itemName = ITEMS_DATA[lastItem]?.name || lastItem;
         pokemon.heldItem = lastItem;
         pokemon.consumedItem = null;

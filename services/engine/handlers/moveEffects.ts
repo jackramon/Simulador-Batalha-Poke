@@ -1,5 +1,6 @@
 
 import { Pokemon, Move, BattleState, LogEntry } from '../../../types';
+import { BattlePRNG } from '../../../utils/prng';
 import { isContactMove } from '../../battleUtils';
 import * as Effects from './effects/index';
 import * as Contact from './abilities/contact';
@@ -25,10 +26,11 @@ export function handleContactEffects(
     move: Move, 
     hitsLanded: number, 
     logs: LogEntry[],
-    state?: BattleState
+    state?: BattleState,
+    prng?: BattlePRNG
 ) {
     const isContact = isContactMove(move);
-    Contact.checkContactEffects(attacker, defender, hitsLanded, isContact, logs, state);
+    Contact.checkContactEffects(attacker, defender, hitsLanded, isContact, logs, state, prng);
 }
 
 export function handleOnHit(

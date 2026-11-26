@@ -1,6 +1,6 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { performSwitch } from '../../services/engine/switching';
-import { disableDeterministicRandom, enableDeterministicRandom } from '../../utils/prng';
+import { BattlePRNG } from '../../utils/prng';
 import {
   createBattleState,
   createMove,
@@ -212,9 +212,8 @@ describe('integração das trocas voluntárias, forçadas e por desmaio', () => 
 
     const replacementState = faintStep.state;
     const replacement = replacementState.team2[1];
-    enableDeterministicRandom(1405);
-    try {
-      const { newState } = performSwitch(replacementState, replacement, 2, false);
+    const prng = new BattlePRNG(1405);
+    const { newState } = performSwitch(replacementState, replacement, 2, false, false, prng);
 
       expect(newState.currentPokemon2).toBe(newState.team2[1]);
       expect(newState.currentPokemon2).not.toBe(replacement);
@@ -224,9 +223,6 @@ describe('integração das trocas voluntárias, forçadas e por desmaio', () => 
       expect(replacementState.currentPokemon2).toBe(replacementState.team2[0]);
       expect(replacement.hp).toBe(400);
       expect(fetchMock).not.toHaveBeenCalled();
-    } finally {
-      disableDeterministicRandom();
-    }
   });
 
   it('continua o turno depois que a UI conclui uma troca forçada coordenada', () => {

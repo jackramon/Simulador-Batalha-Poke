@@ -40,6 +40,7 @@ import * as ChipAway from './moves/chipAway';
 import * as Reflect from './moves/reflect';
 import * as HelpingHand from './moves/helpingHand';
 import * as MoongeistBeam from './moves/moongeistBeam';
+import { BattlePRNG, nextBattleRandom } from '../../../utils/prng';
 
 export function calculateDamage(
     attacker: Pokemon,
@@ -52,7 +53,8 @@ export function calculateDamage(
     logs: LogEntry[],
     state?: BattleState,
     fixedRoll?: number,
-    defenderAction?: Action
+    defenderAction?: Action,
+    prng?: BattlePRNG
 ): number {
     // OHKO Moves Check
     if (OHKO_MOVES.includes(move.name)) {
@@ -182,7 +184,8 @@ export function calculateDamage(
         state,
         hitIndex,
         logs,
-        defenderAction
+        defenderAction,
+        prng
     );
 
     const level = attacker.level || 50;
@@ -260,7 +263,7 @@ export function calculateDamage(
     damage *= AbilityModifiers.getDefensiveMultipliers(defender, move, hitIndex, logs, attacker.ability, typeEffectiveness, isGasActive, attacker, state);
     damage *= typeEffectiveness;
 
-    const roll = fixedRoll !== undefined ? fixedRoll : (Math.floor(Math.random() * 16) + 85);
+    const roll = fixedRoll !== undefined ? fixedRoll : (Math.floor(nextBattleRandom(state, prng) * 16) + 85);
     damage = (damage * roll) / 100;
 
     if (isCrit) {

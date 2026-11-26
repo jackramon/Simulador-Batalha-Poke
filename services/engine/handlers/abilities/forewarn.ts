@@ -1,4 +1,5 @@
 import { Pokemon, Move } from '../../../../types';
+import { BattlePRNG, nextBattleRandom } from '../../../../utils/prng';
 import { log } from '../../utils';
 
 /**
@@ -17,7 +18,8 @@ const COUNTER_MOVES = ['counter', 'mirror-coat', 'metal-burst'];
 export function triggerForewarn(
     pokemon: Pokemon,
     opponent: Pokemon | null,
-    logs: { message: string, color: string }[]
+    logs: { message: string, color: string }[],
+    prng?: BattlePRNG
 ): boolean {
     if (pokemon.ability !== 'forewarn' || pokemon.isFainted || !opponent || opponent.isFainted) {
         return false;
@@ -40,7 +42,7 @@ export function triggerForewarn(
 
     // Se houver empate, o jogo seleciona um aleatoriamente entre os de maior poder
     const candidates = sortedMoves.filter(m => getEffectivePower(m) === highestPower);
-    const chosenMove = candidates[Math.floor(Math.random() * candidates.length)];
+    const chosenMove = candidates[Math.floor(nextBattleRandom(undefined, prng) * candidates.length)];
 
     log(logs, `A Previsão de ${pokemon.name} alertou sobre o movimento ${chosenMove.displayName} de ${opponent.name}!`, 'text-indigo-700 font-bold italic');
 

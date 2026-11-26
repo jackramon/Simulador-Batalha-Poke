@@ -1,7 +1,7 @@
 import type { TurnStepResult } from '../../services/engine/coordinator';
 import { BattleCoordinator } from '../../services/engine/coordinator';
 import type { Action, BattleConfig, BattleState, Move, Pokemon } from '../../types';
-import { disableDeterministicRandom, enableDeterministicRandom } from '../../utils/prng';
+import { createBattlePRNGState } from '../../utils/prng';
 
 export interface CompletedTurn {
   steps: TurnStepResult[];
@@ -83,41 +83,31 @@ export const runCoordinatorTurn = ({
   const steps: TurnStepResult[] = [];
   const stateSnapshots: BattleState[] = [];
   let completed = false;
-  let randomDraws = 0;
+  const seededState: BattleState = { ...initialState, prngState: createBattlePRNGState(seed) };
+  const generator = BattleCoordinator.runTurn(seededState, p1Action, p2Action, config);
 
-  enableDeterministicRandom(seed);
-  const deterministicRandom = Math.random;
-  Math.random = () => {
-    randomDraws += 1;
-    return deterministicRandom();
-  };
-  try {
-    const generator = BattleCoordinator.runTurn(initialState, p1Action, p2Action, config);
-
-    let next = generator.next();
-    while (true) {
-      if (next.done === true) {
-        completed = true;
-        break;
-      }
-
-      const step: TurnStepResult = next.value;
-      steps.push(step);
-      // Cada yield já é um snapshot transacional independente.
-      stateSnapshots.push(step.state);
-      const forcedSwitchAction = step.phase === 'switch-forced'
-        ? chooseForcedSwitch?.(step)
-        : undefined;
-      next = generator.next(forcedSwitchAction);
+  let next = generator.next();
+  while (true) {
+    if (next.done === true) {
+      completed = true;
+      break;
     }
 
-    const finalState = steps[steps.length - 1]?.state;
-    if (!finalState) {
-      throw new Error('O coordenador terminou sem produzir estado');
-    }
-
-    return { steps, stateSnapshots, finalState, completed, randomDraws };
-  } finally {
-    disableDeterministicRandom();
+    const step: TurnStepResult = next.value;
+    steps.push(step);
+    // Cada yield já é um snapshot transacional independente.
+    stateSnapshots.push(step.state);
+    const forcedSwitchAction = step.phase === 'switch-forced'
+      ? chooseForcedSwitch?.(step)
+      : undefined;
+    next = generator.next(forcedSwitchAction);
   }
+
+  const finalState = steps[steps.length - 1]?.state;
+  if (!finalState) {
+    throw new Error('O coordenador terminou sem produzir estado');
+  }
+
+  const randomDraws = finalState.prngState?.cursor ?? 0;
+  return { steps, stateSnapshots, finalState, completed, randomDraws };
 };

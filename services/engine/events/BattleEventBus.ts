@@ -1,5 +1,6 @@
 
 import { Pokemon, BattleState, LogEntry } from '../../../types';
+import { BattlePRNG } from '../../../utils/prng';
 
 export interface ContactEventPayload {
   attacker: Pokemon;
@@ -7,6 +8,7 @@ export interface ContactEventPayload {
   hitsLanded: number;
   logs: LogEntry[];
   state?: BattleState;
+  prng?: BattlePRNG;
 }
 
 export type EventType = 'ON_CONTACT_HIT';

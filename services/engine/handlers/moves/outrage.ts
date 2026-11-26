@@ -1,4 +1,5 @@
 import { Pokemon, BattleState } from '../../../../types';
+import { BattlePRNG, nextBattleRandom } from '../../../../utils/prng';
 import { log } from '../../utils';
 import { BATTLE_MESSAGES } from '../../../../data/battleMessages';
 import * as Effects from '../../../effectHandlers';
@@ -7,12 +8,12 @@ import * as Effects from '../../../effectHandlers';
  * Lógica para o movimento Ultraje (Outrage) e similares (Thrash, Petal Dance).
  * Regra Oficial: O usuário ataca por 2-3 turnos seguidos e depois fica confuso.
  */
-export function processOutrageLock(attacker: Pokemon, logs: {message: string, color: string}[], state?: BattleState) {
+export function processOutrageLock(attacker: Pokemon, logs: {message: string, color: string}[], state?: BattleState, prng?: BattlePRNG) {
     if (attacker.isFainted) return;
 
     // Se ainda não está travado, inicia o contador
     if (!attacker.statusEffects['outrage-lock']) {
-        const duration = Math.floor(Math.random() * 2) + 2; // 2 ou 3 turnos
+        const duration = Math.floor(nextBattleRandom(state, prng) * 2) + 2; // 2 ou 3 turnos
         attacker.statusEffects['outrage-lock'] = { turns: duration };
         attacker.lockedMove = 'outrage';
     } else {

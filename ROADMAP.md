@@ -8,7 +8,7 @@
 - Mantenha `PROJECT_CONTEXT.md` atualizado a cada alteração.
 - Para economizar tokens: inspecione somente os arquivos da tarefa e suas dependências diretas, reutilize a baseline registrada, use testes focados durante a iteração e rode a suíte completa na validação final. Não refaça auditorias globais já concluídas.
 
-**Próximo item:** 2.6 — Substituir o PRNG global por contexto explícito com snapshot/restore para simulações.
+**Próximo item:** 3.1 — Reproduzir ações gravadas sem chamar IA para consumir RNG.
 
 ## Etapa 0 — Restaurar uma baseline confiável
 
@@ -133,7 +133,14 @@
   - `BattleSession` reserva uma única entrega terminal antes do encerramento e a aceita após `finishResolution()` sem liberar commits comuns; invalidar/iniciar sessão revoga a reserva e bloqueia escritas antigas. Dano, PRNG, U-turn, Emergency Exit, Mega e faint-switch não foram alterados.
   - RED→GREEN na fronteira coordinator → `useTurnManager` → React/`localStorage`: 6 testes de UI cobrem vitória de ambos os lados, KO residual, empate, commit único, ausência de ações pós-terminal e nova batalha; 2 testes adicionais cobrem concessão/revogação. Suítes relacionadas: 43/43; suíte completa: 45 arquivos, 192 aprovados e 3 `it.todo` antigos (195 registrados), sem novos todos; lint, build e `git diff --check` aprovados.
   - Smoke real de produção com Nidoking em 1 HP e sem reservas: Folhagem causou o KO, a vitória substituiu “Processando combate...”, Nova Batalha/Exportar Replay ficaram disponíveis e não houve erros de console. Outra batalha começou limpa no turno 1 com 300/1 HP, sem restaurar o resultado anterior; porta liberada. O launcher previamente validado integra o mesmo commit.
-- [ ] **2.6 — Substituir o PRNG global por contexto explícito com snapshot/restore para simulações.**
+- [x] **2.6 — Substituir o PRNG global por contexto explícito com snapshot/restore para simulações.**
+  - `BattlePRNG` mantém seed, estado interno e cursor em `BattleState.prngState`, formato clonável/JSON sem métodos; a instância é recriada/injetada nas fronteiras transacionais, com `snapshot`, `restore` e `fork`. `seed`/`turnSeed` legados são aceitos, e o monkeypatch/singleton global foi removido.
+  - Coordinator, actions, movePipeline, turnEnd, switching, handlers de golpes/habilidades/itens/status, IA, ReplayPlayer e persistência usam o contexto explícito. Geração de equipes antes da seed, apresentação visual, `services/api/factory.ts` e `services/battleEngine.ts` legado sem importadores permanecem fora da migração.
+  - Cada simulação da IA recebe fork próprio, sem alterar avaliação ou estados retornados (3.4/3.5); o cursor real antes/depois de `decideAIAction` permanece igual. Duas batalhas intercaladas, persistência/restauração no meio e replay com mesma seed/ações reproduzem os mesmos snapshots e estado final.
+  - Oito ouros da versão anterior cobrem precisão, crítico, dano mínimo/máximo, status, clima, desempate e troca aleatória com contagens fixas de draws. Os 20 testes novos também cobrem instâncias independentes, `Math.random` nativo sem influência, fork/snapshot/restore e guarda estática de `Math.random`/singleton nos caminhos ativos.
+  - Validação: 20/20 testes focados novos; suíte completa com 49 arquivos, 212 aprovados e 3 `it.todo` antigos (215 registrados); `npm run lint`, `npm run build` e `git diff --check` aprovados. Permanece o aviso informativo preexistente de chunk acima de 500 kB.
+  - Smoke real no bundle de produção: duas batalhas consecutivas iniciadas no turno 1, vitória por KO de Nidoking e replay exportado/reproduzido até 1/1 com os mesmos eventos e desfecho, sem erros de console; porta de teste liberada.
+  - Próximo item: 3.1. Commit: informado no resumo final após o push verificado em `origin/main`.
 
 ## Etapa 3 — Refazer replay e simulação da IA sobre a base consolidada
 
@@ -155,7 +162,7 @@
 
 ## Registro resumido da baseline
 
-- Última suíte integral informada: **45 arquivos, 192 testes aprovados e 3 `it.todo`** (195 registrados); os todos são lacunas de outros itens e não contam como cobertura aprovada.
+- Última suíte integral informada: **49 arquivos, 212 testes aprovados e 3 `it.todo`** (215 registrados); os todos são lacunas de outros itens e não contam como cobertura aprovada.
 - `npm run lint`, `npm run build` e `git diff --check`: aprovados.
 - Auditoria do item 0.5: **17 → 0** ocorrências no total e **6 → 0** em produção; instalação por `npm ci` reproduzida sem alterações nos manifestos.
 - SHA dos itens 1.1 a 1.7 e dos itens 2.1/2.2/2.3/2.4/2.5 informados somente nos respectivos resumos finais após o push; último SHA registrado no roadmap: `baae8a606c37495f30810e2c646dbb234c75ac86` (item 0.4).

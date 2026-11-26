@@ -1,6 +1,7 @@
 
 import { Pokemon, Move, BattleState } from '../../../../types';
 import { applyPartialTrapping } from './partialTrapping';
+import { BattlePRNG } from '../../../../utils/prng';
 
 /**
  * Handler para o movimento Bind (Amarrar).
@@ -12,11 +13,12 @@ export function handleBind(
     defender: Pokemon,
     move: Move,
     logs: {message: string, color: string}[],
-    state?: BattleState
+    state?: BattleState,
+    prng?: BattlePRNG
 ): void {
     // A mecânica principal de Bind é o aprisionamento parcial (Partial Trapping).
     // O dano inicial é calculado pelo sistema de dano padrão.
     // Este handler é chamado pelo roteador de efeitos secundários para aplicar o status 'bind'.
     
-    applyPartialTrapping(attacker, defender, move, logs);
+    applyPartialTrapping(attacker, defender, move, logs, prng);
 }

@@ -1,4 +1,5 @@
 import { Pokemon, LogEntry } from '../../../../types';
+import { BattlePRNG, nextBattleRandom } from '../../../../utils/prng';
 import { log } from '../../utils';
 
 /**
@@ -15,9 +16,10 @@ import { log } from '../../utils';
  */
 export function getMagnitudePower(
     attacker: Pokemon,
-    logs: LogEntry[]
+    logs: LogEntry[],
+    prng?: BattlePRNG
 ): number {
-    const rand = Math.random() * 100;
+    const rand = nextBattleRandom(undefined, prng) * 100;
     let power = 0;
     let magnitudeLevel = 0;
 

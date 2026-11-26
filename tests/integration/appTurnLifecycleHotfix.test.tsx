@@ -8,7 +8,6 @@ import { DetailsModal, SwitchModal } from '../../components/BattleModals';
 import { MoveButton } from '../../components/MoveButton';
 import { BattleCoordinator, type TurnPhase } from '../../services/engine/coordinator';
 import type { BattleConfig, BattleState } from '../../types';
-import { disableDeterministicRandom } from '../../utils/prng';
 import { createBattleState, createMove, createPokemon } from '../factories';
 import { createBattleConfig } from './coordinator.helpers';
 
@@ -157,7 +156,6 @@ describe('hotfix da retomada de trocas forçadas na UI', () => {
 
   afterEach(async () => {
     if (renderer) await act(async () => renderer.unmount());
-    disableDeterministicRandom();
     vi.clearAllTimers();
     vi.useRealTimers();
     vi.unstubAllGlobals();

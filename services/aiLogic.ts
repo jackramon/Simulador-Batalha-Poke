@@ -15,6 +15,7 @@ import { executeMove } from './engine/moves';
 import { performSwitch } from './engine/switching';
 import { getSortedActions } from './engine/actions';
 import { processTurnEnd } from './engine/turnEnd';
+import { BattlePRNG } from '../utils/prng';
 
 // --- CONFIGURAÇÃO DA IA ---
 const SIMULATION_DEPTH = 1; // 1 Turno completo
@@ -573,6 +574,8 @@ function rehydrateActionForSimulation(originalAction: Action, simulationState: B
 
 function simulateTurn(initialState: BattleState, botAction: Action, oppAction: Action, botConfigOverride?: Partial<BattleConfig>): BattleState {
     const state = cloneBattleState(initialState);
+    const prng = BattlePRNG.fromBattleState(initialState).fork();
+    prng.attachTo(state);
     const logs: LogEntry[] = []; 
 
     const simBotAction = rehydrateActionForSimulation(botAction, state);
@@ -580,7 +583,7 @@ function simulateTurn(initialState: BattleState, botAction: Action, oppAction: A
 
     if (!simBotAction || !simOppAction) return state;
 
-    const actions = getSortedActions([simBotAction, simOppAction], state);
+    const actions = getSortedActions([simBotAction, simOppAction], state, prng);
 
     for (const action of actions) {
         const userRef = action.user; 
@@ -594,7 +597,7 @@ function simulateTurn(initialState: BattleState, botAction: Action, oppAction: A
         }
 
         if (action.type === 'switch') {
-            performSwitch(state, action.data, action.playerNum, currentConfig.weatherEnabled);
+            performSwitch(state, action.data, action.playerNum, currentConfig.weatherEnabled, false, prng);
         } else if (action.type === 'move' && targetRef) {
             executeMove(
                 state, 
@@ -606,12 +609,13 @@ function simulateTurn(initialState: BattleState, botAction: Action, oppAction: A
                 false, 
                 action.shouldTerastallize,
                 false,
-                action.shouldMegaEvolve
+                action.shouldMegaEvolve,
+                prng
             );
         }
     }
 
-    processTurnEnd(state, SIMULATION_CONFIG);
+    processTurnEnd(state, SIMULATION_CONFIG, prng);
     return state;
 }
 
@@ -949,7 +953,7 @@ export function decideAIAction(
             if (!chosenAction.shouldMegaEvolve) {
                 const move = chosenAction.data as Move;
                 if (move.type === aiPokemon.teraType || aiPokemon.hp < aiPokemon.maxHP * 0.3) {
-                    if (Math.random() < 0.4 || aiPokemon.hp < aiPokemon.maxHP * 0.25) {
+                    if (BattlePRNG.fromBattleState(perceptionState).fork().next() < 0.4 || aiPokemon.hp < aiPokemon.maxHP * 0.25) {
                         chosenAction.shouldTerastallize = true;
                     }
                 }

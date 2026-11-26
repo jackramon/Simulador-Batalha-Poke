@@ -1,5 +1,6 @@
 
 import { Pokemon, StatStages } from '../../../../types';
+import { BattlePRNG, nextBattleRandom } from '../../../../utils/prng';
 import { STAT_NAMES_PT } from '../../../../data/pokemon';
 import { log } from '../../utils';
 
@@ -8,7 +9,7 @@ import { log } from '../../utils';
  * Regra Oficial (Gen 8+): Ao final de cada turno, um atributo aleatório (Atk, Def, SpA, SpD, Spe)
  * aumenta em 2 estágios e outro atributo diferente cai 1 estágio.
  */
-export function handleMoody(pokemon: Pokemon, logs: { message: string; color: string }[]) {
+export function handleMoody(pokemon: Pokemon, logs: { message: string; color: string }[], prng?: BattlePRNG) {
     if (pokemon.ability !== 'moody' || pokemon.isFainted) return;
 
     const stats: (keyof StatStages)[] = ['attack', 'defense', 'spAttack', 'spDefense', 'speed'];
@@ -20,7 +21,7 @@ export function handleMoody(pokemon: Pokemon, logs: { message: string; color: st
     const boostable = stats.filter(s => pokemon.statStages[s] < 6);
     if (boostable.length === 0) return;
 
-    const statToBoost = boostable[Math.floor(Math.random() * boostable.length)];
+    const statToBoost = boostable[Math.floor(nextBattleRandom(undefined, prng) * boostable.length)];
 
     // 2. Seleciona o atributo para reduzir (-1), garantindo que seja diferente do primeiro
     const lowerable = stats.filter(s => s !== statToBoost && pokemon.statStages[s] > -6);
@@ -30,7 +31,7 @@ export function handleMoody(pokemon: Pokemon, logs: { message: string; color: st
 
     // Aplica a redução se houver um stat válido
     if (lowerable.length > 0) {
-        const statToLower = lowerable[Math.floor(Math.random() * lowerable.length)];
+        const statToLower = lowerable[Math.floor(nextBattleRandom(undefined, prng) * lowerable.length)];
         applyStatChange(pokemon, statToLower, -1, logs);
     }
 }

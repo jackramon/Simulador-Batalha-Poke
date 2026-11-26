@@ -1,5 +1,6 @@
 
 import { Pokemon, Move, BattleState } from '../../../../types';
+import { BattlePRNG, nextBattleRandom } from '../../../../utils/prng';
 import * as BeatUp from '../moves/beatUp';
 
 /**
@@ -7,7 +8,7 @@ import * as BeatUp from '../moves/beatUp';
  * Garante que movimentos de múltiplos acertos atinjam o número máximo de vezes.
  * Também gerencia contagens dinâmicas de movimentos como Beat Up e Population Bomb.
  */
-export function getHitCount(attacker: Pokemon, move: Move, state?: BattleState): number {
+export function getHitCount(attacker: Pokemon, move: Move, state?: BattleState, prng?: BattlePRNG): number {
     // Lógica específica para Beat Up (Surra)
     if (move.name === 'beat-up' && state) {
         return BeatUp.getHitCount(attacker, state);
@@ -23,5 +24,5 @@ export function getHitCount(attacker: Pokemon, move: Move, state?: BattleState):
     }
     
     // Lógica padrão de aleatoriedade (Uniforme entre min e max)
-    return Math.floor(Math.random() * (move.maxHits - move.minHits + 1)) + move.minHits;
+    return Math.floor(nextBattleRandom(state, prng) * (move.maxHits - move.minHits + 1)) + move.minHits;
 }

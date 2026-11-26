@@ -191,7 +191,17 @@ export interface BattleReplay {
   events: BattleReplayEvent[];
 }
 
+export interface BattlePRNGState {
+  seed: number;
+  state: number;
+  cursor: number;
+}
+
 export interface BattleState {
+  // Estado legado continua aceito; novas batalhas persistem o snapshot completo.
+  seed?: number;
+  turnSeed?: number;
+  prngState?: BattlePRNGState;
   team1: Pokemon[];
   team2: Pokemon[];
   currentPokemon1: Pokemon | null;

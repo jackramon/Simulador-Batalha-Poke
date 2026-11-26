@@ -1,5 +1,6 @@
 
 import { Pokemon, BattleState } from '../../../../types';
+import { BattlePRNG, nextBattleRandom } from '../../../../utils/prng';
 import * as NeutralizingGas from './neutralizing_gas';
 
 /**
@@ -10,7 +11,7 @@ import * as NeutralizingGas from './neutralizing_gas';
  * o que permite superar outros movimentos de mesma prioridade mas mantém abaixo
  * de movimentos com prioridade +1 real.
  */
-export function getPriorityBoost(pokemon: Pokemon, state: BattleState): number {
+export function getPriorityBoost(pokemon: Pokemon, state: BattleState, prng?: BattlePRNG): number {
     if (pokemon.ability !== 'quick-draw' || pokemon.isFainted) {
         return 0;
     }
@@ -21,7 +22,7 @@ export function getPriorityBoost(pokemon: Pokemon, state: BattleState): number {
     }
 
     // 30% de chance de ativar
-    if (Math.random() < 0.3) {
+    if (nextBattleRandom(state, prng) < 0.3) {
         return 0.1;
     }
 

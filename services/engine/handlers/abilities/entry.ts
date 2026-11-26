@@ -1,6 +1,7 @@
 
 import { Pokemon, BattleState, LogEntry } from '../../../../types';
 import { getPokemonPlayerNum } from '../../../../utils/pokemonIdentity';
+import { BattlePRNG } from '../../../../utils/prng';
 import { ABILITY_EFFECTS } from '../../../../data/abilities';
 import { log } from '../../utils';
 import * as Forms from './forms';
@@ -72,8 +73,10 @@ export function handleEntryAbilities(
     weatherEnabled: boolean, 
     logs: LogEntry[], 
     state: BattleState,
-    lastPokemon: Pokemon | null = null
+    lastPokemon: Pokemon | null = null,
+    prng?: BattlePRNG
 ): { weather?: BattleState['weather'] } {
+    const random = prng ?? BattlePRNG.fromBattleState(state);
     let newWeather: BattleState['weather'] | undefined;
 
     // Multitipo (Arceus) e Sistema RKS (Silvally) - Devem ocorrer imediatamente
@@ -180,7 +183,7 @@ export function handleEntryAbilities(
     SupersweetSyrup.triggerSupersweetSyrup(pokemon, opponent, logs);
     Frisk.handleFrisk(pokemon, opponent, logs);
     Anticipation.checkAnticipation(pokemon, opponent, logs);
-    Forewarn.triggerForewarn(pokemon, opponent, logs);
+    Forewarn.triggerForewarn(pokemon, opponent, logs, random);
     Commander.handleCommander(pokemon, state, logs);
 
     if (pokemon.ability === 'download') {

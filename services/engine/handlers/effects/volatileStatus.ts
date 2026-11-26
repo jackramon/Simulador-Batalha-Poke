@@ -4,6 +4,7 @@ import { log } from '../../utils';
 import * as PartialTrapping from '../moves/partialTrapping';
 import * as InnerFocus from '../abilities/inner_focus';
 import { applyStatus } from './statusConditions';
+import { BattlePRNG } from '../../../../utils/prng';
 
 export function handleVolatileStatus(
     attacker: Pokemon, 
@@ -11,7 +12,8 @@ export function handleVolatileStatus(
     move: Move, 
     status: string,
     logs: LogEntry[], 
-    state?: BattleState
+    state?: BattleState,
+    prng?: BattlePRNG
 ) {
     if (status === 'leech-seed') {
         if (defender.types.includes('grass')) {
@@ -33,7 +35,7 @@ export function handleVolatileStatus(
         }
     } 
     else if (PartialTrapping.isPartialTrappingMove(move)) {
-        PartialTrapping.applyPartialTrapping(attacker, defender, move, logs);
+        PartialTrapping.applyPartialTrapping(attacker, defender, move, logs, prng);
     } 
     else {
         applyStatus(defender, status, logs, attacker, false, state);

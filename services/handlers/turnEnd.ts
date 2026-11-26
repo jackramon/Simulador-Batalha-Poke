@@ -1,5 +1,6 @@
 
 import { Pokemon, BattleState } from '../../types';
+import { BattlePRNG } from '../../utils/prng';
 import { log, LogEntry } from '../engine/utils';
 import { checkConsumableItems } from './items';
 
@@ -40,9 +41,10 @@ import * as MirrorArmor from '../engine/handlers/abilities/mirror_armor';
 import * as GuardDog from '../engine/handlers/abilities/guard_dog';
 import * as PowerConstruct from '../engine/handlers/abilities/power_construct';
 
-export const processTurnEndEffects = (pokemonList: (Pokemon | null)[], weather: BattleState['weather'], weatherEnabled: boolean, logs: LogEntry[], state?: BattleState) => {
+export const processTurnEndEffects = (pokemonList: (Pokemon | null)[], weather: BattleState['weather'], weatherEnabled: boolean, logs: LogEntry[], state?: BattleState, prng?: BattlePRNG) => {
     const isWeatherSuppressed = AirLock.isWeatherSuppressed(state);
     const effectiveWeather = isWeatherSuppressed ? 'none' : weather;
+    const random = prng ?? (state ? BattlePRNG.fromBattleState(state) : undefined);
 
     const p1 = pokemonList[0];
     const p2 = pokemonList[1];
@@ -69,7 +71,7 @@ export const processTurnEndEffects = (pokemonList: (Pokemon | null)[], weather: 
                 Forms.checkShieldsDown(p, logs as any);
                 ZenMode.checkZenMode(p, logs as any);
                 OwnTempo.checkOwnTempo(p, logs as any);
-                ShedSkin.handleShedSkin(p, logs as any);
+                ShedSkin.handleShedSkin(p, logs as any, random);
 
                 if (weatherEnabled) {
                     if (p.ability === 'ice-body') IceBody.handleIceBody(p, effectiveWeather, logs as any);
@@ -79,15 +81,15 @@ export const processTurnEndEffects = (pokemonList: (Pokemon | null)[], weather: 
                     if (state) Forecast.handleForecast(p, state, logs as any);
                 }
                 
-                Harvest.handleHarvest(p, effectiveWeather, logs as any);
+                Harvest.handleHarvest(p, effectiveWeather, logs as any, random);
                 Hydration.handleHydration(p, effectiveWeather, logs as any);
                 BallFetch.handleBallFetch(p, logs as any);
                 
                 if (state) Pickup.handlePickup(p, state, logs as any);
-                if (state) HoneyGather.handleHoneyGather(p, state, logs as any);
-                if (state) Healer.handleHealer(p, state, logs as any);
+                if (state) HoneyGather.handleHoneyGather(p, state, logs as any, random);
+                if (state) Healer.handleHealer(p, state, logs as any, random);
                 SlowStart.checkRecovery(p, logs as any);
-                Moody.handleMoody(p, logs as any);
+                Moody.handleMoody(p, logs as any, random);
                 
                 // Agrupamento (Power Construct)
                 if (state) PowerConstruct.checkPowerConstruct(p, state, logs as any);

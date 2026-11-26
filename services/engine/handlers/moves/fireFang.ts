@@ -1,5 +1,6 @@
 
 import { Pokemon, BattleState } from '../../../../types';
+import { BattlePRNG, nextBattleRandom } from '../../../../utils/prng';
 import * as StatusConditions from '../effects/statusConditions';
 import * as VolatileStatus from '../effects/volatileStatus';
 
@@ -15,14 +16,15 @@ export function handleFireFangEffect(
     defender: Pokemon,
     logs: {message: string, color: string}[],
     state?: BattleState,
-    ignoresAbilities: boolean = false
+    ignoresAbilities: boolean = false,
+    prng?: BattlePRNG
 ) {
     if (defender.isFainted) return;
 
     const sereneMult = attacker.ability === 'serene-grace' ? 2 : 1;
 
     // Rolagem para Queimadura (Burn) - 10% base
-    if (Math.random() < 0.1 * sereneMult) {
+    if (nextBattleRandom(state, prng) < 0.1 * sereneMult) {
         StatusConditions.applyStatus(
             defender, 
             'burn', 
@@ -34,7 +36,7 @@ export function handleFireFangEffect(
     }
 
     // Rolagem para Recuo (Flinch) - 10% base
-    if (Math.random() < 0.1 * sereneMult) {
+    if (nextBattleRandom(state, prng) < 0.1 * sereneMult) {
         VolatileStatus.handleFlinch(defender, logs, ignoresAbilities);
     }
 }

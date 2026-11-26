@@ -2,17 +2,19 @@ import { describe, it, expect } from 'vitest';
 import { getMagnitudePower } from '../../services/engine/handlers/moves/magnitude';
 import { createDummy } from '../factories';
 import { LogEntry } from '../../types';
+import { BattlePRNG } from '../../utils/prng';
 
 describe('Magnitude', () => {
   it('deve retornar um valor de poder válido (10, 30, 50, 70, 90, 110, 150)', () => {
     const attacker = createDummy({ name: 'Golem' });
     const logs: LogEntry[] = [];
+    const prng = new BattlePRNG(42);
     
     const validPowers = [10, 30, 50, 70, 90, 110, 150];
     
     // Executa várias vezes para garantir que cai em algum range válido
     for (let i = 0; i < 20; i++) {
-        const power = getMagnitudePower(attacker, logs);
+        const power = getMagnitudePower(attacker, logs, prng);
         expect(validPowers).toContain(power);
     }
   });
@@ -21,7 +23,7 @@ describe('Magnitude', () => {
     const attacker = createDummy({ name: 'Dugtrio' });
     const logs: LogEntry[] = [];
     
-    getMagnitudePower(attacker, logs);
+    getMagnitudePower(attacker, logs, new BattlePRNG(42));
     
     expect(logs.some(l => l.message.includes('Magnitude'))).toBe(true);
   });

@@ -1,4 +1,5 @@
 import { Pokemon, BattleState } from '../../../../types';
+import { BattlePRNG, nextBattleRandom } from '../../../../utils/prng';
 import * as StatChanges from '../effects/statChanges';
 
 /**
@@ -12,14 +13,15 @@ export function handleSpringtideStormEffect(
     attacker: Pokemon,
     defender: Pokemon,
     logs: {message: string, color: string}[],
-    state?: BattleState
+    state?: BattleState,
+    prng?: BattlePRNG
 ) {
     const isTherian = attacker.name.includes('Therian') || attacker.name.includes('therian');
     const chance = isTherian ? 100 : 30;
     const sereneGraceMult = attacker.ability === 'serene-grace' ? 2 : 1;
     const finalChance = chance * sereneGraceMult;
 
-    if (Math.random() * 100 < finalChance) {
+    if (nextBattleRandom(state, prng) * 100 < finalChance) {
         StatChanges.applyMoveStatChange(defender, 'attack-down', logs, true, false, 'springtide-storm', state);
     }
 }

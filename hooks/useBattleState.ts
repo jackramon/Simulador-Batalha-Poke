@@ -4,7 +4,7 @@ import { BattleState, BattleConfig, Pokemon, PlayerInventory, BattleReplay, Batt
 import { fetchTeam, clearApiCache, fetchRawPokemonData } from '../services/api';
 import { ITEMS_DATA, POKEMON_TO_MEGA_STONES, MEGA_STONES } from '../data/items';
 import * as Effects from '../services/effectHandlers';
-import { enableDeterministicRandom, disableDeterministicRandom } from '../utils/prng';
+import { createBattlePRNGState } from '../utils/prng';
 import { removerItem } from '../utils/safeStorage';
 import { isSamePokemonInstance, normalizeBattleTeams, restoreActivePokemonIdentity } from '../utils/pokemonIdentity';
 import { BattleSession, type TurnResolutionToken } from '../services/battleSession';
@@ -428,7 +428,6 @@ export const useBattleState = () => {
       const p2Inv = config.itemsEnabled ? generateRandomInventory(t2, config.megaEvolutionEnabled) : { items: [] };
 
       const seed = Math.floor(Math.random() * 1000000);
-      enableDeterministicRandom(seed);
 
       const newReplay: BattleReplay = {
         initialState: {
@@ -444,6 +443,7 @@ export const useBattleState = () => {
       setCurrentReplay(newReplay);
 
       const initialState: BattleState = {
+        prngState: createBattlePRNGState(seed),
         team1: t1, team2: t2, currentPokemon1: p1, currentPokemon2: p2,
         p1Inventory: p1Inv, 
         p2Inventory: p2Inv,

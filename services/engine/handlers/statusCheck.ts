@@ -1,5 +1,6 @@
 
 import { Pokemon, Move, BattleState, LogEntry } from '../../../types';
+import { BattlePRNG, nextBattleRandom } from '../../../utils/prng';
 import { log } from '../utils';
 import { getRawStat } from '../../battleUtils';
 import { BATTLE_MESSAGES } from '../../../data/battleMessages';
@@ -13,7 +14,8 @@ export function checkStatusBlocking(
   move: Move, 
   logs: LogEntry[], 
   state: BattleState,
-  isSleepTalkTriggered: boolean = false
+  isSleepTalkTriggered: boolean = false,
+  prng?: BattlePRNG
 ): boolean {
   // Returns true if the pokemon can move, false if blocked
 
@@ -41,7 +43,7 @@ export function checkStatusBlocking(
   }
   
   if (attacker.statusEffects.freeze) {
-    if (Math.random() < 0.2 || (move.type === 'fire' || move.name === 'scald' || move.name === 'steam-eruption')) {
+    if (nextBattleRandom(state, prng) < 0.2 || (move.type === 'fire' || move.name === 'scald' || move.name === 'steam-eruption')) {
       delete attacker.statusEffects.freeze;
       log(logs, BATTLE_MESSAGES.THAWED(attacker.name), 'text-blue-500');
     } else {
@@ -59,7 +61,7 @@ export function checkStatusBlocking(
         
         // Suporte para duração fixa (Rest) vs aleatória (Spore, Hypnosis)
         const sleepData = attacker.statusEffects.sleep as any;
-        const threshold = sleepData.maxTurns ? sleepData.maxTurns : (Math.floor(Math.random() * 3) + 1);
+        const threshold = sleepData.maxTurns ? sleepData.maxTurns : (Math.floor(nextBattleRandom(state, prng) * 3) + 1);
 
         if (attacker.statusEffects.sleep.turns >= threshold) {
           delete attacker.statusEffects.sleep;
@@ -76,19 +78,19 @@ export function checkStatusBlocking(
   }
 
   if (attacker.statusEffects.confusion) {
-    if (Math.random() < 0.25) {
+    if (nextBattleRandom(state, prng) < 0.25) {
        delete attacker.statusEffects.confusion;
        log(logs, BATTLE_MESSAGES.CONFUSION_ENDED(attacker.name), 'text-yellow-600');
     } else {
       log(logs, BATTLE_MESSAGES.IS_CONFUSED(attacker.name), 'text-yellow-600');
       
-      if (Math.random() < 0.5) {
+      if (nextBattleRandom(state, prng) < 0.5) {
          const attack = getRawStat(attacker, 'attack', state.weather);
          const defense = getRawStat(attacker, 'defense', state.weather);
          const level = 50;
          
          let confusionDmg = Math.floor(((2 * level / 5 + 2) * 40 * attack / defense) / 50 + 2);
-         confusionDmg = Math.floor(confusionDmg * ((Math.random() * 0.15) + 0.85));
+         confusionDmg = Math.floor(confusionDmg * ((nextBattleRandom(state, prng) * 0.15) + 0.85));
          confusionDmg = Math.max(1, confusionDmg);
 
          attacker.hp = Math.max(0, attacker.hp - confusionDmg);
@@ -103,14 +105,14 @@ export function checkStatusBlocking(
     }
   }
 
-  if (attacker.statusEffects.paralysis && Math.random() < 0.25) {
+  if (attacker.statusEffects.paralysis && nextBattleRandom(state, prng) < 0.25) {
     log(logs, BATTLE_MESSAGES.PARALYZED_CANT_MOVE(attacker.name), 'text-yellow-500');
     return false;
   }
 
   if (attacker.statusEffects.infatuation) {
     log(logs, BATTLE_MESSAGES.INFATUATED(attacker.name), 'text-pink-500');
-    if (Math.random() < 0.5) {
+    if (nextBattleRandom(state, prng) < 0.5) {
         log(logs, BATTLE_MESSAGES.PARALYZED_BY_LOVE(attacker.name), 'text-pink-600 italic');
         return false;
     }

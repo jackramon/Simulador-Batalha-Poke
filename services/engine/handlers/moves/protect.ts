@@ -1,5 +1,6 @@
 
 import { Pokemon, LogEntry } from '../../../../types';
+import { BattlePRNG, nextBattleRandom } from '../../../../utils/prng';
 import { log } from '../../utils';
 
 /**
@@ -13,7 +14,8 @@ import { log } from '../../utils';
 export function handleProtect(
     attacker: Pokemon, 
     logs: LogEntry[],
-    moveName: string = 'protect'
+    moveName: string = 'protect',
+    prng?: BattlePRNG
 ) {
     // Inicializa contador se não existir
     if (attacker.protectCounter === undefined) {
@@ -30,7 +32,7 @@ export function handleProtect(
     // Nota: O reset deste contador ocorre em preMoveValidation.ts se o usuário escolher um golpe diferente
     attacker.protectCounter++;
 
-    if (Math.random() < chance) {
+    if (nextBattleRandom(undefined, prng) < chance) {
         // Sucesso
         let status = 'protect';
         if (moveName === 'endure') status = 'endure';

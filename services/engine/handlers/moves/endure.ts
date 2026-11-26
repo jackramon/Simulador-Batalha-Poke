@@ -1,15 +1,16 @@
 import { Pokemon, LogEntry } from '../../../../types';
 import { log } from '../../utils';
 import { handleProtect } from './protect';
+import { BattlePRNG } from '../../../../utils/prng';
 
 /**
  * Lógica para o movimento Aguentar (Endure).
  * Permite que o usuário resista a qualquer ataque que o nocautearia, deixando-o com 1 HP.
  * A chance de sucesso diminui com o uso consecutivo.
  */
-export function handleEndure(attacker: Pokemon, logs: LogEntry[]) {
+export function handleEndure(attacker: Pokemon, logs: LogEntry[], prng?: BattlePRNG) {
     // Reutiliza a lógica de contador e sucesso de Protect/Detect
-    handleProtect(attacker, logs, 'endure');
+    handleProtect(attacker, logs, 'endure', prng);
 }
 
 /**

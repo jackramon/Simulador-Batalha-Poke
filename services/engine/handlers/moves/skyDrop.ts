@@ -1,5 +1,6 @@
 
 import { Pokemon, BattleState, LogEntry } from '../../../../types';
+import { BattlePRNG, nextBattleRandom } from '../../../../utils/prng';
 import { log } from '../../utils';
 import * as HeavyMetal from '../abilities/heavy_metal';
 import { calculateHitChance } from '../../mechanics/accuracy';
@@ -54,13 +55,14 @@ export function handleChargeTurn(
     defender: Pokemon, 
     logs: LogEntry[], 
     state: BattleState,
-    move: any // Passando o objeto do movimento para checar precisão
+    move: any, // Passando o objeto do movimento para checar precisão
+    prng?: BattlePRNG
 ): boolean {
     // Checagem manual de precisão no primeiro turno
     // Sky Drop precisa "acertar" para levantar o alvo
     const hitChance = calculateHitChance(move, attacker, defender, state.weather, state.gravity);
     
-    if (hitChance !== '∞' && Math.random() * 100 > (hitChance as number)) {
+    if (hitChance !== '∞' && nextBattleRandom(state, prng) * 100 > (hitChance as number)) {
         log(logs, `O ataque falhou!`, 'text-gray-500 italic');
         return false; // Não procede com a carga
     }

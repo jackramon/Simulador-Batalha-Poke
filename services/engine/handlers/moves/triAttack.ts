@@ -1,5 +1,6 @@
 
 import { Pokemon, BattleState } from '../../../../types';
+import { BattlePRNG, nextBattleRandom } from '../../../../utils/prng';
 import * as StatusConditions from '../effects/statusConditions';
 
 /**
@@ -11,11 +12,12 @@ export function handleTriAttackEffect(
     attacker: Pokemon,
     defender: Pokemon,
     logs: {message: string, color: string}[],
-    state?: BattleState
+    state?: BattleState,
+    prng?: BattlePRNG
 ) {
     if (defender.isFainted) return;
 
-    const rand = Math.random();
+    const rand = nextBattleRandom(state, prng);
     let status = '';
 
     if (rand < 0.3333) {

@@ -1,5 +1,6 @@
 
 import { Pokemon, Move, LogEntry } from '../../../../types';
+import { BattlePRNG, nextBattleRandom } from '../../../../utils/prng';
 import { log } from '../../utils';
 
 const BANNED_MOVES = [
@@ -40,10 +41,11 @@ const METRONOME_POOL: Partial<Move>[] = [
 
 export function getMetronomeMove(
     attacker: Pokemon, 
-    logs: LogEntry[]
+    logs: LogEntry[],
+    prng?: BattlePRNG
 ): Move | null {
     // Escolhe um movimento aleatório do pool
-    const randomIndex = Math.floor(Math.random() * METRONOME_POOL.length);
+    const randomIndex = Math.floor(nextBattleRandom(undefined, prng) * METRONOME_POOL.length);
     const selectedTemplate = METRONOME_POOL[randomIndex];
 
     log(logs, `${attacker.name} balançou um dedo!`, 'text-gray-700 italic');

@@ -6,19 +6,21 @@ import * as FieldEffects from './fieldEffects';
 import * as UniqueEffects from './uniqueEffects';
 import * as StatChanges from './statChanges';
 import { getStatusMoveRoute, type StatusMoveResult } from './statusMoveRegistry';
+import { BattlePRNG } from '../../../../utils/prng';
 
 export function handleStatusMove(
     state: BattleState,
     attacker: Pokemon,
     defender: Pokemon,
     move: Move,
-    logs: LogEntry[]
+    logs: LogEntry[],
+    prng?: BattlePRNG
 ): StatusMoveResult {
     const ignoresAbilities = MoldBreaker.suppressesAbilities(attacker.ability);
     const route = getStatusMoveRoute(move.name);
 
     if (route) {
-        return route.execute({ state, attacker, defender, move, logs, ignoresAbilities });
+        return route.execute({ state, attacker, defender, move, logs, ignoresAbilities, prng });
     }
 
     if (move.effect) {
