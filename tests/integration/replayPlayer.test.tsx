@@ -8,6 +8,7 @@ import * as AiLogic from '../../services/aiLogic';
 import { decideLLMAction } from '../../services/llmAiLogic';
 import { BattleCoordinator } from '../../services/engine/coordinator';
 import * as BattleEngine from '../../services/engine';
+import * as Effects from '../../services/effectHandlers';
 import {
   appendReplayCheckpoint,
   createBattleReplay,
@@ -238,7 +239,8 @@ describe('reprodução exclusivamente por decisões gravadas', () => {
   const clickNext = async () => {
     const nextButton = renderer.root.findAllByType('button')
       .find(button => button.children.join('').includes('Próximo'));
-    expect(nextButton).toBeDefined();
+    const messages = renderer.root.findAllByType('p').map(node => node.children.join('')).join(' | ');
+    expect(nextButton, messages).toBeDefined();
     await act(async () => {
       nextButton!.props.onClick();
       await Promise.resolve();
@@ -357,6 +359,7 @@ describe('reprodução exclusivamente por decisões gravadas', () => {
       p2TeraUsed: false,
       p1MegaUsed: false,
       p2MegaUsed: false,
+      prngState: createBattlePRNGState(3102),
     });
     const p1Action: Action = { type: 'move', data: attacker.moves[0], user: attacker, playerNum: 1, priority: 0 };
     const p2Action: Action = { type: 'move', data: defender.moves[0], user: defender, playerNum: 2, priority: 0 };
@@ -369,21 +372,14 @@ describe('reprodução exclusivamente por decisões gravadas', () => {
       config,
       chooseForcedSwitch: () => forcedAction,
     });
-    const replayData: BattleReplay = {
-      initialState: {
-        team1: structuredClone(initialState.team1),
-        team2: structuredClone(initialState.team2),
-        p1Inventory: structuredClone(initialState.p1Inventory),
-        p2Inventory: structuredClone(initialState.p2Inventory),
-        config: structuredClone(config),
-      },
-      seed: 3102,
+    const replayData = appendReplayCheckpoint({
+      ...createBattleReplay(initialState, config, 3102),
       events: [
         createBattleReplayEvent({ turn: 1, player: 1, type: 'move', data: attacker.moves[0], user: attacker }),
         createBattleReplayEvent({ turn: 1, player: 2, type: 'move', data: defender.moves[0], user: defender }),
         createBattleReplayEvent({ turn: 1, player: 1, type: 'switch', data: reserve, user: attacker, isForcedSwitch: true }),
       ],
-    };
+    }, 1, live.finalState);
 
     const replay = await playReplay(replayData);
 
@@ -420,6 +416,7 @@ describe('reprodução exclusivamente por decisões gravadas', () => {
       p2TeraUsed: false,
       p1MegaUsed: false,
       p2MegaUsed: false,
+      prngState: createBattlePRNGState(3103),
     });
     const p1Action: Action = { type: 'move', data: attacker.moves[0], user: attacker, playerNum: 1, priority: 0 };
     const p2Action: Action = { type: 'move', data: defeated.moves[0], user: defeated, playerNum: 2, priority: 0 };
@@ -428,24 +425,18 @@ describe('reprodução exclusivamente por decisões gravadas', () => {
     expect(live.finalState.currentPokemon2?.isFainted).toBe(true);
     const liveSwitch = BattleEngine.performSwitch(live.finalState, live.finalState.team2[1], 2, config.weatherEnabled);
     const liveFinal = { ...liveSwitch.newState, waitingForAction: false };
-    const replayData: BattleReplay = {
-      initialState: {
-        team1: structuredClone(initialState.team1),
-        team2: structuredClone(initialState.team2),
-        p1Inventory: structuredClone(initialState.p1Inventory),
-        p2Inventory: structuredClone(initialState.p2Inventory),
-        config: structuredClone(config),
-      },
-      seed: 3103,
+    const replayData = appendReplayCheckpoint({
+      ...createBattleReplay(initialState, config, 3103),
       events: [
         createBattleReplayEvent({ turn: 1, player: 1, type: 'move', data: attacker.moves[0], user: attacker }),
         createBattleReplayEvent({ turn: 1, player: 2, type: 'move', data: defeated.moves[0], user: defeated }),
         createBattleReplayEvent({ turn: 2, player: 2, type: 'switch', data: reserve, user: defeated, isForcedSwitch: true }),
       ],
-    };
+    }, 1, live.finalState);
 
     const firstTurn = await playReplay(replayData);
     expect(firstTurn.snapshots.map(withoutLogs)).toEqual(live.stateSnapshots.map(withoutLogs));
+    expect(renderer.root.findAllByProps({ role: 'alert' })).toHaveLength(0);
 
     captures = [];
     const switchSpy = vi.spyOn(BattleEngine, 'performSwitch');
@@ -459,6 +450,188 @@ describe('reprodução exclusivamente por decisões gravadas', () => {
     expect(replayFinal.turn).toBe(2);
     expect(replayFinal.currentPokemon2?.instanceId).toBe(reserve.instanceId);
     expect(replayFinal.prngState).toEqual(liveFinal.prngState);
+    expect(fetch).not.toHaveBeenCalled();
+  });
+
+  it('hotfix: reproduz troca+item e o turno seguinte validando hash e cursor em cada checkpoint', async () => {
+    const seed = 570857;
+    const outgoing = createPokemon({
+      id: 101, name: 'Titular Previsor', ability: 'forewarn', hp: 400, maxHP: 400,
+      moves: [createMove({ name: 'outgoing-move' })],
+    });
+    const reserve = createPokemon({
+      id: 102, name: 'Reserva da Troca', hp: 400, maxHP: 400,
+      moves: [createMove({ name: 'reserve-move', power: 35, uses: 10, maxUses: 10 })],
+    });
+    const opponent = createPokemon({
+      id: 201, name: 'Aerodactyl Previsor', ability: 'forewarn', hp: 400, maxHP: 400,
+      moves: [createMove({ name: 'aerodactyl-move', power: 30, uses: 10, maxUses: 10 })],
+    });
+    const config = createBattleConfig({ forceAccuracyOutcome: 'hit', fixedRoll: 1 });
+    const initialState = createBattleState([outgoing, reserve], [opponent], {
+      prngState: createBattlePRNGState(seed),
+      p1TeraUsed: false,
+      p2TeraUsed: false,
+      p1MegaUsed: false,
+      p2MegaUsed: false,
+      p2Inventory: { items: [{ id: 'aerodactylite', quantity: 1 }] },
+    });
+    let replayData = createBattleReplay(initialState, config, seed);
+    const entryLogs: BattleState['logs'] = [];
+    Effects.handleEntryAbilities(initialState.currentPokemon1!, initialState.currentPokemon2, false, entryLogs, initialState);
+    Effects.handleEntryAbilities(initialState.currentPokemon2!, initialState.currentPokemon1, false, entryLogs, initialState);
+    expect(initialState.prngState?.cursor).toBe(2);
+    // A hidratação termina antes das ações, mas depois da criação do replay inicial.
+    initialState.currentPokemon2!.megaProfile = {
+      name: 'Mega Aerodactyl',
+      stats: { hp: 80, attack: 135, defense: 85, spAttack: 70, spDefense: 95, speed: 150 },
+      ability: 'tough-claws',
+      types: ['rock', 'flying'],
+      spriteUrl: 'mega-aerodactyl.png',
+      backSpriteUrl: 'mega-aerodactyl-back.png',
+      pixelSpriteUrl: 'mega-aerodactyl-pixel.png',
+      weight: 790,
+    };
+
+    const firstP1Action: Action = { type: 'switch', data: reserve, user: outgoing, playerNum: 1, priority: 6 };
+    const firstP2Action: Action = {
+      type: 'item',
+      data: {
+        itemId: 'aerodactylite', targetId: opponent.id, targetInstanceId: opponent.instanceId, isGive: false,
+      },
+      user: opponent,
+      playerNum: 2,
+      priority: 6,
+    };
+    const firstTurn = runCoordinatorTurn({
+      seed, initialState, p1Action: firstP1Action, p2Action: firstP2Action, config, preservePrngState: true,
+    });
+    expect(firstTurn.finalState.prngState).toEqual({ seed, state: 3031866813, cursor: 4 });
+    replayData = appendReplayCheckpoint({
+      ...replayData,
+      events: [
+        createBattleReplayEvent({ turn: 1, player: 1, type: 'switch', data: reserve, user: outgoing }),
+        createBattleReplayEvent({
+          turn: 1, player: 2, type: 'item', data: firstP2Action.data, user: opponent,
+        }),
+      ],
+    }, 1, firstTurn.finalState);
+
+    const secondP1 = firstTurn.finalState.currentPokemon1!;
+    const secondP2 = firstTurn.finalState.currentPokemon2!;
+    const secondTurn = runCoordinatorTurn({
+      seed,
+      initialState: firstTurn.finalState,
+      p1Action: { type: 'move', data: secondP1.moves[0], user: secondP1, playerNum: 1, priority: 0 },
+      p2Action: { type: 'move', data: secondP2.moves[0], user: secondP2, playerNum: 2, priority: 0 },
+      config,
+      preservePrngState: true,
+    });
+    replayData = appendReplayCheckpoint({
+      ...replayData,
+      events: [
+        ...replayData.events,
+        createBattleReplayEvent({ turn: 2, player: 1, type: 'move', data: secondP1.moves[0], user: secondP1 }),
+        createBattleReplayEvent({ turn: 2, player: 2, type: 'move', data: secondP2.moves[0], user: secondP2 }),
+      ],
+    }, 2, secondTurn.finalState);
+    expect(replayData.checkpoints?.[0]?.megaProfiles).toBeUndefined();
+    expect(replayData.checkpoints?.[1]?.megaProfiles?.['p2-slot-0']?.stats.attack).toBe(135);
+
+    await loadReplay(replayData);
+    await clickNext();
+
+    expect(captures).toHaveLength(1);
+    expect(captures[0]!.snapshots.at(-1)?.prngState).toEqual(replayData.checkpoints?.[1]?.prngState);
+    expect(renderer.root.findAllByProps({ role: 'alert' })).toHaveLength(0);
+    const firstTurnLabels = renderer.root.findAllByType('h3').map(node => node.children.join(''));
+    expect(firstTurnLabels).toContain('⚔️ Ações do Turno 1');
+
+    await clickNext();
+
+    expect(captures).toHaveLength(2);
+    expect(captures[1]!.snapshots.at(-1)?.prngState).toEqual(replayData.checkpoints?.[2]?.prngState);
+    expect(captures[1]!.snapshots.map(withoutLogs)).toEqual(secondTurn.stateSnapshots.map(withoutLogs));
+    expect(renderer.root.findAllByProps({ role: 'alert' })).toHaveLength(0);
+    expect(renderer.root.findAllByType('div').map(node => node.children.join('')).join(' ')).toContain('Turno: 2 / 2');
+    expect(fetch).not.toHaveBeenCalled();
+  });
+
+  it('hotfix: valida o checkpoint do turno terminal sem executar ações adicionais', async () => {
+    const attacker = createPokemon({
+      id: 131, name: 'Atacante Terminal', hp: 300, maxHP: 300, attackStat: 500, speedStat: 200,
+      moves: [createMove({ name: 'terminal-move', power: 500, uses: 10, maxUses: 10 })],
+    });
+    const defender = createPokemon({
+      id: 231, name: 'Defensor Terminal', hp: 1, maxHP: 300, defenseStat: 1, speedStat: 100,
+      moves: [createMove({ name: 'terminal-response' })],
+    });
+    const seed = 3150;
+    const config = createBattleConfig({ forceAccuracyOutcome: 'hit', fixedRoll: 1 });
+    const initialState = createBattleState([attacker], [defender], {
+      p1TeraUsed: false,
+      p2TeraUsed: false,
+      p1MegaUsed: false,
+      p2MegaUsed: false,
+      prngState: createBattlePRNGState(seed),
+    });
+    const live = runCoordinatorTurn({
+      seed,
+      initialState,
+      p1Action: { type: 'move', data: attacker.moves[0], user: attacker, playerNum: 1, priority: 0 },
+      p2Action: { type: 'move', data: defender.moves[0], user: defender, playerNum: 2, priority: 0 },
+      config,
+    });
+    const replayData = appendReplayCheckpoint({
+      ...createBattleReplay(initialState, config, seed),
+      events: [
+        createBattleReplayEvent({ turn: 1, player: 1, type: 'move', data: attacker.moves[0], user: attacker }),
+        createBattleReplayEvent({ turn: 1, player: 2, type: 'move', data: defender.moves[0], user: defender }),
+      ],
+    }, 1, live.finalState);
+    expect(live.finalState.winner).toBe(1);
+    expect(live.steps.at(-1)?.phase).toBe('game-over');
+
+    const replay = await playReplay(replayData);
+
+    expect(replay.snapshots.at(-1)?.winner).toBe(1);
+    expect(replay.snapshots.at(-1)?.prngState).toEqual(replayData.checkpoints?.[1]?.prngState);
+    expect(createReplayCheckpoint(1, replay.snapshots.at(-1)!)).toEqual(replayData.checkpoints?.[1]);
+    expect(renderer.root.findAllByProps({ role: 'alert' })).toHaveLength(0);
+    expect(fetch).not.toHaveBeenCalled();
+  });
+
+  it('hotfix: orienta regravação do checkpoint prematuro da 3.2.0 sem alterar o arquivo', async () => {
+    const fixture = await createLiveReplayFixture('local');
+    const replayData = createVersionedReplay(fixture);
+    const stateBeforeTurn = createBattleState(
+      structuredClone(replayData.initialState.team1),
+      structuredClone(replayData.initialState.team2),
+      {
+        p1Inventory: structuredClone(replayData.initialState.p1Inventory),
+        p2Inventory: structuredClone(replayData.initialState.p2Inventory),
+        p1TeraUsed: false,
+        p2TeraUsed: false,
+        p1MegaUsed: false,
+        p2MegaUsed: false,
+        prngState: createBattlePRNGState(replayData.seed),
+      },
+    );
+    replayData.engineRevision = '3.2.0';
+    replayData.checkpoints = replayData.checkpoints?.map(checkpoint => checkpoint.turn === 1
+      ? createReplayCheckpoint(1, stateBeforeTurn)
+      : checkpoint);
+    const originalJson = JSON.stringify(replayData);
+
+    await playReplay(replayData);
+
+    const alert = renderer.root.findByProps({ role: 'alert' });
+    const message = alert.children.join('');
+    expect(message).toContain('revisão 3.2.0');
+    expect(message).toContain('checkpoint do turno 1 antes das ações');
+    expect(message).toContain('Regrave a batalha');
+    expect(JSON.stringify(replayData)).toBe(originalJson);
+    expect(renderer.root.findAllByType('div').map(node => node.children.join('')).join(' ')).toContain('Turno: 0 / 1');
     expect(fetch).not.toHaveBeenCalled();
   });
 

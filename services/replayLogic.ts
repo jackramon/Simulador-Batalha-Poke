@@ -3,7 +3,7 @@ import { normalizeBattleTeams, resolvePokemonTarget } from '../utils/pokemonIden
 import { createBattlePRNGState } from '../utils/prng';
 
 export const REPLAY_FORMAT_VERSION = 1;
-export const REPLAY_ENGINE_REVISION = '3.2.0';
+export const REPLAY_ENGINE_REVISION = '3.2.1';
 export const LEGACY_REPLAY_WARNING = 'Replay legado: arquivo sem checkpoints; a reprodução continuará sem verificação de integridade.';
 
 interface ParsedBattleReplay {
@@ -123,11 +123,35 @@ export const hashBattleReplayState = (state: BattleState): string => {
   return `fnv1a32:${(hash >>> 0).toString(16).padStart(8, '0')}`;
 };
 
-export const createReplayCheckpoint = (turn: number, state: BattleState): BattleReplayCheckpoint => ({
-  turn,
-  prngState: replayPrngState(state),
-  stateHash: hashBattleReplayState(state),
-});
+export const createReplayCheckpoint = (turn: number, state: BattleState): BattleReplayCheckpoint => {
+  const megaProfiles = Object.fromEntries([...state.team1, ...state.team2]
+    .filter(pokemon => pokemon.instanceId && pokemon.megaProfile)
+    .map(pokemon => [pokemon.instanceId!, structuredClone(pokemon.megaProfile!)]));
+  return {
+    turn,
+    prngState: replayPrngState(state),
+    stateHash: hashBattleReplayState(state),
+    ...(Object.keys(megaProfiles).length > 0 ? { megaProfiles } : {}),
+  };
+};
+
+export const applyReplayCheckpointMegaProfiles = (
+  replay: BattleReplay,
+  turn: number,
+  state: BattleState,
+): void => {
+  const profiles = replay.checkpoints?.find(checkpoint => checkpoint.turn === turn)?.megaProfiles;
+  if (!profiles) return;
+  const hydrate = (pokemon: Pokemon | null) => {
+    if (!pokemon?.instanceId) return;
+    const profile = profiles[pokemon.instanceId];
+    if (profile) pokemon.megaProfile = structuredClone(profile);
+  };
+  state.team1.forEach(hydrate);
+  state.team2.forEach(hydrate);
+  hydrate(state.currentPokemon1);
+  hydrate(state.currentPokemon2);
+};
 
 export const createBattleReplay = (
   initialState: BattleState,
@@ -199,7 +223,12 @@ export const parseBattleReplay = (value: unknown): ParsedBattleReplay => {
   return { replay: data as BattleReplay, legacy: false, warning: '' };
 };
 
-export const assertReplayCheckpoint = (replay: BattleReplay, turn: number, state: BattleState): void => {
+export const assertReplayCheckpoint = (
+  replay: BattleReplay,
+  turn: number,
+  state: BattleState,
+  stateBeforeTurn?: BattleState,
+): void => {
   if (replay.formatVersion === undefined) return;
   if (replay.formatVersion !== REPLAY_FORMAT_VERSION) {
     throw new Error(`Versão de replay ${replay.formatVersion} não suportada.`);
@@ -211,6 +240,15 @@ export const assertReplayCheckpoint = (replay: BattleReplay, turn: number, state
     || expected.prngState.state !== actual.prngState.state
     || expected.prngState.cursor !== actual.prngState.cursor;
   if (expected.stateHash !== actual.stateHash || prngDiverged) {
+    if (replay.engineRevision === '3.2.0' && stateBeforeTurn) {
+      const premature = createReplayCheckpoint(turn, stateBeforeTurn);
+      const matchesPrematurePrng = expected.prngState.seed === premature.prngState.seed
+        && expected.prngState.state === premature.prngState.state
+        && expected.prngState.cursor === premature.prngState.cursor;
+      if (expected.stateHash === premature.stateHash && matchesPrematurePrng) {
+        throw new Error(`Replay incompatível: a revisão 3.2.0 gravou o checkpoint do turno ${turn} antes das ações. O hash final não está disponível e não será substituído. Regrave a batalha na revisão ${REPLAY_ENGINE_REVISION}.`);
+      }
+    }
     const prngDetail = prngDiverged
       ? ` PRNG esperado ${stableSerialize(expected.prngState)}, obtido ${stableSerialize(actual.prngState)}.`
       : '';

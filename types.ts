@@ -185,6 +185,8 @@ export interface BattleReplayCheckpoint {
   turn: number;
   prngState: BattlePRNGState;
   stateHash: string;
+  /** Perfis Mega hidratados após o estado inicial e necessários antes deste turno. */
+  megaProfiles?: Record<string, NonNullable<Pokemon['megaProfile']>>;
 }
 
 export interface BattleReplay {

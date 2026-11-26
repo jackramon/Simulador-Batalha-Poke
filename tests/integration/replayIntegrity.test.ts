@@ -173,4 +173,33 @@ describe('integridade e versionamento do replay', () => {
     expect(error?.message).toContain(`hash esperado ${expectedHash}`);
     expect(error?.message).toContain(`hash obtido ${actualHash}`);
   });
+
+  it('hotfix: identifica checkpoint prematuro da 3.2.0 sem flexibilizar os demais', () => {
+    const { initialState, live, replay } = createVerifiedFixture();
+    const prematureReplay: BattleReplay = {
+      ...replay,
+      engineRevision: '3.2.0',
+      checkpoints: replay.checkpoints?.map(checkpoint => checkpoint.turn === 1
+        ? createReplayCheckpoint(1, initialState)
+        : checkpoint),
+    };
+
+    expect(() => assertReplayCheckpoint(prematureReplay, 1, live.finalState, initialState))
+      .toThrow('Regrave a batalha');
+    expect(() => assertReplayCheckpoint(
+      { ...replay, engineRevision: '3.2.0' },
+      1,
+      live.finalState,
+      initialState,
+    )).not.toThrow();
+
+    const changed = structuredClone(live.finalState);
+    changed.team1[0].hp -= 1;
+    expect(() => assertReplayCheckpoint(
+      { ...replay, engineRevision: '3.2.0' },
+      1,
+      changed,
+      initialState,
+    )).toThrow('Divergência de replay no turno 1');
+  });
 });

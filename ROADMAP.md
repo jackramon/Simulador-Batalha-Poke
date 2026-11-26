@@ -160,6 +160,14 @@
   - Versão futura é rejeitada na leitura; a reprodução recalcula e compara checkpoints e interrompe na primeira divergência informando turno, hash esperado e hash obtido.
   - Validação: 3 arquivos focados e 20 testes aprovados; suíte completa com 52 arquivos, 234 aprovados e 2 `it.todo` (236 registrados); `npm run lint`, `npm run build` e `git diff --check` aprovados.
   - Smoke no bundle de produção: exportação real com `formatVersion 1`, `engineRevision 3.2.0`, checkpoint inicial e do turno 1; reprodução até `Turno: 1 / 1` sem alerta e sem chamadas `/api/`; cópia corrompida detectada no turno 1 com hash esperado e obtido; porta liberada.
+- [x] **Hotfix prioritário antes de 3.3 — Corrigir checkpoints prematuros e hidratação Mega em replays válidos.**
+  - Causa raiz reproduzida: a gravação normal lia `stateRef.current`, potencialmente anterior às ações quando a animação não rendia ao React. Os dois draws ausentes no arquivo eram os `tieBreaker` das duas ações; na seed do relato, os estados/cursores 2→4 e `3663702483`→`3031866813` foram reproduzidos exatamente. Não houve execução duplicada nem draw adicional.
+  - `useTurnManager` grava o último snapshot emitido pelo coordinator; o terminal já usava esse snapshot. O player verifica o checkpoint do turno concluído correspondente e o painel de ações usa o turno dos eventos, não `state.turn` já incrementado. U-turn, troca pós-desmaio e terminal permanecem cobertos.
+  - O smoke revelou uma segunda origem de hash: a hidratação assíncrona de `megaProfile` podia ocorrer após o checkpoint inicial e antes do turno. Checkpoints agora podem transportar `megaProfiles` por `instanceId`; o player aplica esses dados locais antes do turno correspondente, sem fetch/IA, sem alterar hashes e sem modificar `formatVersion = 1`.
+  - Replays 3.2.0 com checkpoints finais corretos continuam aceitos. Um checkpoint 3.2.0 comprovadamente pré-ação é identificado e interrompido com orientação explícita de regravação: o arquivo não contém o hash final original e não pode ser reparado sem aceitar adulterações. O replay afetado precisa ser regravado; nenhum arquivo é reescrito e nenhuma validação é desativada.
+  - RED→GREEN cobriu draws por sessão/resolução/ação, troca+`aerodactylite`, turno seguinte, cursores em todos os checkpoints, hidratação tardia, U-turn, desmaio, terminal, cópia corrompida, seed adulterada e compatibilidade. Validação: 3 arquivos focados e 25 testes aprovados; suíte completa com 52 arquivos, 239 aprovados e 2 `it.todo` antigos (241 registrados); `npm run lint`, `npm run build` e `git diff --check` aprovados, sem novos todos.
+  - Smoke real no bundle: batalha de dois turnos com troca+`aerodactylite` e terminal; exportação 3.2.1 com seed 336430, cursores 0/4/10 e perfil Mega somente nos checkpoints 1/2; replay até 2/2 com rótulo do turno 1; cópia com item alterada rejeitada no turno 1; zero requests durante replay, zero erros de console e porta liberada. A hidratação ao vivo fez somente a chamada esperada a `aerodactyl-mega`.
+  - Próximo item: 3.3. Commit: informado no resumo final após o push verificado em `origin/main`.
 - [ ] **3.3 — Preservar a identidade entre Pokémon ativo e entrada correspondente da equipe.**
 - [ ] **3.4 — Parametrizar a IA pelo lado controlado e corrigir sua avaliação.**
   - Dependência de 2.5: adaptar a avaliação para consumir os `newState`/snapshots transacionais; a caracterização de 1.5 passou a fixar legalidade e determinismo, não a escolha do golpe de maior poder.
@@ -176,7 +184,7 @@
 
 ## Registro resumido da baseline
 
-- Última suíte integral informada: **52 arquivos, 234 testes aprovados e 2 `it.todo`** (236 registrados); os todos são lacunas de 3.3/3.4 e não contam como cobertura aprovada.
+- Última suíte integral informada: **52 arquivos, 239 testes aprovados e 2 `it.todo`** (241 registrados); os todos são lacunas de 3.3/3.4 e não contam como cobertura aprovada.
 - `npm run lint`, `npm run build` e `git diff --check`: aprovados.
 - Auditoria do item 0.5: **17 → 0** ocorrências no total e **6 → 0** em produção; instalação por `npm ci` reproduzida sem alterações nos manifestos.
 - SHA dos itens 1.1 a 1.7 e dos itens 2.1/2.2/2.3/2.4/2.5 informados somente nos respectivos resumos finais após o push; último SHA registrado no roadmap: `baae8a606c37495f30810e2c646dbb234c75ac86` (item 0.4).

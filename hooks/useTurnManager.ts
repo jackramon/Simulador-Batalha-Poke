@@ -455,12 +455,14 @@ export const useTurnManager = ({
         const isCurrent = () => battleSession.isResolutionCurrent(resolution);
 
         try {
+            let latestCoordinatorState = stateRef.current;
             const coordinator = BattleCoordinator.runTurn(stateRef.current, p1Action, p2Action, configRef.current);
             let nextResult = coordinator.next();
 
             while (isCurrent()) {
                 if (nextResult.done) break;
                 const step = nextResult.value as TurnStepResult;
+                latestCoordinatorState = step.state;
                 if (step.state) {
                     updateStateWithLogs(step.state, step.logs, resolution);
                 }
@@ -517,7 +519,7 @@ export const useTurnManager = ({
             }
 
             if (!isCurrent()) return;
-            recordCompletedTurn(resolution.turn, stateRef.current, resolution);
+            recordCompletedTurn(resolution.turn, latestCoordinatorState, resolution);
             setP1Action(null);
             setP2Action(null);
             uiActions.setIsTeraToggled(false);

@@ -8,6 +8,7 @@ import { BattleHeader } from './BattleLayout';
 import * as BattleEngine from '../services/engine';
 import * as Effects from '../services/effectHandlers';
 import {
+    applyReplayCheckpointMegaProfiles,
     assertReplayCheckpoint,
     buildReplayForcedSwitchAction,
     buildReplayTurnAction,
@@ -119,6 +120,7 @@ export default function ReplayPlayer({ onClose }: ReplayPlayerProps) {
         };
 
         // O checkpoint inicial antecede os efeitos de entrada, como na batalha ao vivo.
+        applyReplayCheckpointMegaProfiles(data, 0, initialState);
         assertReplayCheckpoint(data, 0, initialState);
 
         const entryLogs: any[] = [];
@@ -180,6 +182,8 @@ export default function ReplayPlayer({ onClose }: ReplayPlayerProps) {
             const p2Event = turnEvents.find(e => e.actorId === 2 && !e.isForcedSwitch && !e.isBatonPass);
 
             if (p1Event || p2Event) {
+                applyReplayCheckpointMegaProfiles(replayData, currentTurnNum, stateRef.current!);
+                const stateBeforeTurn = structuredClone(stateRef.current!);
                 const p1Action = buildReplayTurnAction(stateRef.current!, p1Event, 1, currentTurnNum);
                 const p2Action = buildReplayTurnAction(stateRef.current!, p2Event, 2, currentTurnNum);
                 const uiActions = { setAnimationState: () => {} };
@@ -226,7 +230,7 @@ export default function ReplayPlayer({ onClose }: ReplayPlayerProps) {
                 }
 
                 // Só um turno efetivamente concluído pelo coordinator possui checkpoint.
-                assertReplayCheckpoint(replayData, currentTurnNum, stateRef.current!);
+                assertReplayCheckpoint(replayData, currentTurnNum, stateRef.current!, stateBeforeTurn);
             }
 
             setStateHistory(prev => [...prev, stateRef.current!]);
@@ -445,7 +449,7 @@ export default function ReplayPlayer({ onClose }: ReplayPlayerProps) {
                                 {currentTurnEvents.length > 0 && (
                                     <div className="bg-gray-800 border border-gray-700 rounded-xl p-4">
                                         <h3 className="text-xs font-black uppercase tracking-widest text-gray-400 mb-3 text-center">
-                                            ⚔️ Ações do Turno {replayState.turn}
+                                            ⚔️ Ações do Turno {currentTurnEvents[0]?.turn ?? replayState.turn}
                                         </h3>
                                         <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                                             {/* P1 */}

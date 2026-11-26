@@ -18,6 +18,7 @@ interface RunCoordinatorTurnOptions {
   p2Action?: Action;
   config: BattleConfig;
   chooseForcedSwitch?: (step: TurnStepResult) => Action | undefined;
+  preservePrngState?: boolean;
 }
 
 export const createBattleConfig = (overrides: Partial<BattleConfig> = {}): BattleConfig => ({
@@ -79,11 +80,17 @@ export const runCoordinatorTurn = ({
   p2Action,
   config,
   chooseForcedSwitch,
+  preservePrngState = false,
 }: RunCoordinatorTurnOptions): CompletedTurn => {
   const steps: TurnStepResult[] = [];
   const stateSnapshots: BattleState[] = [];
   let completed = false;
-  const seededState: BattleState = { ...initialState, prngState: createBattlePRNGState(seed) };
+  const seededState: BattleState = {
+    ...initialState,
+    prngState: preservePrngState && initialState.prngState
+      ? { ...initialState.prngState }
+      : createBattlePRNGState(seed),
+  };
   const generator = BattleCoordinator.runTurn(seededState, p1Action, p2Action, config);
 
   let next = generator.next();
