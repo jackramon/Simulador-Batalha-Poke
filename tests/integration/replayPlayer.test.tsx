@@ -8,8 +8,15 @@ import * as AiLogic from '../../services/aiLogic';
 import { decideLLMAction } from '../../services/llmAiLogic';
 import { BattleCoordinator } from '../../services/engine/coordinator';
 import * as BattleEngine from '../../services/engine';
-import { createBattleReplayEvent } from '../../services/replayLogic';
+import {
+  appendReplayCheckpoint,
+  createBattleReplay,
+  createBattleReplayEvent,
+  createReplayCheckpoint,
+  REPLAY_FORMAT_VERSION,
+} from '../../services/replayLogic';
 import type { Action, BattleReplay, BattleState } from '../../types';
+import { createBattlePRNGState } from '../../utils/prng';
 import { createBattleState, createMove, createPokemon } from '../factories';
 import { createBattleConfig, runCoordinatorTurn } from './coordinator.helpers';
 
@@ -45,7 +52,10 @@ const createLiveReplayFixture = async (mode: 'local' | 'llm'): Promise<LiveRepla
     hp: 400,
     maxHP: 400,
     speedStat: 90,
-    moves: [createMove({ name: 'manual-move', power: 40, uses: 10, maxUses: 10 })],
+    moves: [
+      createMove({ name: 'manual-move', power: 40, uses: 10, maxUses: 10 }),
+      createMove({ name: 'alternate-manual-move', power: 95, uses: 10, maxUses: 10 }),
+    ],
   });
   const p2 = createPokemon({
     id: 201,
@@ -163,6 +173,32 @@ const createLiveReplayFixture = async (mode: 'local' | 'llm'): Promise<LiveRepla
   return { live, liveP1Action, liveP2Action, replay };
 };
 
+const createVersionedReplay = (fixture: LiveReplayFixture): BattleReplay => {
+  const initialState = createBattleState(
+    structuredClone(fixture.replay.initialState.team1),
+    structuredClone(fixture.replay.initialState.team2),
+    {
+      p1Inventory: structuredClone(fixture.replay.initialState.p1Inventory),
+      p2Inventory: structuredClone(fixture.replay.initialState.p2Inventory),
+      p1TeraUsed: false,
+      p2TeraUsed: false,
+      p1MegaUsed: false,
+      p2MegaUsed: false,
+      prngState: createBattlePRNGState(fixture.replay.seed),
+    },
+  );
+  const replay = createBattleReplay(
+    initialState,
+    structuredClone(fixture.replay.initialState.config),
+    fixture.replay.seed,
+  );
+  return appendReplayCheckpoint(
+    { ...replay, events: structuredClone(fixture.replay.events) },
+    1,
+    fixture.live.finalState,
+  );
+};
+
 describe('reprodução exclusivamente por decisões gravadas', () => {
   let renderer: TestRenderer.ReactTestRenderer;
   let captures: CoordinatorCapture[];
@@ -212,7 +248,7 @@ describe('reprodução exclusivamente por decisões gravadas', () => {
     });
   };
 
-  const playReplay = async (replay: BattleReplay, expectTurn = true): Promise<CoordinatorCapture> => {
+  const loadReplay = async (replay: BattleReplay) => {
     captures = [];
     await act(async () => {
       renderer = TestRenderer.create(React.createElement(ReplayPlayer, { onClose: () => {} }));
@@ -223,6 +259,10 @@ describe('reprodução exclusivamente por decisões gravadas', () => {
         target: { files: [{ text: async () => JSON.stringify(replay) }] },
       });
     });
+  };
+
+  const playReplay = async (replay: BattleReplay, expectTurn = true): Promise<CoordinatorCapture> => {
+    await loadReplay(replay);
     await clickNext();
     if (expectTurn) expect(captures).toHaveLength(1);
     return captures[0]!;
@@ -419,6 +459,85 @@ describe('reprodução exclusivamente por decisões gravadas', () => {
     expect(replayFinal.turn).toBe(2);
     expect(replayFinal.currentPokemon2?.instanceId).toBe(reserve.instanceId);
     expect(replayFinal.prngState).toEqual(liveFinal.prngState);
+    expect(fetch).not.toHaveBeenCalled();
+  });
+
+  it('3.2: ao vivo e replay produzem o mesmo hash e cursor no turno concluído', async () => {
+    const fixture = await createLiveReplayFixture('local');
+    const replayData = createVersionedReplay(fixture);
+
+    const replay = await playReplay(replayData);
+    const actual = createReplayCheckpoint(1, replay.snapshots.at(-1)!);
+
+    expect(actual).toEqual(replayData.checkpoints?.[1]);
+    expect(renderer.root.findAllByProps({ role: 'alert' })).toHaveLength(0);
+    expect(fetch).not.toHaveBeenCalled();
+  });
+
+  it('3.2: interrompe na primeira ação divergente e informa o turno e os dois hashes', async () => {
+    const fixture = await createLiveReplayFixture('local');
+    const replayData = createVersionedReplay(fixture);
+    replayData.events = replayData.events.map(event => event.actorId === 1
+      ? { ...event, moveId: 'alternate-manual-move' }
+      : event);
+
+    await playReplay(replayData);
+
+    const alert = renderer.root.findByProps({ role: 'alert' });
+    const message = alert.children.join('');
+    expect(message).toContain('Divergência de replay no turno 1');
+    expect(message).toContain('hash esperado');
+    expect(message).toContain('hash obtido');
+    expect(message).toContain('Reprodução interrompida');
+    expect(renderer.root.findAllByType('div').map(node => node.children.join('')).join(' ')).toContain('Turno: 0 / 1');
+    expect(captures).toHaveLength(1);
+    expect(fetch).not.toHaveBeenCalled();
+  });
+
+  it('3.2: detecta seed adulterada no checkpoint inicial', async () => {
+    const fixture = await createLiveReplayFixture('local');
+    const replayData = { ...createVersionedReplay(fixture), seed: fixture.replay.seed + 1 };
+
+    await loadReplay(replayData);
+
+    const messages = renderer.root.findAllByType('p').map(node => node.children.join('')).join(' ');
+    expect(messages).toContain('Divergência de replay no turno 0');
+    expect(captures).toHaveLength(0);
+  });
+
+  it('3.2: rejeita uma versão futura já na leitura do arquivo', async () => {
+    const fixture = await createLiveReplayFixture('local');
+    const replayData = { ...createVersionedReplay(fixture), formatVersion: REPLAY_FORMAT_VERSION + 1 };
+
+    await loadReplay(replayData);
+
+    const messages = renderer.root.findAllByType('p').map(node => node.children.join('')).join(' ');
+    expect(messages).toContain(`Versão de replay ${REPLAY_FORMAT_VERSION + 1} não suportada`);
+    expect(renderer.root.findAllByProps({ type: 'file' })).toHaveLength(1);
+  });
+
+  it('3.2: replay legado completo funciona com aviso explícito de ausência de verificação', async () => {
+    const fixture = await createLiveReplayFixture('local');
+
+    await playReplay(fixture.replay);
+
+    const warning = renderer.root.findByProps({ role: 'status' });
+    expect(warning.children.join('')).toContain('Replay legado');
+    expect(warning.children.join('')).toContain('sem verificação');
+    expect(renderer.root.findAllByProps({ role: 'alert' })).toHaveLength(0);
+  });
+
+  it('3.2: logs e apresentação alterados não produzem falsa divergência', async () => {
+    const fixture = await createLiveReplayFixture('local');
+    const replayData = createVersionedReplay(fixture);
+    replayData.initialState.team1[0].name = 'Nome Visual Alterado';
+    replayData.initialState.team1[0].spriteUrl = 'sprite-visual-alterado';
+    replayData.initialState.team1[0].moves[0].displayName = 'Apresentação Alterada';
+    replayData.initialState.team1[0].moves[0].description = 'Somente apresentação';
+
+    await playReplay(replayData);
+
+    expect(renderer.root.findAllByProps({ role: 'alert' })).toHaveLength(0);
     expect(fetch).not.toHaveBeenCalled();
   });
 

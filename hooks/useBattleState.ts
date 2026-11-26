@@ -8,6 +8,7 @@ import { createBattlePRNGState } from '../utils/prng';
 import { removerItem } from '../utils/safeStorage';
 import { isSamePokemonInstance, normalizeBattleTeams, restoreActivePokemonIdentity } from '../utils/pokemonIdentity';
 import { BattleSession, type TurnResolutionToken } from '../services/battleSession';
+import { createBattleReplay } from '../services/replayLogic';
 
 const KEY_BATTLE_STATE = 'poke_sim_battle_state';
 const KEY_BATTLE_CONFIG = 'poke_sim_battle_config';
@@ -429,19 +430,6 @@ export const useBattleState = () => {
 
       const seed = Math.floor(Math.random() * 1000000);
 
-      const newReplay: BattleReplay = {
-        initialState: {
-          team1: structuredClone(t1),
-          team2: structuredClone(t2),
-          p1Inventory: structuredClone(p1Inv),
-          p2Inventory: structuredClone(p2Inv),
-          config: structuredClone(config)
-        },
-        seed,
-        events: []
-      };
-      setCurrentReplay(newReplay);
-
       const initialState: BattleState = {
         prngState: createBattlePRNGState(seed),
         team1: t1, team2: t2, currentPokemon1: p1, currentPokemon2: p2,
@@ -463,6 +451,7 @@ export const useBattleState = () => {
         p2Hazards: { toxicSpikes: 0, reflect: 0, lightScreen: 0, safeguard: 0, mist: 0, luckyChant: 0, auroraVeil: 0, stealthRock: false, stickyWeb: false, spikes: 0, tailwind: 0 },
         logs: initialLogs, isBattleInProgress: true, winner: null, waitingForAction: false
       };
+      setCurrentReplay(createBattleReplay(initialState, config, seed));
       
       const entryLogs: any[] = [];
       Effects.handleEntryAbilities(p1, p2, config.weatherEnabled, entryLogs, initialState);

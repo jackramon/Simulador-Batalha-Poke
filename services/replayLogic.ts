@@ -1,5 +1,222 @@
-import { Action, BattleReplay, BattleReplayEvent, BattleState, Pokemon } from '../types';
+import { Action, BattleConfig, BattleReplay, BattleReplayCheckpoint, BattleReplayEvent, BattleState, Move, Pokemon } from '../types';
 import { normalizeBattleTeams, resolvePokemonTarget } from '../utils/pokemonIdentity';
+import { createBattlePRNGState } from '../utils/prng';
+
+export const REPLAY_FORMAT_VERSION = 1;
+export const REPLAY_ENGINE_REVISION = '3.2.0';
+export const LEGACY_REPLAY_WARNING = 'Replay legado: arquivo sem checkpoints; a reprodução continuará sem verificação de integridade.';
+
+interface ParsedBattleReplay {
+  replay: BattleReplay;
+  legacy: boolean;
+  warning: string;
+}
+
+const replayPrngState = (state: BattleState) => ({
+  ...(state.prngState ?? createBattlePRNGState(state.turnSeed ?? state.seed ?? 0)),
+});
+
+// Remove somente apresentação; os demais campos preservam inclusive regras dinâmicas dos golpes.
+const canonicalMove = (move: Move | null | undefined): unknown => {
+  if (!move) return move;
+  const { displayName: _displayName, description: _description, ...mechanicalData } = move;
+  return mechanicalData;
+};
+
+const canonicalPokemon = (pokemon: Pokemon | null): unknown => {
+  if (!pokemon) return null;
+  const {
+    name: _name,
+    spriteUrl: _spriteUrl,
+    backSpriteUrl: _backSpriteUrl,
+    pixelSpriteUrl: _pixelSpriteUrl,
+    fallbackUrls: _fallbackUrls,
+    cries: _cries,
+    isShiny: _isShiny,
+    ...mechanicalData
+  } = pokemon;
+  const megaProfile = pokemon.megaProfile ? (() => {
+    const {
+      name: _megaName,
+      spriteUrl: _megaSprite,
+      backSpriteUrl: _megaBackSprite,
+      pixelSpriteUrl: _megaPixelSprite,
+      ...mechanicalProfile
+    } = pokemon.megaProfile!;
+    return mechanicalProfile;
+  })() : undefined;
+  const illusionData = pokemon.illusionData
+    ? { originalGender: pokemon.illusionData.originalGender }
+    : undefined;
+  return {
+    ...mechanicalData,
+    moves: pokemon.moves.map(canonicalMove),
+    movePool: pokemon.movePool?.map(canonicalMove),
+    lastMoveUsed: canonicalMove(pokemon.lastMoveUsed),
+    selectedMove: canonicalMove(pokemon.selectedMove),
+    megaProfile,
+    illusionData,
+  };
+};
+
+const canonicalBattleState = (state: BattleState): unknown => ({
+  turn: state.turn,
+  team1: state.team1.map(canonicalPokemon),
+  team2: state.team2.map(canonicalPokemon),
+  currentPokemon1: canonicalPokemon(state.currentPokemon1),
+  currentPokemon2: canonicalPokemon(state.currentPokemon2),
+  p1Inventory: state.p1Inventory,
+  p2Inventory: state.p2Inventory,
+  p1TeraUsed: state.p1TeraUsed,
+  p2TeraUsed: state.p2TeraUsed,
+  p1MegaUsed: state.p1MegaUsed,
+  p2MegaUsed: state.p2MegaUsed,
+  weather: state.weather,
+  weatherTurns: state.weatherTurns,
+  terrain: state.terrain,
+  terrainTurns: state.terrainTurns,
+  gravity: state.gravity,
+  gravityTurns: state.gravityTurns,
+  mudSportTurns: state.mudSportTurns,
+  waterSportTurns: state.waterSportTurns,
+  ionDelugeActive: state.ionDelugeActive,
+  wonderRoomActive: state.wonderRoomActive,
+  wonderRoomTurns: state.wonderRoomTurns,
+  magicRoomActive: state.magicRoomActive,
+  magicRoomTurns: state.magicRoomTurns,
+  trickRoomActive: state.trickRoomActive,
+  trickRoomTurns: state.trickRoomTurns,
+  p1Hazards: state.p1Hazards,
+  p2Hazards: state.p2Hazards,
+  isBattleInProgress: state.isBattleInProgress,
+  winner: state.winner,
+  prngState: replayPrngState(state),
+});
+
+const stableSerialize = (value: unknown): string => {
+  if (value === null || typeof value === 'string' || typeof value === 'boolean') {
+    return JSON.stringify(value);
+  }
+  if (typeof value === 'number') return Number.isFinite(value) ? JSON.stringify(value) : 'null';
+  if (Array.isArray(value)) return `[${value.map(item => stableSerialize(item) || 'null').join(',')}]`;
+  if (typeof value === 'object') {
+    const entries = Object.entries(value as Record<string, unknown>)
+      .filter(([, entry]) => entry !== undefined && typeof entry !== 'function' && typeof entry !== 'symbol')
+      .sort(([left], [right]) => {
+        if (left === right) return 0;
+        return left < right ? -1 : 1;
+      });
+    return `{${entries.map(([key, entry]) => `${JSON.stringify(key)}:${stableSerialize(entry)}`).join(',')}}`;
+  }
+  return 'null';
+};
+
+// FNV-1a de 32 bits sobre os bytes UTF-16: síncrono e idêntico em Node e navegador.
+export const hashBattleReplayState = (state: BattleState): string => {
+  const serialized = stableSerialize(canonicalBattleState(state));
+  let hash = 0x811C9DC5;
+  for (let index = 0; index < serialized.length; index += 1) {
+    const code = serialized.charCodeAt(index);
+    hash = Math.imul(hash ^ (code & 0xFF), 0x01000193);
+    hash = Math.imul(hash ^ (code >>> 8), 0x01000193);
+  }
+  return `fnv1a32:${(hash >>> 0).toString(16).padStart(8, '0')}`;
+};
+
+export const createReplayCheckpoint = (turn: number, state: BattleState): BattleReplayCheckpoint => ({
+  turn,
+  prngState: replayPrngState(state),
+  stateHash: hashBattleReplayState(state),
+});
+
+export const createBattleReplay = (
+  initialState: BattleState,
+  config: BattleConfig,
+  seed: number,
+): BattleReplay => ({
+  formatVersion: REPLAY_FORMAT_VERSION,
+  engineRevision: REPLAY_ENGINE_REVISION,
+  initialState: {
+    team1: structuredClone(initialState.team1),
+    team2: structuredClone(initialState.team2),
+    p1Inventory: structuredClone(initialState.p1Inventory),
+    p2Inventory: structuredClone(initialState.p2Inventory),
+    config: structuredClone(config),
+  },
+  seed,
+  events: [],
+  checkpoints: [createReplayCheckpoint(0, initialState)],
+});
+
+export const appendReplayCheckpoint = (
+  replay: BattleReplay,
+  turn: number,
+  state: BattleState,
+): BattleReplay => {
+  if (replay.formatVersion !== REPLAY_FORMAT_VERSION) return replay;
+  const checkpoint = createReplayCheckpoint(turn, state);
+  const checkpoints = [...(replay.checkpoints ?? []).filter(entry => entry.turn !== turn), checkpoint]
+    .sort((left, right) => left.turn - right.turn);
+  return { ...replay, checkpoints };
+};
+
+const invalidReplay = (detail: string): Error => new Error(`Formato de replay inválido: ${detail}`);
+
+export const parseBattleReplay = (value: unknown): ParsedBattleReplay => {
+  if (!value || typeof value !== 'object') throw invalidReplay('conteúdo ausente.');
+  const data = value as Partial<BattleReplay>;
+  if (!data.initialState || typeof data.seed !== 'number' || !Number.isFinite(data.seed) || !Array.isArray(data.events)) {
+    throw invalidReplay('estado inicial, seed ou eventos ausentes.');
+  }
+
+  if (data.formatVersion === undefined) {
+    if (data.engineRevision !== undefined || data.checkpoints !== undefined) {
+      throw invalidReplay('campos versionados exigem formatVersion.');
+    }
+    return { replay: data as BattleReplay, legacy: true, warning: LEGACY_REPLAY_WARNING };
+  }
+  if (!Number.isInteger(data.formatVersion)) throw invalidReplay('formatVersion deve ser inteiro.');
+  if (data.formatVersion > REPLAY_FORMAT_VERSION) {
+    throw new Error(`Versão de replay ${data.formatVersion} não suportada. Esta versão do simulador suporta até a versão ${REPLAY_FORMAT_VERSION}.`);
+  }
+  if (data.formatVersion !== REPLAY_FORMAT_VERSION) {
+    throw new Error(`Versão de replay ${data.formatVersion} não suportada.`);
+  }
+  if (typeof data.engineRevision !== 'string' || !data.engineRevision) {
+    throw invalidReplay('engineRevision ausente na versão 1.');
+  }
+  if (!Array.isArray(data.checkpoints) || data.checkpoints[0]?.turn !== 0) {
+    throw invalidReplay('checkpoint inicial ausente na versão 1.');
+  }
+  for (const checkpoint of data.checkpoints) {
+    if (!Number.isInteger(checkpoint?.turn) || typeof checkpoint.stateHash !== 'string'
+      || !Number.isFinite(checkpoint.prngState?.seed)
+      || !Number.isFinite(checkpoint.prngState?.state)
+      || !Number.isInteger(checkpoint.prngState?.cursor)) {
+      throw invalidReplay(`checkpoint inválido no turno ${String(checkpoint?.turn)}.`);
+    }
+  }
+  return { replay: data as BattleReplay, legacy: false, warning: '' };
+};
+
+export const assertReplayCheckpoint = (replay: BattleReplay, turn: number, state: BattleState): void => {
+  if (replay.formatVersion === undefined) return;
+  if (replay.formatVersion !== REPLAY_FORMAT_VERSION) {
+    throw new Error(`Versão de replay ${replay.formatVersion} não suportada.`);
+  }
+  const expected = replay.checkpoints?.find(checkpoint => checkpoint.turn === turn);
+  if (!expected) throw new Error(`Replay incompatível: checkpoint do turno ${turn} ausente.`);
+  const actual = createReplayCheckpoint(turn, state);
+  const prngDiverged = expected.prngState.seed !== actual.prngState.seed
+    || expected.prngState.state !== actual.prngState.state
+    || expected.prngState.cursor !== actual.prngState.cursor;
+  if (expected.stateHash !== actual.stateHash || prngDiverged) {
+    const prngDetail = prngDiverged
+      ? ` PRNG esperado ${stableSerialize(expected.prngState)}, obtido ${stableSerialize(actual.prngState)}.`
+      : '';
+    throw new Error(`Divergência de replay no turno ${turn}: hash esperado ${expected.stateHash}, hash obtido ${actual.stateHash}.${prngDetail} Reprodução interrompida.`);
+  }
+};
 
 interface CreateReplayEventOptions {
   turn: number;

@@ -10,7 +10,7 @@ import { calculateTypeEffectiveness } from '../services/battleUtils';
 import { TurnAnimator } from '../services/animation/turnAnimator';
 import { removerItem } from '../utils/safeStorage';
 import { isPokemonOnTeam, resolvePokemonTarget } from '../utils/pokemonIdentity';
-import { createBattleReplayEvent } from '../services/replayLogic';
+import { appendReplayCheckpoint, createBattleReplayEvent } from '../services/replayLogic';
 import { BattleSession, type TurnResolutionToken } from '../services/battleSession';
 
 interface TurnManagerProps {
@@ -98,6 +98,16 @@ export const useTurnManager = ({
                 isBatonPass,
             });
             return { ...prev, events: [...prev.events, event] };
+        });
+    };
+
+    const recordCompletedTurn = (turn: number, completedState: BattleState, resolution: TurnResolutionToken) => {
+        const sessionId = resolution.sessionId;
+        if (!battleSession.isCurrent(sessionId) || !battleSession.canCommitResolution(resolution)) return;
+        setCurrentReplay(prev => {
+            // O updater pode executar após finishResolution/terminate; a sessão ainda impede escrita cruzada.
+            if (!prev || !battleSession.ownsSnapshot(sessionId)) return prev;
+            return appendReplayCheckpoint(prev, turn, completedState);
         });
     };
 
@@ -460,6 +470,7 @@ export const useTurnManager = ({
                 if (!isCurrent()) return;
 
                 if (step.phase === 'game-over') {
+                    recordCompletedTurn(resolution.turn, step.state, resolution);
                     battleSession.terminate();
                     return;
                 }
@@ -506,6 +517,7 @@ export const useTurnManager = ({
             }
 
             if (!isCurrent()) return;
+            recordCompletedTurn(resolution.turn, stateRef.current, resolution);
             setP1Action(null);
             setP2Action(null);
             uiActions.setIsTeraToggled(false);

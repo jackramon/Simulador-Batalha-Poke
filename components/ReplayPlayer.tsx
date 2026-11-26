@@ -7,7 +7,14 @@ import { PokemonCard } from './PokemonCard';
 import { BattleHeader } from './BattleLayout';
 import * as BattleEngine from '../services/engine';
 import * as Effects from '../services/effectHandlers';
-import { buildReplayForcedSwitchAction, buildReplayTurnAction, normalizeReplayTeams, resolveReplaySwitchTarget } from '../services/replayLogic';
+import {
+    assertReplayCheckpoint,
+    buildReplayForcedSwitchAction,
+    buildReplayTurnAction,
+    normalizeReplayTeams,
+    parseBattleReplay,
+    resolveReplaySwitchTarget,
+} from '../services/replayLogic';
 
 // ── Tipo das velocidades de reprodução ──────────────────────────────
 //    Valores < 1 = mais lento; 1 = velocidade original dos delays
@@ -30,6 +37,7 @@ interface ReplayPlayerProps {
 export default function ReplayPlayer({ onClose }: ReplayPlayerProps) {
     const [replayData, setReplayData]           = useState<BattleReplay | null>(null);
     const [error, setError]                     = useState<string>('');
+    const [compatibilityWarning, setCompatibilityWarning] = useState('');
     const [isPlaying, setIsPlaying]             = useState(false);
     const [currentTurnIndex, setCurrentTurnIndex] = useState(0);
     const [playbackSpeed, setPlaybackSpeed]     = useState(DEFAULT_SPEED);
@@ -64,14 +72,14 @@ export default function ReplayPlayer({ onClose }: ReplayPlayerProps) {
         if (!file) return;
         try {
             const text = await file.text();
-            const data = JSON.parse(text) as BattleReplay;
-            if (!data.initialState || !data.seed || !Array.isArray(data.events)) {
-                throw new Error('Formato de replay inválido.');
-            }
-            setReplayData(data);
-            resetReplay(data);
+            const parsed = parseBattleReplay(JSON.parse(text));
+            setReplayData(parsed.replay);
+            setCompatibilityWarning(parsed.warning);
+            resetReplay(parsed.replay);
             setError('');
         } catch (err: any) {
+            setReplayData(null);
+            setCompatibilityWarning('');
             setError(err.message || 'Erro ao carregar replay.');
         }
     };
@@ -81,6 +89,7 @@ export default function ReplayPlayer({ onClose }: ReplayPlayerProps) {
         setIsPlaying(false);
         setCurrentTurnIndex(0);
         setCurrentTurnEvents([]);
+        setError('');
 
         // FIX #5: reiniciar acumulador de logs junto com o replay
         const initialLog = { message: 'Replay Carregado. Pronto para iniciar.', color: 'text-blue-600 font-bold' };
@@ -108,6 +117,9 @@ export default function ReplayPlayer({ onClose }: ReplayPlayerProps) {
             logs: [initialLog],
             isBattleInProgress: true, winner: null, waitingForAction: false,
         };
+
+        // O checkpoint inicial antecede os efeitos de entrada, como na batalha ao vivo.
+        assertReplayCheckpoint(data, 0, initialState);
 
         const entryLogs: any[] = [];
         Effects.handleEntryAbilities(initialState.currentPokemon1, initialState.currentPokemon2, data.initialState.config?.weatherEnabled ?? true, entryLogs, initialState);
@@ -212,6 +224,9 @@ export default function ReplayPlayer({ onClose }: ReplayPlayerProps) {
 
                     result = generator.next();
                 }
+
+                // Só um turno efetivamente concluído pelo coordinator possui checkpoint.
+                assertReplayCheckpoint(replayData, currentTurnNum, stateRef.current!);
             }
 
             setStateHistory(prev => [...prev, stateRef.current!]);
@@ -367,6 +382,11 @@ export default function ReplayPlayer({ onClose }: ReplayPlayerProps) {
                     {error && (
                         <p role="alert" className="flex-shrink-0 text-red-300 font-bold bg-red-950/80 px-6 py-3 border-b border-red-700">
                             {error}
+                        </p>
+                    )}
+                    {compatibilityWarning && (
+                        <p role="status" className="flex-shrink-0 text-amber-200 font-bold bg-amber-950/70 px-6 py-3 border-b border-amber-700">
+                            {compatibilityWarning}
                         </p>
                     )}
 

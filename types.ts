@@ -180,7 +180,18 @@ export interface BattleReplayEvent {
   isBatonPass?: boolean;
 }
 
+export interface BattleReplayCheckpoint {
+  /** Zero identifica o estado inicial; os demais valores identificam o turno concluído. */
+  turn: number;
+  prngState: BattlePRNGState;
+  stateHash: string;
+}
+
 export interface BattleReplay {
+  /** Ausente somente em replays legados; arquivos novos usam a versão explícita. */
+  formatVersion?: number;
+  /** Revisão semântica das regras do motor que produziu o replay. */
+  engineRevision?: string;
   initialState: {
     team1: Pokemon[];
     team2: Pokemon[];
@@ -190,6 +201,8 @@ export interface BattleReplay {
   };
   seed: number;
   events: BattleReplayEvent[];
+  /** Ausente em replays legados; obrigatório a partir da versão 1. */
+  checkpoints?: BattleReplayCheckpoint[];
 }
 
 export interface BattlePRNGState {
