@@ -172,6 +172,7 @@ export interface BattleReplayEvent {
   switchId?: number;
   switchInstanceId?: string;
   itemId?: string;
+  moveName?: string; // Golpe associado ao uso do item, quando aplicável
   isGive?: boolean;
   shouldTerastallize?: boolean;
   shouldMegaEvolve?: boolean;

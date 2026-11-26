@@ -392,6 +392,5 @@ describe('replay manual e decisões de IA no núcleo', () => {
     expect(fetchMock).toHaveBeenCalledWith('/api/llm-action', expect.objectContaining({ method: 'POST' }));
   });
 
-  it.todo('3.1: reproduzir replay com LLM sem executar a IA local para consumir PRNG');
   it.todo('3.3: preservar a identidade entre o Pokémon ativo e sua entrada na equipe no ReplayPlayer');
 });

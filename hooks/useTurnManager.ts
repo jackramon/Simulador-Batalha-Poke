@@ -101,7 +101,7 @@ export const useTurnManager = ({
         });
     };
 
-    const handlePlayerAction = (player: 1 | 2, type: 'move' | 'switch' | 'item', data: any, isForcedSwitch?: boolean, isBatonPass?: boolean, resolution?: TurnResolutionToken) => {
+    const handlePlayerAction = (player: 1 | 2, type: 'move' | 'switch' | 'item', data: any, isForcedSwitch?: boolean, isBatonPass?: boolean, resolution?: TurnResolutionToken, decision?: Pick<Action, 'shouldTerastallize' | 'shouldMegaEvolve'>) => {
         const sessionId = battleSession.sessionId;
         if (!battleSession.isCurrent(sessionId)) return;
         const resumeForcedSwitch = type === 'switch' ? forcedSwitchResolverRef.current : null;
@@ -110,8 +110,12 @@ export const useTurnManager = ({
 
         const user = player === 1 ? state.currentPokemon1 : state.currentPokemon2;
         if (!user) return;
-        const shouldTerastallize = (player === 1 && type === 'move' && uiActions.isTeraToggled) ? true : undefined;
-        const shouldMegaEvolve = (player === 1 && type === 'move' && uiActions.isMegaToggled) ? true : undefined;
+        const shouldTerastallize = decision
+            ? decision.shouldTerastallize
+            : (player === 1 && type === 'move' && uiActions.isTeraToggled) ? true : undefined;
+        const shouldMegaEvolve = decision
+            ? decision.shouldMegaEvolve
+            : (player === 1 && type === 'move' && uiActions.isMegaToggled) ? true : undefined;
         
         const act: Action = { 
             type, 
@@ -279,16 +283,7 @@ export const useTurnManager = ({
                 
                 battleSession.schedule(sessionId, () => {
                     if (!isCurrent()) return;
-                    handlePlayerAction(1, 'move', aiAction.data); 
-                    // Atualiza a ação pendente com as flags corretas se não foram passadas pelo handle
-                    setP1Action(prev => {
-                        if (!prev) return prev;
-                        return {
-                            ...prev,
-                            shouldTerastallize: aiAction.shouldTerastallize,
-                            shouldMegaEvolve: aiAction.shouldMegaEvolve
-                        };
-                    });
+                    handlePlayerAction(1, 'move', aiAction.data, undefined, undefined, undefined, aiAction);
                     uiActions.setP1AiSelectedMove(null); 
                 }, 3000);
             } else if (aiAction.type === 'switch') {

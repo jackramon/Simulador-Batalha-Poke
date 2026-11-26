@@ -8,7 +8,7 @@
 - Mantenha `PROJECT_CONTEXT.md` atualizado a cada alteração.
 - Para economizar tokens: inspecione somente os arquivos da tarefa e suas dependências diretas, reutilize a baseline registrada, use testes focados durante a iteração e rode a suíte completa na validação final. Não refaça auditorias globais já concluídas.
 
-**Próximo item:** 3.1 — Reproduzir ações gravadas sem chamar IA para consumir RNG.
+**Próximo item:** 3.2 — Versionar o formato e adicionar checkpoints ou hashes de estado por turno.
 
 ## Etapa 0 — Restaurar uma baseline confiável
 
@@ -144,7 +144,14 @@
 
 ## Etapa 3 — Refazer replay e simulação da IA sobre a base consolidada
 
-- [ ] **3.1 — Reproduzir ações gravadas sem chamar IA para consumir RNG.**
+- [x] **3.1 — Reproduzir ações gravadas sem chamar IA para consumir RNG.**
+  - `ReplayPlayer` e `replayLogic` não importam nem chamam decisões de IA; a reprodução usa somente seed, estado/cursor e eventos gravados.
+  - P1/P2 manual, IA local, LLM, golpes, itens, trocas voluntárias, forçadas e por desmaio são reidratados do replay, com flags Tera/Mega, alvos e `moveName` por `instanceId`. U-turn/Baton Pass retomam o mesmo generator, e a troca pós-desmaio isolada não executa outro turno.
+  - Replays antigos sem decisão necessária exibem `Replay incompatível` sem IA/fetch ou ação inventada; apenas `recharge`/`struggle` mantêm o fallback temporário. A IA automática de P1 grava as flags da própria decisão, sem depender do toggle visual.
+  - O `it.todo` de 3.1 virou teste no player real para IA local e LLM mockado, comparando ações, snapshots, cursor e estado final ao vivo versus replay. RED→GREEN adicionais cobriram troca forçada, desmaio, item e compatibilidade.
+  - Validação: 4 arquivos focados com 22 aprovados e 1 `it.todo`; suíte completa com 50 arquivos, 220 aprovados e 2 `it.todo` (222 registrados); lint, build e `git diff --check` aprovados.
+  - Smoke no bundle de produção: IA local e LLM mockado reproduzidos até 1/1, Nidoking em 0/1 PV, log de desmaio, zero chamadas `/api/` e zero erros; porta liberada. Permanece o aviso preexistente de chunk acima de 500 kB.
+  - Próximo item: 3.2. Commit: informado no resumo final após o push verificado em `origin/main`.
 - [ ] **3.2 — Versionar o formato e adicionar checkpoints ou hashes de estado por turno.**
 - [ ] **3.3 — Preservar a identidade entre Pokémon ativo e entrada correspondente da equipe.**
 - [ ] **3.4 — Parametrizar a IA pelo lado controlado e corrigir sua avaliação.**
@@ -162,7 +169,7 @@
 
 ## Registro resumido da baseline
 
-- Última suíte integral informada: **49 arquivos, 212 testes aprovados e 3 `it.todo`** (215 registrados); os todos são lacunas de outros itens e não contam como cobertura aprovada.
+- Última suíte integral informada: **50 arquivos, 220 testes aprovados e 2 `it.todo`** (222 registrados); os todos são lacunas de 3.3/3.4 e não contam como cobertura aprovada.
 - `npm run lint`, `npm run build` e `git diff --check`: aprovados.
 - Auditoria do item 0.5: **17 → 0** ocorrências no total e **6 → 0** em produção; instalação por `npm ci` reproduzida sem alterações nos manifestos.
 - SHA dos itens 1.1 a 1.7 e dos itens 2.1/2.2/2.3/2.4/2.5 informados somente nos respectivos resumos finais após o push; último SHA registrado no roadmap: `baae8a606c37495f30810e2c646dbb234c75ac86` (item 0.4).

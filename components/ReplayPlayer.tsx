@@ -6,10 +6,8 @@ import { TurnAnimator } from '../services/animation/turnAnimator';
 import { PokemonCard } from './PokemonCard';
 import { BattleHeader } from './BattleLayout';
 import * as BattleEngine from '../services/engine';
-import { decideAIAction } from '../services/aiLogic';
-import * as AirLock from '../services/engine/handlers/abilities/air_lock';
 import * as Effects from '../services/effectHandlers';
-import { buildReplayAction, normalizeReplayTeams, resolveReplaySwitchTarget } from '../services/replayLogic';
+import { buildReplayForcedSwitchAction, buildReplayTurnAction, normalizeReplayTeams, resolveReplaySwitchTarget } from '../services/replayLogic';
 
 // ── Tipo das velocidades de reprodução ──────────────────────────────
 //    Valores < 1 = mais lento; 1 = velocidade original dos delays
@@ -151,128 +149,79 @@ export default function ReplayPlayer({ onClose }: ReplayPlayerProps) {
         setCurrentTurnEvents(turnEvents);
 
         isAnimatingRef.current = true;
+        setError('');
 
-        // FIX: Se um Pokémon desmaiou no turno anterior (ou mid-turn) e a troca forçada
-        // está gravada neste turno, precisamos realizar a troca ANTES de construir as ações
-        // e rodar o turno, para que o novo Pokémon possa agir!
-        ([1, 2] as const).forEach(playerNum => {
-            const active = playerNum === 1 ? stateRef.current!.currentPokemon1 : stateRef.current!.currentPokemon2;
-            if (active?.isFainted) {
-                const forcedEvent = turnEvents.find(e => e.actorId === playerNum && e.isForcedSwitch);
-                if (forcedEvent && (forcedEvent.switchInstanceId || forcedEvent.switchId !== undefined)) {
-                    const switchTarget = resolveReplaySwitchTarget(stateRef.current!, forcedEvent);
-                    if (switchTarget) {
-                        const res = BattleEngine.performSwitch(stateRef.current!, switchTarget, playerNum, replayData.initialState.config.weatherEnabled);
-                        updateStateWithLogs(res.newState, res.logs);
-                    }
+        try {
+            // Trocas pós-desmaio são externas ao coordinator e podem ser a única
+            // decisão gravada no turno seguinte; nesse caso não há novo turno a executar.
+            ([1, 2] as const).forEach(playerNum => {
+                const active = playerNum === 1 ? stateRef.current!.currentPokemon1 : stateRef.current!.currentPokemon2;
+                if (active?.isFainted) {
+                    const forcedEvent = turnEvents.find(e => e.actorId === playerNum && e.isForcedSwitch);
+                    const forcedAction = buildReplayForcedSwitchAction(stateRef.current!, forcedEvent, playerNum, currentTurnNum);
+                    const res = BattleEngine.performSwitch(stateRef.current!, forcedAction.data, playerNum, replayData.initialState.config.weatherEnabled);
+                    updateStateWithLogs(res.newState, res.logs);
                 }
-            }
-        });
+            });
 
-        const p1Event = turnEvents.find(e => e.actorId === 1 && !e.isForcedSwitch && !e.isBatonPass);
-        const p2Event = turnEvents.find(e => e.actorId === 2 && !e.isForcedSwitch && !e.isBatonPass);
+            const p1Event = turnEvents.find(e => e.actorId === 1 && !e.isForcedSwitch && !e.isBatonPass);
+            const p2Event = turnEvents.find(e => e.actorId === 2 && !e.isForcedSwitch && !e.isBatonPass);
 
-        let p1Action = buildReplayAction(stateRef.current!, p1Event);
-        let p2Action = buildReplayAction(stateRef.current!, p2Event);
+            if (p1Event || p2Event) {
+                const p1Action = buildReplayTurnAction(stateRef.current!, p1Event, 1, currentTurnNum);
+                const p2Action = buildReplayTurnAction(stateRef.current!, p2Event, 2, currentTurnNum);
+                const uiActions = { setAnimationState: () => {} };
+                const generator = BattleCoordinator.runTurn(
+                    stateRef.current,
+                    p1Action,
+                    p2Action,
+                    replayData.initialState.config
+                );
 
-        // Compatibilidade: a chamada legada da IA será revista em 3.1.
-        // As simulações agora usam forks e não alteram o cursor real do replay.
-        
-        const isSuppressed = AirLock.isWeatherSuppressed(stateRef.current!);
+                let result = generator.next();
+                while (!result.done) {
+                    const step = result.value;
+                    if (!step) { result = generator.next(); continue; }
 
-        const p1HasChargingMove = stateRef.current!.currentPokemon1 && stateRef.current!.currentPokemon1.chargingMove && !stateRef.current!.currentPokemon1.isFainted;
+                    await TurnAnimator.processStep(step, uiActions, playbackSpeed);
+                    updateStateWithLogs(step.state, step.logs);
 
-        if (replayData.initialState.config.p1AutoMode && stateRef.current!.currentPokemon1 && !stateRef.current!.currentPokemon1.isFainted && !p1HasChargingMove) {
-            const aiGeneratedActionP1 = decideAIAction(
-                stateRef.current!.currentPokemon1,
-                stateRef.current!.currentPokemon2!,
-                stateRef.current!.team1,
-                stateRef.current!.team2,
-                isSuppressed ? 'none' : stateRef.current!.weather,
-                replayData.initialState.config.moveLimitEnabled,
-                replayData.initialState.config.itemsEnabled ? stateRef.current!.p1Inventory : undefined,
-                replayData.initialState.config.terastallizationEnabled,
-                stateRef.current!.p1TeraUsed,
-                stateRef.current!,
-                replayData.initialState.config.megaEvolutionEnabled,
-                stateRef.current!.p1MegaUsed
-            );
-            
-            if (!p1Action) {
-                p1Action = { ...aiGeneratedActionP1, playerNum: 1 };
-            }
-        }
-
-        if (replayData.initialState.config.opponentMode === 'auto' && stateRef.current!.currentPokemon2 && !stateRef.current!.currentPokemon2.isFainted) {
-            const aiGeneratedActionP2 = decideAIAction(
-                stateRef.current!.currentPokemon2,
-                stateRef.current!.currentPokemon1!,
-                stateRef.current!.team2,
-                stateRef.current!.team1,
-                isSuppressed ? 'none' : stateRef.current!.weather,
-                replayData.initialState.config.moveLimitEnabled,
-                replayData.initialState.config.itemsEnabled ? stateRef.current!.p2Inventory : undefined,
-                replayData.initialState.config.terastallizationEnabled,
-                stateRef.current!.p2TeraUsed,
-                stateRef.current!,
-                replayData.initialState.config.megaEvolutionEnabled,
-                stateRef.current!.p2MegaUsed
-            );
-            
-            // Fallback para replays antigos onde as ações da IA não foram gravadas no JSON
-            if (!p2Action) {
-                p2Action = aiGeneratedActionP2;
-            }
-        }
-
-        const uiActions = { setAnimationState: () => {} };
-
-        const generator = BattleCoordinator.runTurn(
-            stateRef.current,
-            p1Action,
-            p2Action,
-            replayData.initialState.config
-        );
-
-        let result = generator.next();
-        while (!result.done) {
-            const step = result.value;
-            if (!step) { result = generator.next(); continue; }
-
-            await TurnAnimator.processStep(step, uiActions, playbackSpeed);
-            updateStateWithLogs(step.state, step.logs);
-
-            if (step.switchPrompt) {
-                const playerNum = step.switchPrompt.player;
-                const forcedEvent = turnEvents.find(e => e.actorId === playerNum && (e.isForcedSwitch || e.isBatonPass));
-                if (forcedEvent && (forcedEvent.switchInstanceId || forcedEvent.switchId !== undefined)) {
-                    const switchTarget = resolveReplaySwitchTarget(stateRef.current!, forcedEvent);
-                    if (switchTarget) {
-                        const res = BattleEngine.performSwitch(stateRef.current!, switchTarget, playerNum, replayData.initialState.config.weatherEnabled, step.switchPrompt.isBatonPass);
-                        updateStateWithLogs(res.newState, res.logs);
+                    if (step.switchPrompt) {
+                        const playerNum = step.switchPrompt.player;
+                        const forcedEvent = turnEvents.find(e => e.actorId === playerNum && (e.isForcedSwitch || e.isBatonPass));
+                        const forcedAction = buildReplayForcedSwitchAction(stateRef.current!, forcedEvent, playerNum, currentTurnNum);
+                        result = generator.next(forcedAction);
+                        continue;
                     }
-                }
-            } else if (step.phase === 'faint-switch') {
-                ([1, 2] as const).forEach(playerNum => {
-                    const active = playerNum === 1 ? stateRef.current!.currentPokemon1 : stateRef.current!.currentPokemon2;
-                    if (active?.isFainted) {
-                        const forcedEvent = turnEvents.find(e => e.actorId === playerNum && e.isForcedSwitch);
-                        if (forcedEvent && (forcedEvent.switchInstanceId || forcedEvent.switchId !== undefined)) {
-                            const switchTarget = resolveReplaySwitchTarget(stateRef.current!, forcedEvent);
-                            if (switchTarget) {
-                                const res = BattleEngine.performSwitch(stateRef.current!, switchTarget, playerNum, replayData.initialState.config.weatherEnabled);
-                                updateStateWithLogs(res.newState, res.logs);
+
+                    if (step.phase === 'faint-switch') {
+                        ([1, 2] as const).forEach(playerNum => {
+                            const active = playerNum === 1 ? stateRef.current!.currentPokemon1 : stateRef.current!.currentPokemon2;
+                            if (active?.isFainted) {
+                                const forcedEvent = turnEvents.find(e => e.actorId === playerNum && e.isForcedSwitch);
+                                if (forcedEvent && (forcedEvent.switchInstanceId || forcedEvent.switchId !== undefined)) {
+                                    const switchTarget = resolveReplaySwitchTarget(stateRef.current!, forcedEvent);
+                                    if (switchTarget) {
+                                        const res = BattleEngine.performSwitch(stateRef.current!, switchTarget, playerNum, replayData.initialState.config.weatherEnabled);
+                                        updateStateWithLogs(res.newState, res.logs);
+                                    }
+                                }
                             }
-                        }
+                        });
                     }
-                });
+
+                    result = generator.next();
+                }
             }
 
-            result = generator.next();
+            setStateHistory(prev => [...prev, stateRef.current!]);
+        } catch (err: any) {
+            setError(err.message || 'Erro ao reproduzir replay.');
+            setIsPlaying(false);
+            return;
+        } finally {
+            isAnimatingRef.current = false;
         }
-
-        setStateHistory(prev => [...prev, stateRef.current!]);
-        isAnimatingRef.current = false;
 
         // FIX #3: pausa entre turnos antes de avançar automaticamente
         await new Promise(r => setTimeout(r, INTER_TURN_DELAY_MS / playbackSpeed));
@@ -414,6 +363,12 @@ export default function ReplayPlayer({ onClose }: ReplayPlayerProps) {
                             Turno: {currentTurnIndex} / {turns.length}
                         </div>
                     </div>
+
+                    {error && (
+                        <p role="alert" className="flex-shrink-0 text-red-300 font-bold bg-red-950/80 px-6 py-3 border-b border-red-700">
+                            {error}
+                        </p>
+                    )}
 
                     {/* ── Área principal (scrollável) ─────────────────── */}
                     <div className="flex-grow overflow-y-auto p-4 bg-gray-900 space-y-4">

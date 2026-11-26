@@ -558,4 +558,49 @@ describe('hotfix do ciclo de vida das resoluções de turno', () => {
       .filter(message => message === BATTLE_MESSAGES.USED_MOVE('Lilligant', 'Tempestade de Folhas')))
       .toHaveLength(1);
   });
+
+  it('grava as flags da decisão automática de P1 sem depender dos toggles visuais', async () => {
+    const p1 = createPokemon({ id: 941, name: 'P1 Automático', moves: [createMove({ name: 'mega-ai-move' })] });
+    const p2 = createPokemon({ id: 942, name: 'Oponente Manual', moves: [createMove()] });
+    await loadBattle([p1], [p2]);
+    const aiAction: Action = {
+      type: 'move',
+      data: harness.battle.state.currentPokemon1!.moves[0],
+      user: harness.battle.state.currentPokemon1!,
+      playerNum: 1,
+      priority: 0,
+      shouldTerastallize: false,
+      shouldMegaEvolve: true,
+    };
+    vi.spyOn(AiLogic, 'decideAIAction').mockReturnValue(aiAction);
+
+    await act(async () => {
+      harness.battle.configRef.current = {
+        ...harness.battle.configRef.current,
+        p1AutoMode: true,
+        terastallizationEnabled: true,
+        megaEvolutionEnabled: true,
+      };
+      harness.battle.setConfig(prev => ({
+        ...prev,
+        p1AutoMode: true,
+        terastallizationEnabled: true,
+        megaEvolutionEnabled: true,
+      }));
+    });
+    await flushAsync();
+    await act(async () => {
+      await vi.advanceTimersToNextTimerAsync();
+    });
+
+    expect(harness.battle.currentReplay?.events).toHaveLength(1);
+    expect(harness.battle.currentReplay?.events[0]).toMatchObject({
+      actorId: 1,
+      actorInstanceId: 'p1-slot-0',
+      actionType: 'move',
+      moveId: 'mega-ai-move',
+      shouldTerastallize: false,
+      shouldMegaEvolve: true,
+    });
+  });
 });

@@ -1,0 +1,431 @@
+import React from 'react';
+import TestRenderer, { act } from 'react-test-renderer';
+import { readFileSync } from 'node:fs';
+import { join } from 'node:path';
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
+import ReplayPlayer from '../../components/ReplayPlayer';
+import * as AiLogic from '../../services/aiLogic';
+import { decideLLMAction } from '../../services/llmAiLogic';
+import { BattleCoordinator } from '../../services/engine/coordinator';
+import * as BattleEngine from '../../services/engine';
+import { createBattleReplayEvent } from '../../services/replayLogic';
+import type { Action, BattleReplay, BattleState } from '../../types';
+import { createBattleState, createMove, createPokemon } from '../factories';
+import { createBattleConfig, runCoordinatorTurn } from './coordinator.helpers';
+
+vi.mock('../../components/PokemonCard', () => ({ PokemonCard: () => null }));
+vi.mock('../../components/BattleLayout', () => ({ BattleHeader: () => null }));
+vi.mock('../../services/animation/turnAnimator', () => ({
+  TurnAnimator: { processStep: vi.fn(async () => {}) },
+}));
+
+interface CoordinatorCapture {
+  p1Action?: Action;
+  p2Action?: Action;
+  snapshots: BattleState[];
+}
+
+interface LiveReplayFixture {
+  live: ReturnType<typeof runCoordinatorTurn>;
+  liveP1Action: Action;
+  liveP2Action: Action;
+  replay: BattleReplay;
+}
+
+const withoutLogs = (state: BattleState): BattleState => {
+  const normalized = JSON.parse(JSON.stringify(state)) as BattleState;
+  normalized.logs = [];
+  return normalized;
+};
+
+const createLiveReplayFixture = async (mode: 'local' | 'llm'): Promise<LiveReplayFixture> => {
+  const p1 = createPokemon({
+    id: 101,
+    name: 'Manual ao Vivo',
+    hp: 400,
+    maxHP: 400,
+    speedStat: 90,
+    moves: [createMove({ name: 'manual-move', power: 40, uses: 10, maxUses: 10 })],
+  });
+  const p2 = createPokemon({
+    id: 201,
+    name: mode === 'llm' ? 'LLM ao Vivo' : 'IA Local ao Vivo',
+    hp: 400,
+    maxHP: 400,
+    speedStat: 140,
+    moves: [
+      createMove({ name: 'first-ai-move', power: 40, uses: 10, maxUses: 10 }),
+      createMove({ name: 'recorded-ai-move', power: 80, uses: 10, maxUses: 10 }),
+    ],
+  });
+  const config = createBattleConfig({
+    opponentMode: 'auto',
+    useLLM: mode === 'llm',
+    itemsEnabled: false,
+    terastallizationEnabled: mode === 'llm',
+    forceAccuracyOutcome: 'hit',
+    fixedRoll: 1,
+  });
+  const initialState = createBattleState([p1], [p2], {
+    p1Inventory: { items: [] },
+    p2Inventory: { items: [] },
+    p1TeraUsed: false,
+    p2TeraUsed: false,
+    p1MegaUsed: false,
+    p2MegaUsed: false,
+  });
+  const liveP1Action: Action = {
+    type: 'move',
+    data: p1.moves[0],
+    user: p1,
+    playerNum: 1,
+    priority: p1.moves[0].priority ?? 0,
+  };
+
+  let liveP2Action: Action;
+  if (mode === 'llm') {
+    vi.mocked(fetch).mockResolvedValueOnce(new Response(JSON.stringify({
+      result: JSON.stringify({
+        type: 'move',
+        data: { name: 'recorded-ai-move' },
+        shouldTerastallize: true,
+        shouldMegaEvolve: false,
+      }),
+    }), { status: 200 }));
+    liveP2Action = await decideLLMAction(
+      p2,
+      p1,
+      initialState.team2,
+      initialState.team1,
+      initialState.weather,
+      config.moveLimitEnabled,
+      undefined,
+      config.terastallizationEnabled,
+      false,
+      initialState,
+      false,
+      false,
+      'openrouter',
+      'modelo-local',
+    );
+  } else {
+    liveP2Action = AiLogic.decideAIAction(
+      p2,
+      p1,
+      initialState.team2,
+      initialState.team1,
+      initialState.weather,
+      config.moveLimitEnabled,
+      undefined,
+      false,
+      false,
+      initialState,
+      false,
+      false,
+    );
+  }
+
+  const replay: BattleReplay = {
+    initialState: {
+      team1: structuredClone(initialState.team1),
+      team2: structuredClone(initialState.team2),
+      p1Inventory: structuredClone(initialState.p1Inventory),
+      p2Inventory: structuredClone(initialState.p2Inventory),
+      config: structuredClone(config),
+    },
+    seed: 3101,
+    events: [
+      createBattleReplayEvent({
+        turn: 1,
+        player: 1,
+        type: liveP1Action.type,
+        data: liveP1Action.data,
+        user: liveP1Action.user,
+      }),
+      createBattleReplayEvent({
+        turn: 1,
+        player: 2,
+        type: liveP2Action.type,
+        data: liveP2Action.data,
+        user: liveP2Action.user,
+        shouldTerastallize: liveP2Action.shouldTerastallize,
+        shouldMegaEvolve: liveP2Action.shouldMegaEvolve,
+      }),
+    ],
+  };
+  const live = runCoordinatorTurn({
+    seed: replay.seed,
+    initialState,
+    p1Action: liveP1Action,
+    p2Action: liveP2Action,
+    config,
+  });
+  return { live, liveP1Action, liveP2Action, replay };
+};
+
+describe('reprodução exclusivamente por decisões gravadas', () => {
+  let renderer: TestRenderer.ReactTestRenderer;
+  let captures: CoordinatorCapture[];
+
+  beforeEach(() => {
+    vi.useFakeTimers();
+    vi.stubGlobal('IS_REACT_ACT_ENVIRONMENT', true);
+    vi.stubGlobal('fetch', vi.fn(() => {
+      throw new Error('Rede proibida durante o replay');
+    }));
+    captures = [];
+    const originalRunTurn = BattleCoordinator.runTurn;
+    vi.spyOn(BattleCoordinator, 'runTurn').mockImplementation((state, p1Action, p2Action, config) => {
+      const capture: CoordinatorCapture = { p1Action, p2Action, snapshots: [] };
+      captures.push(capture);
+      const generator = originalRunTurn(state, p1Action, p2Action, config);
+      const originalNext = generator.next.bind(generator);
+      generator.next = ((...args: Parameters<typeof generator.next>) => {
+        const result = originalNext(...args);
+        if (!result.done) capture.snapshots.push(result.value.state);
+        return result;
+      }) as typeof generator.next;
+      return generator;
+    });
+  });
+
+  afterEach(async () => {
+    if (renderer) {
+      await act(async () => renderer.unmount());
+    }
+    vi.clearAllTimers();
+    vi.useRealTimers();
+    vi.unstubAllGlobals();
+    vi.restoreAllMocks();
+  });
+
+  const clickNext = async () => {
+    const nextButton = renderer.root.findAllByType('button')
+      .find(button => button.children.join('').includes('Próximo'));
+    expect(nextButton).toBeDefined();
+    await act(async () => {
+      nextButton!.props.onClick();
+      await Promise.resolve();
+    });
+    await act(async () => {
+      await vi.runAllTimersAsync();
+    });
+  };
+
+  const playReplay = async (replay: BattleReplay, expectTurn = true): Promise<CoordinatorCapture> => {
+    captures = [];
+    await act(async () => {
+      renderer = TestRenderer.create(React.createElement(ReplayPlayer, { onClose: () => {} }));
+    });
+    const fileInput = renderer.root.findByProps({ type: 'file' });
+    await act(async () => {
+      await fileInput.props.onChange({
+        target: { files: [{ text: async () => JSON.stringify(replay) }] },
+      });
+    });
+    await clickNext();
+    if (expectTurn) expect(captures).toHaveLength(1);
+    return captures[0]!;
+  };
+
+  it('3.1: reproduz replay com LLM sem IA local nem fetch e preserva o desfecho ao vivo', async () => {
+    const fixture = await createLiveReplayFixture('llm');
+    vi.mocked(fetch).mockClear();
+    const localAiSpy = vi.spyOn(AiLogic, 'decideAIAction');
+
+    const replay = await playReplay(fixture.replay);
+
+    expect(localAiSpy).not.toHaveBeenCalled();
+    expect(fetch).not.toHaveBeenCalled();
+    expect(replay.p1Action).toMatchObject({ playerNum: 1, type: 'move' });
+    expect(replay.p2Action).toMatchObject({
+      playerNum: 2,
+      type: 'move',
+      shouldTerastallize: true,
+      shouldMegaEvolve: false,
+    });
+    expect(replay.p1Action?.data.name).toBe(fixture.liveP1Action.data.name);
+    expect(replay.p2Action?.data.name).toBe(fixture.liveP2Action.data.name);
+    expect(replay.snapshots.map(withoutLogs)).toEqual(fixture.live.stateSnapshots.map(withoutLogs));
+    expect(withoutLogs(replay.snapshots.at(-1)!)).toEqual(withoutLogs(fixture.live.finalState));
+    expect(replay.snapshots.at(-1)?.prngState).toEqual(fixture.live.finalState.prngState);
+  });
+
+  it('reproduz a decisão da IA local com as mesmas ações, snapshots, cursor e estado final', async () => {
+    const fixture = await createLiveReplayFixture('local');
+    const localAiSpy = vi.spyOn(AiLogic, 'decideAIAction');
+
+    const replay = await playReplay(fixture.replay);
+
+    expect(localAiSpy).not.toHaveBeenCalled();
+    expect(fetch).not.toHaveBeenCalled();
+    expect(replay.p1Action?.data.name).toBe(fixture.liveP1Action.data.name);
+    expect(replay.p2Action?.data.name).toBe(fixture.liveP2Action.data.name);
+    expect(replay.snapshots.map(withoutLogs)).toEqual(fixture.live.stateSnapshots.map(withoutLogs));
+    expect(withoutLogs(replay.snapshots.at(-1)!)).toEqual(withoutLogs(fixture.live.finalState));
+    expect(replay.snapshots.at(-1)?.prngState).toEqual(fixture.live.finalState.prngState);
+  });
+
+  it('rejeita replay antigo sem uma decisão necessária, sem IA, fetch ou ação inventada', async () => {
+    const fixture = await createLiveReplayFixture('local');
+    const localAiSpy = vi.spyOn(AiLogic, 'decideAIAction');
+    const oldReplay: BattleReplay = {
+      ...fixture.replay,
+      events: fixture.replay.events.filter(event => event.actorId === 1),
+    };
+
+    await playReplay(oldReplay, false);
+
+    expect(localAiSpy).not.toHaveBeenCalled();
+    expect(fetch).not.toHaveBeenCalled();
+    expect(captures).toHaveLength(0);
+    const alert = renderer.root.findByProps({ role: 'alert' });
+    expect(alert.children.join('')).toContain('Replay incompatível');
+    expect(alert.children.join('')).toContain('Jogador 2');
+    expect(alert.children.join('')).toContain('turno 1');
+  });
+
+  it('retoma a troca forçada gravada no mesmo generator e reproduz o turno ao vivo', async () => {
+    const attacker = createPokemon({
+      id: 111,
+      name: 'U-turn ao Vivo',
+      hp: 400,
+      maxHP: 400,
+      speedStat: 200,
+      moves: [createMove({
+        name: 'u-turn',
+        displayName: 'U-turn',
+        power: 70,
+        type: 'bug',
+        uses: 10,
+        maxUses: 10,
+        effect: { status: 'switch-self', chance: 100 },
+      })],
+    });
+    const reserve = createPokemon({ id: 112, name: 'Reserva Gravada', hp: 400, maxHP: 400 });
+    const defender = createPokemon({
+      id: 211,
+      name: 'Oponente da Troca',
+      hp: 500,
+      maxHP: 500,
+      speedStat: 100,
+      moves: [createMove({ name: 'opponent-move', power: 50, uses: 12, maxUses: 12 })],
+    });
+    const config = createBattleConfig({ forceAccuracyOutcome: 'hit', fixedRoll: 1 });
+    const initialState = createBattleState([attacker, reserve], [defender], {
+      p1TeraUsed: false,
+      p2TeraUsed: false,
+      p1MegaUsed: false,
+      p2MegaUsed: false,
+    });
+    const p1Action: Action = { type: 'move', data: attacker.moves[0], user: attacker, playerNum: 1, priority: 0 };
+    const p2Action: Action = { type: 'move', data: defender.moves[0], user: defender, playerNum: 2, priority: 0 };
+    const forcedAction: Action = { type: 'switch', data: reserve, user: attacker, playerNum: 1, priority: 6 };
+    const live = runCoordinatorTurn({
+      seed: 3102,
+      initialState,
+      p1Action,
+      p2Action,
+      config,
+      chooseForcedSwitch: () => forcedAction,
+    });
+    const replayData: BattleReplay = {
+      initialState: {
+        team1: structuredClone(initialState.team1),
+        team2: structuredClone(initialState.team2),
+        p1Inventory: structuredClone(initialState.p1Inventory),
+        p2Inventory: structuredClone(initialState.p2Inventory),
+        config: structuredClone(config),
+      },
+      seed: 3102,
+      events: [
+        createBattleReplayEvent({ turn: 1, player: 1, type: 'move', data: attacker.moves[0], user: attacker }),
+        createBattleReplayEvent({ turn: 1, player: 2, type: 'move', data: defender.moves[0], user: defender }),
+        createBattleReplayEvent({ turn: 1, player: 1, type: 'switch', data: reserve, user: attacker, isForcedSwitch: true }),
+      ],
+    };
+
+    const replay = await playReplay(replayData);
+
+    expect(fetch).not.toHaveBeenCalled();
+    expect(replay.snapshots.map(withoutLogs)).toEqual(live.stateSnapshots.map(withoutLogs));
+    expect(replay.snapshots.at(-1)?.prngState).toEqual(live.finalState.prngState);
+    expect(replay.snapshots.at(-1)?.turn).toBe(2);
+    expect(replay.snapshots.at(-1)?.currentPokemon1?.instanceId).toBe(reserve.instanceId);
+  });
+
+  it('aplica troca por desmaio como único evento do turno sem executar outro turno', async () => {
+    const attacker = createPokemon({
+      id: 121,
+      name: 'Atacante do Desmaio',
+      hp: 400,
+      maxHP: 400,
+      attackStat: 400,
+      speedStat: 200,
+      moves: [createMove({ name: 'knockout-move', power: 500, uses: 10, maxUses: 10 })],
+    });
+    const defeated = createPokemon({
+      id: 221,
+      name: 'Titular Desmaiado',
+      hp: 30,
+      maxHP: 30,
+      defenseStat: 1,
+      speedStat: 100,
+      moves: [createMove({ name: 'defeated-move' })],
+    });
+    const reserve = createPokemon({ id: 222, name: 'Reserva Pós-Desmaio', hp: 300, maxHP: 300 });
+    const config = createBattleConfig({ forceAccuracyOutcome: 'hit', fixedRoll: 1 });
+    const initialState = createBattleState([attacker], [defeated, reserve], {
+      p1TeraUsed: false,
+      p2TeraUsed: false,
+      p1MegaUsed: false,
+      p2MegaUsed: false,
+    });
+    const p1Action: Action = { type: 'move', data: attacker.moves[0], user: attacker, playerNum: 1, priority: 0 };
+    const p2Action: Action = { type: 'move', data: defeated.moves[0], user: defeated, playerNum: 2, priority: 0 };
+    const live = runCoordinatorTurn({ seed: 3103, initialState, p1Action, p2Action, config });
+    expect(live.finalState.turn).toBe(2);
+    expect(live.finalState.currentPokemon2?.isFainted).toBe(true);
+    const liveSwitch = BattleEngine.performSwitch(live.finalState, live.finalState.team2[1], 2, config.weatherEnabled);
+    const liveFinal = { ...liveSwitch.newState, waitingForAction: false };
+    const replayData: BattleReplay = {
+      initialState: {
+        team1: structuredClone(initialState.team1),
+        team2: structuredClone(initialState.team2),
+        p1Inventory: structuredClone(initialState.p1Inventory),
+        p2Inventory: structuredClone(initialState.p2Inventory),
+        config: structuredClone(config),
+      },
+      seed: 3103,
+      events: [
+        createBattleReplayEvent({ turn: 1, player: 1, type: 'move', data: attacker.moves[0], user: attacker }),
+        createBattleReplayEvent({ turn: 1, player: 2, type: 'move', data: defeated.moves[0], user: defeated }),
+        createBattleReplayEvent({ turn: 2, player: 2, type: 'switch', data: reserve, user: defeated, isForcedSwitch: true }),
+      ],
+    };
+
+    const firstTurn = await playReplay(replayData);
+    expect(firstTurn.snapshots.map(withoutLogs)).toEqual(live.stateSnapshots.map(withoutLogs));
+
+    captures = [];
+    const switchSpy = vi.spyOn(BattleEngine, 'performSwitch');
+    await clickNext();
+
+    expect(switchSpy).toHaveBeenCalledTimes(1);
+    expect(captures).toHaveLength(0);
+    expect(renderer.root.findAllByProps({ role: 'alert' })).toHaveLength(0);
+    const replayFinal = switchSpy.mock.results[0].value.newState as BattleState;
+    expect(withoutLogs(replayFinal)).toEqual(withoutLogs(liveFinal));
+    expect(replayFinal.turn).toBe(2);
+    expect(replayFinal.currentPokemon2?.instanceId).toBe(reserve.instanceId);
+    expect(replayFinal.prngState).toEqual(liveFinal.prngState);
+    expect(fetch).not.toHaveBeenCalled();
+  });
+
+  it('mantém ReplayPlayer e replayLogic sem chamadas a decisões de IA', () => {
+    for (const path of ['components/ReplayPlayer.tsx', 'services/replayLogic.ts']) {
+      const source = readFileSync(join(process.cwd(), path), 'utf8');
+      expect(source, path).not.toMatch(/\bdecide(?:AI|LLM)Action\b/);
+    }
+  });
+});

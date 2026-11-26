@@ -34,6 +34,7 @@ export const createBattleReplayEvent = ({
   switchId: type === 'switch' ? data?.id : undefined,
   switchInstanceId: type === 'switch' ? data?.instanceId : undefined,
   itemId: type === 'item' ? data?.itemId : undefined,
+  moveName: type === 'item' ? data?.moveName : undefined,
   isGive: type === 'item' ? data?.isGive : undefined,
   shouldTerastallize,
   shouldMegaEvolve,
@@ -73,10 +74,11 @@ export const buildReplayAction = (
   if (event.actionType === 'move') {
     data = user.moves.find(move => move.name === event.moveId);
     if (!data) {
-      // Mantém o fallback para golpes temporários que não pertencem ao set original.
+      if (event.moveId !== 'recharge' && event.moveId !== 'struggle') return null;
+      // Recarga e Debater são decisões temporárias legítimas fora do set original.
       data = {
         name: event.moveId,
-        displayName: event.moveId === 'recharge' ? 'Recarregar' : (event.moveId === 'struggle' ? 'Debater' : event.moveId),
+        displayName: event.moveId === 'recharge' ? 'Recarregar' : 'Debater',
         priority: 0,
         type: 'normal',
         category: 'status',
@@ -98,6 +100,7 @@ export const buildReplayAction = (
       targetId: target.id,
       targetInstanceId: target.instanceId,
       isGive: event.isGive,
+      moveName: event.moveName,
     };
   }
 
@@ -110,4 +113,43 @@ export const buildReplayAction = (
     shouldTerastallize: event.shouldTerastallize,
     shouldMegaEvolve: event.shouldMegaEvolve,
   };
+};
+
+const replayCompatibilityError = (detail: string, turn: number): Error =>
+  new Error(`Replay incompatível: ${detail} no turno ${turn}. A reprodução exige decisões gravadas e não chama IA.`);
+
+export const buildReplayTurnAction = (
+  state: BattleState,
+  event: BattleReplayEvent | undefined,
+  player: 1 | 2,
+  turn: number,
+): Action | undefined => {
+  const active = player === 1 ? state.currentPokemon1 : state.currentPokemon2;
+  if (!active || active.isFainted) return undefined;
+  if (!event) {
+    throw replayCompatibilityError(`decisão do Jogador ${player} ausente`, turn);
+  }
+
+  const action = buildReplayAction(state, event);
+  if (!action) {
+    throw replayCompatibilityError(`decisão gravada do Jogador ${player} inválida`, turn);
+  }
+  return action;
+};
+
+export const buildReplayForcedSwitchAction = (
+  state: BattleState,
+  event: BattleReplayEvent | undefined,
+  player: 1 | 2,
+  turn: number,
+): Action => {
+  if (!event) {
+    throw replayCompatibilityError(`troca forçada do Jogador ${player} ausente`, turn);
+  }
+
+  const action = buildReplayAction(state, event);
+  if (!action || action.type !== 'switch') {
+    throw replayCompatibilityError(`troca forçada gravada do Jogador ${player} inválida`, turn);
+  }
+  return action;
 };

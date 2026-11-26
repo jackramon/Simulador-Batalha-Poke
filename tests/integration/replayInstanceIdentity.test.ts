@@ -28,7 +28,7 @@ describe('identidade de instâncias no replay', () => {
       turn: 2,
       player: 1,
       type: 'item',
-      data: { itemId: 'potion', targetId: 25, targetInstanceId: state.team1[1].instanceId, isGive: false },
+      data: { itemId: 'potion', targetId: 25, targetInstanceId: state.team1[1].instanceId, isGive: false, moveName: 'natural-gift' },
       user: state.currentPokemon1!,
     });
     const opponentEvent = createBattleReplayEvent({
@@ -45,7 +45,7 @@ describe('identidade de instâncias no replay', () => {
       switchId: 25,
       switchInstanceId: 'p1-slot-1',
     });
-    expect(itemEvent).toMatchObject({ targetId: 25, targetInstanceId: 'p1-slot-1' });
+    expect(itemEvent).toMatchObject({ targetId: 25, targetInstanceId: 'p1-slot-1', moveName: 'natural-gift' });
     expect(opponentEvent).toMatchObject({ actorId: 2, actorInstanceId: 'p2-slot-0' });
     expect(randomSpy).not.toHaveBeenCalled();
 
@@ -56,6 +56,7 @@ describe('identidade de instâncias no replay', () => {
     expect(switchAction?.user).toBe(state.currentPokemon1);
     expect(switchAction?.data).toBe(state.team1[1]);
     expect(itemAction?.data.targetInstanceId).toBe('p1-slot-1');
+    expect(itemAction?.data.moveName).toBe('natural-gift');
     expect(opponentAction?.user).toBe(state.currentPokemon2);
     expect(opponentAction?.playerNum).toBe(2);
 
@@ -112,6 +113,20 @@ describe('identidade de instâncias no replay', () => {
 
     expect(buildReplayAction(ambiguousState, ambiguousEvent)).toBeNull();
     expect(resolveReplaySwitchTarget(ambiguousState, ambiguousEvent)).toBeUndefined();
+  });
+
+  it('não inventa um golpe ausente do conjunto e preserva somente as ações temporárias conhecidas', () => {
+    const state = createBattleState([createPokemon({ id: 1 })], [createPokemon({ id: 2 })]);
+    const event: BattleReplayEvent = {
+      turn: 1,
+      actorId: 1,
+      actionType: 'move',
+      moveId: 'golpe-que-não-existe-no-conjunto',
+    };
+
+    expect(buildReplayAction(state, event)).toBeNull();
+    expect(buildReplayAction(state, { ...event, moveId: 'recharge' })?.data.name).toBe('recharge');
+    expect(buildReplayAction(state, { ...event, moveId: 'struggle' })?.data.name).toBe('struggle');
   });
 
   it('normaliza replay antigo uma única vez e preserva os IDs em novas leituras', () => {
