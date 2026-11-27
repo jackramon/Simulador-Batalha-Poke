@@ -176,6 +176,13 @@
   - Validação: 3 arquivos focados e 20 testes; suíte completa com 54 arquivos, 252 aprovados e 2 `it.todo` antigos (254 registrados); `npm run lint`, `npm run build` e `git diff --check` aprovados.
   - Smoke no bundle de produção: arquivo anexado reproduzido 10/10 turnos no player real, sem alerta nem aviso; replay novo 3.2.2 gravado ao vivo (6 turnos, com desmaios e trocas) importado e reproduzido 6/6 sem divergência.
   - Próximo item: 3.3. Commit: informado no resumo final após o push verificado em `origin/main`.
+- [x] **Hotfix prioritário antes de 3.3 — Verificação de checkpoint no estado anterior às trocas pós-desmaio (3.2.3).**
+  - Causa comprovada com o arquivo anexado (seed 533665): no turno 22 o checkpoint gravado (`c816f7ae`, cursor 152) é o passo `faint-switch`, **antes** das trocas externas pós-desmaio, com Porygon2 já substituído por Raio Furioso e Chi-Yu desmaiado. O player executava `performSwitch` e validava o estado já com Groudon Primitivo (`92338112`), rejeitando um replay íntegro; PRNG e demais turnos conferiam.
+  - `playNextTurn` guarda um snapshot (`structuredClone`) do passo `faint-switch` antes de qualquer troca e o usa em `assertReplayCheckpoint`; sem esse passo, continua validando `stateRef.current`. O estado de continuação mantém os substitutos, e coordinator, PRNG, gravação, regras e política de compatibilidade não foram alterados (`REPLAY_ENGINE_REVISION` segue `3.2.2`; nenhum hash ou formato mudou).
+  - Cobertura: fixture real até o turno 29 com hash e `prngState` de todos os checkpoints, desmaio dos dois lados no mesmo turno com dois `performSwitch`, continuação nos turnos seguintes, cópia com ação adulterada ainda rejeitada e troca pós-desmaio isolada preservada pelo teste existente do player. RED sem o snapshot: falha no turno 22 com `c816f7ae` × `92338112` e no turno 1 do desmaio simultâneo.
+  - Validação: 6 arquivos focados e 41 testes; suíte completa com 55 arquivos, 255 aprovados e 2 `it.todo` antigos (257 registrados); `npm run lint`, `npm run build` e `git diff --check` aprovados, sem novos todos.
+  - Smoke no bundle de produção (`NODE_ENV=production`, porta 38131): fixture real reproduzida até `Turno: 29 / 29` sem alerta nem aviso, troca de Chi-Yu por Groudon Primitivo no turno 22 e turno 23 iniciando com o substituto; zero chamadas de rede, zero erros de console e porta liberada.
+  - Próximo item: 3.3. Commit: informado no resumo final após o push verificado em `origin/main`.
 - [ ] **3.3 — Preservar a identidade entre Pokémon ativo e entrada correspondente da equipe.**
 - [ ] **3.4 — Parametrizar a IA pelo lado controlado e corrigir sua avaliação.**
   - Dependência de 2.5: adaptar a avaliação para consumir os `newState`/snapshots transacionais; a caracterização de 1.5 passou a fixar legalidade e determinismo, não a escolha do golpe de maior poder.
@@ -192,7 +199,7 @@
 
 ## Registro resumido da baseline
 
-- Última suíte integral informada: **54 arquivos, 252 testes aprovados e 2 `it.todo`** (254 registrados); os todos são lacunas de 3.3/3.4 e não contam como cobertura aprovada.
+- Última suíte integral informada: **55 arquivos, 255 testes aprovados e 2 `it.todo`** (257 registrados); os todos são lacunas de 3.3/3.4 e não contam como cobertura aprovada.
 - `npm run lint`, `npm run build` e `git diff --check`: aprovados.
 - Auditoria do item 0.5: **17 → 0** ocorrências no total e **6 → 0** em produção; instalação por `npm ci` reproduzida sem alterações nos manifestos.
 - SHA dos itens 1.1 a 1.7 e dos itens 2.1/2.2/2.3/2.4/2.5 informados somente nos respectivos resumos finais após o push; último SHA registrado no roadmap: `baae8a606c37495f30810e2c646dbb234c75ac86` (item 0.4).

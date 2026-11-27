@@ -207,6 +207,7 @@ export default function ReplayPlayer({ onClose }: ReplayPlayerProps) {
                     replayData.initialState.config
                 );
 
+                let verificationState: BattleState | null = null;
                 let result = generator.next();
                 while (!result.done) {
                     const step = result.value;
@@ -224,6 +225,9 @@ export default function ReplayPlayer({ onClose }: ReplayPlayerProps) {
                     }
 
                     if (step.phase === 'faint-switch') {
+                        // O checkpoint é gravado antes das trocas externas pós-desmaio.
+                        // O estado vivo segue recebendo os substitutos para os próximos turnos.
+                        verificationState = structuredClone(step.state);
                         ([1, 2] as const).forEach(playerNum => {
                             const active = playerNum === 1 ? stateRef.current!.currentPokemon1 : stateRef.current!.currentPokemon2;
                             if (active?.isFainted) {
@@ -243,7 +247,7 @@ export default function ReplayPlayer({ onClose }: ReplayPlayerProps) {
                 }
 
                 // Só um turno efetivamente concluído pelo coordinator possui checkpoint.
-                addWarning(assertReplayCheckpoint(replayData, currentTurnNum, stateRef.current!, stateBeforeTurn));
+                addWarning(assertReplayCheckpoint(replayData, currentTurnNum, verificationState ?? stateRef.current!, stateBeforeTurn));
             }
 
             setStateHistory(prev => [...prev, stateRef.current!]);
