@@ -10,7 +10,7 @@ import { calculateTypeEffectiveness } from '../services/battleUtils';
 import { TurnAnimator } from '../services/animation/turnAnimator';
 import { removerItem } from '../utils/safeStorage';
 import { isPokemonOnTeam, resolvePokemonTarget } from '../utils/pokemonIdentity';
-import { appendReplayCheckpoint, createBattleReplayEvent } from '../services/replayLogic';
+import { appendReplayCheckpointSnapshot, createBattleReplayEvent, createReplayCheckpoint } from '../services/replayLogic';
 import { BattleSession, type TurnResolutionToken } from '../services/battleSession';
 
 interface TurnManagerProps {
@@ -104,10 +104,13 @@ export const useTurnManager = ({
     const recordCompletedTurn = (turn: number, completedState: BattleState, resolution: TurnResolutionToken) => {
         const sessionId = resolution.sessionId;
         if (!battleSession.isCurrent(sessionId) || !battleSession.canCommitResolution(resolution)) return;
+        // Snapshot imutável calculado no instante da conclusão: nenhuma alteração
+        // posterior do estado pode mudar o hash gravado no checkpoint.
+        const checkpoint = createReplayCheckpoint(turn, completedState);
         setCurrentReplay(prev => {
             // O updater pode executar após finishResolution/terminate; a sessão ainda impede escrita cruzada.
             if (!prev || !battleSession.ownsSnapshot(sessionId)) return prev;
-            return appendReplayCheckpoint(prev, turn, completedState);
+            return appendReplayCheckpointSnapshot(prev, checkpoint);
         });
     };
 

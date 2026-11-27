@@ -3,8 +3,13 @@ import { normalizeBattleTeams, resolvePokemonTarget } from '../utils/pokemonIden
 import { createBattlePRNGState } from '../utils/prng';
 
 export const REPLAY_FORMAT_VERSION = 1;
-export const REPLAY_ENGINE_REVISION = '3.2.1';
+export const REPLAY_ENGINE_REVISION = '3.2.2';
 export const LEGACY_REPLAY_WARNING = 'Replay legado: arquivo sem checkpoints; a reprodução continuará sem verificação de integridade.';
+// Revisões que gravavam o checkpoint dentro do updater React, com hash sobre um estado
+// possivelmente alterado depois da conclusão do turno: não têm integridade confiável.
+const UNSTABLE_CHECKPOINT_REVISIONS = new Set(['3.2.0', '3.2.1']);
+export const unstableCheckpointWarning = (turn: number, revision: string): string =>
+  `Aviso de compatibilidade: o checkpoint do turno ${turn} gravado na revisão ${revision} não tem integridade confiável (hash divergente, PRNG coincidente). A reprodução continua, mas regrave a batalha na revisão ${REPLAY_ENGINE_REVISION} para obter checkpoints verificáveis.`;
 
 interface ParsedBattleReplay {
   replay: BattleReplay;
@@ -35,6 +40,18 @@ const canonicalPokemon = (pokemon: Pokemon | null): unknown => {
     isShiny: _isShiny,
     ...mechanicalData
   } = pokemon;
+  // O PP do pool é derivado de `moves`: em memória o mesmo objeto de golpe pode estar
+  // compartilhado entre `moves` e `movePool` (o motor decrementa só o golpe usado) e o
+  // JSON do replay perde esse alias. Derivar de `moves` mantém o hash independente da
+  // representação e idêntico entre a batalha ao vivo e a reprodução.
+  const usableUses = new Map<string, number>();
+  pokemon.moves?.forEach(move => { usableUses.set(move.name, move.uses); });
+  const canonicalPool = pokemon.movePool?.map(move => {
+    if (!move) return move;
+    const uses = usableUses.get(move.name);
+    const { displayName: _poolDisplayName, description: _poolDescription, ...poolMove } = move;
+    return uses === undefined ? poolMove : { ...poolMove, uses };
+  });
   const megaProfile = pokemon.megaProfile ? (() => {
     const {
       name: _megaName,
@@ -51,7 +68,7 @@ const canonicalPokemon = (pokemon: Pokemon | null): unknown => {
   return {
     ...mechanicalData,
     moves: pokemon.moves.map(canonicalMove),
-    movePool: pokemon.movePool?.map(canonicalMove),
+    movePool: canonicalPool,
     lastMoveUsed: canonicalMove(pokemon.lastMoveUsed),
     selectedMove: canonicalMove(pokemon.selectedMove),
     megaProfile,
@@ -127,12 +144,15 @@ export const createReplayCheckpoint = (turn: number, state: BattleState): Battle
   const megaProfiles = Object.fromEntries([...state.team1, ...state.team2]
     .filter(pokemon => pokemon.instanceId && pokemon.megaProfile)
     .map(pokemon => [pokemon.instanceId!, structuredClone(pokemon.megaProfile!)]));
-  return {
+  // Hash calculado de forma síncrona e resultado congelado: o checkpoint é um
+  // snapshot imutável e nenhuma alteração posterior do estado muda o que foi gravado.
+  const checkpoint: BattleReplayCheckpoint = {
     turn,
-    prngState: replayPrngState(state),
+    prngState: Object.freeze(replayPrngState(state)),
     stateHash: hashBattleReplayState(state),
-    ...(Object.keys(megaProfiles).length > 0 ? { megaProfiles } : {}),
+    ...(Object.keys(megaProfiles).length > 0 ? { megaProfiles: Object.freeze(megaProfiles) } : {}),
   };
+  return Object.freeze(checkpoint);
 };
 
 export const applyReplayCheckpointMegaProfiles = (
@@ -176,10 +196,16 @@ export const appendReplayCheckpoint = (
   replay: BattleReplay,
   turn: number,
   state: BattleState,
+): BattleReplay => appendReplayCheckpointSnapshot(replay, createReplayCheckpoint(turn, state));
+
+// Anexa um checkpoint JÁ calculado (e imutável). É o único caminho usado pelo
+// updater React: ele nunca recalcula hash e nunca lê o estado vivo.
+export const appendReplayCheckpointSnapshot = (
+  replay: BattleReplay,
+  checkpoint: BattleReplayCheckpoint,
 ): BattleReplay => {
   if (replay.formatVersion !== REPLAY_FORMAT_VERSION) return replay;
-  const checkpoint = createReplayCheckpoint(turn, state);
-  const checkpoints = [...(replay.checkpoints ?? []).filter(entry => entry.turn !== turn), checkpoint]
+  const checkpoints = [...(replay.checkpoints ?? []).filter(entry => entry.turn !== checkpoint.turn), checkpoint]
     .sort((left, right) => left.turn - right.turn);
   return { ...replay, checkpoints };
 };
@@ -228,8 +254,8 @@ export const assertReplayCheckpoint = (
   turn: number,
   state: BattleState,
   stateBeforeTurn?: BattleState,
-): void => {
-  if (replay.formatVersion === undefined) return;
+): string | null => {
+  if (replay.formatVersion === undefined) return null;
   if (replay.formatVersion !== REPLAY_FORMAT_VERSION) {
     throw new Error(`Versão de replay ${replay.formatVersion} não suportada.`);
   }
@@ -240,6 +266,11 @@ export const assertReplayCheckpoint = (
     || expected.prngState.state !== actual.prngState.state
     || expected.prngState.cursor !== actual.prngState.cursor;
   if (expected.stateHash !== actual.stateHash || prngDiverged) {
+    // Política de compatibilidade explícita para revisões que gravaram o hash dentro do
+    // updater React: PRNG divergente = rejeição; apenas hash instável = aviso visível.
+    if (!prngDiverged && UNSTABLE_CHECKPOINT_REVISIONS.has(replay.engineRevision)) {
+      return unstableCheckpointWarning(turn, replay.engineRevision);
+    }
     if (replay.engineRevision === '3.2.0' && stateBeforeTurn) {
       const premature = createReplayCheckpoint(turn, stateBeforeTurn);
       const matchesPrematurePrng = expected.prngState.seed === premature.prngState.seed
@@ -254,6 +285,7 @@ export const assertReplayCheckpoint = (
       : '';
     throw new Error(`Divergência de replay no turno ${turn}: hash esperado ${expected.stateHash}, hash obtido ${actual.stateHash}.${prngDetail} Reprodução interrompida.`);
   }
+  return null;
 };
 
 interface CreateReplayEventOptions {

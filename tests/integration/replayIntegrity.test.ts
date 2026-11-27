@@ -195,11 +195,16 @@ describe('integridade e versionamento do replay', () => {
 
     const changed = structuredClone(live.finalState);
     changed.team1[0].hp -= 1;
-    expect(() => assertReplayCheckpoint(
+    // Política 3.2.2: hash instável com PRNG coincidente em revisões antigas gera aviso
+    // visível, não rejeição; arquivos novos (revisão atual) continuam sendo rejeitados.
+    const warning = assertReplayCheckpoint(
       { ...replay, engineRevision: '3.2.0' },
       1,
       changed,
       initialState,
-    )).toThrow('Divergência de replay no turno 1');
+    );
+    expect(warning).toContain('não tem integridade confiável');
+    expect(() => assertReplayCheckpoint(replay, 1, changed, initialState))
+      .toThrow('Divergência de replay no turno 1');
   });
 });

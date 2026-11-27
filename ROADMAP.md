@@ -168,6 +168,14 @@
   - RED→GREEN cobriu draws por sessão/resolução/ação, troca+`aerodactylite`, turno seguinte, cursores em todos os checkpoints, hidratação tardia, U-turn, desmaio, terminal, cópia corrompida, seed adulterada e compatibilidade. Validação: 3 arquivos focados e 25 testes aprovados; suíte completa com 52 arquivos, 239 aprovados e 2 `it.todo` antigos (241 registrados); `npm run lint`, `npm run build` e `git diff --check` aprovados, sem novos todos.
   - Smoke real no bundle: batalha de dois turnos com troca+`aerodactylite` e terminal; exportação 3.2.1 com seed 336430, cursores 0/4/10 e perfil Mega somente nos checkpoints 1/2; replay até 2/2 com rótulo do turno 1; cópia com item alterada rejeitada no turno 1; zero requests durante replay, zero erros de console e porta liberada. A hidratação ao vivo fez somente a chamada esperada a `aerodactyl-mega`.
   - Próximo item: 3.3. Commit: informado no resumo final após o push verificado em `origin/main`.
+- [x] **Hotfix prioritário antes de 3.3 — Checkpoint imutável e hash independente do alias `moves`/`movePool` (3.2.2).**
+  - Causa comprovada com o arquivo anexado (seed 662638): `hashBattleReplayState` dependia do alias de objetos entre `moves` e `movePool`. Em memória a fábrica compartilha o mesmo objeto de golpe; o motor decrementa o PP do objeto usado, então o pool acompanhava o decremento ao vivo, mas o JSON do replay perde o alias e mantém o PP antigo. O turno 1 (troca + item, sem golpe) coincidia; do turno 2 em diante o hash gravado (`bf73055b` no turno 2) deixava de corresponder a qualquer fase do turno.
+  - Correção: o PP do `movePool` é derivado do golpe de mesmo nome em `moves` (fonte única do PP utilizável), tornando o hash independente da representação. `recordCompletedTurn` passou a calcular o checkpoint de forma síncrona na conclusão (objeto congelado) e o updater React apenas anexa por `appendReplayCheckpointSnapshot`, sem recalcular hash nem ler o estado vivo.
+  - `REPLAY_ENGINE_REVISION = '3.2.2'`; `formatVersion = 1` preservado porque o formato do arquivo não mudou. Política de compatibilidade: 3.2.0/3.2.1 com PRNG divergente é rejeitada; com PRNG coincidente e apenas hash instável a reprodução continua com aviso visível de integridade não confiável (risco residual documentado); arquivos 3.2.2 permanecem estritos.
+  - Prova e cobertura: o arquivo anexado reproduz os 10 turnos com todos os hashes conferindo, cursores `0/5/12/25/31/37/44/50/59/65/71` e zero avisos. RED→GREEN cobriu o alias (falha na canonicalização antiga) e o checkpoint tardio (falha com o hash dentro do updater), além de seed e ação adulteradas, política por revisão e imutabilidade do checkpoint.
+  - Validação: 3 arquivos focados e 20 testes; suíte completa com 54 arquivos, 252 aprovados e 2 `it.todo` antigos (254 registrados); `npm run lint`, `npm run build` e `git diff --check` aprovados.
+  - Smoke no bundle de produção: arquivo anexado reproduzido 10/10 turnos no player real, sem alerta nem aviso; replay novo 3.2.2 gravado ao vivo (6 turnos, com desmaios e trocas) importado e reproduzido 6/6 sem divergência.
+  - Próximo item: 3.3. Commit: informado no resumo final após o push verificado em `origin/main`.
 - [ ] **3.3 — Preservar a identidade entre Pokémon ativo e entrada correspondente da equipe.**
 - [ ] **3.4 — Parametrizar a IA pelo lado controlado e corrigir sua avaliação.**
   - Dependência de 2.5: adaptar a avaliação para consumir os `newState`/snapshots transacionais; a caracterização de 1.5 passou a fixar legalidade e determinismo, não a escolha do golpe de maior poder.
@@ -184,7 +192,7 @@
 
 ## Registro resumido da baseline
 
-- Última suíte integral informada: **52 arquivos, 239 testes aprovados e 2 `it.todo`** (241 registrados); os todos são lacunas de 3.3/3.4 e não contam como cobertura aprovada.
+- Última suíte integral informada: **54 arquivos, 252 testes aprovados e 2 `it.todo`** (254 registrados); os todos são lacunas de 3.3/3.4 e não contam como cobertura aprovada.
 - `npm run lint`, `npm run build` e `git diff --check`: aprovados.
 - Auditoria do item 0.5: **17 → 0** ocorrências no total e **6 → 0** em produção; instalação por `npm ci` reproduzida sem alterações nos manifestos.
 - SHA dos itens 1.1 a 1.7 e dos itens 2.1/2.2/2.3/2.4/2.5 informados somente nos respectivos resumos finais após o push; último SHA registrado no roadmap: `baae8a606c37495f30810e2c646dbb234c75ac86` (item 0.4).

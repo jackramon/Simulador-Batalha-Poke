@@ -51,6 +51,15 @@ export default function ReplayPlayer({ onClose }: ReplayPlayerProps) {
     // FIX #4 — eventos do turno ATUAL para exibir ações dos jogadores
     const [currentTurnEvents, setCurrentTurnEvents] = useState<BattleReplayEvent[]>([]);
 
+    // Avisos acumulados de compatibilidade (legado + checkpoints antigos sem integridade)
+    const warningsRef = useRef<string[]>([]);
+    const legacyWarningRef = useRef('');
+    const addWarning = useCallback((warning: string | null) => {
+        if (!warning || warningsRef.current.includes(warning)) return;
+        warningsRef.current = [...warningsRef.current, warning];
+        setCompatibilityWarning(warningsRef.current.join(' '));
+    }, []);
+
     const stateRef        = useRef<BattleState | null>(null);
     const isAnimatingRef  = useRef(false);
     const logContainerRef = useRef<HTMLDivElement>(null);
@@ -74,13 +83,15 @@ export default function ReplayPlayer({ onClose }: ReplayPlayerProps) {
         try {
             const text = await file.text();
             const parsed = parseBattleReplay(JSON.parse(text));
+            legacyWarningRef.current = parsed.warning;
             setReplayData(parsed.replay);
-            setCompatibilityWarning(parsed.warning);
             resetReplay(parsed.replay);
             setError('');
         } catch (err: any) {
             setReplayData(null);
             setCompatibilityWarning('');
+            warningsRef.current = [];
+            legacyWarningRef.current = '';
             setError(err.message || 'Erro ao carregar replay.');
         }
     };
@@ -121,7 +132,9 @@ export default function ReplayPlayer({ onClose }: ReplayPlayerProps) {
 
         // O checkpoint inicial antecede os efeitos de entrada, como na batalha ao vivo.
         applyReplayCheckpointMegaProfiles(data, 0, initialState);
-        assertReplayCheckpoint(data, 0, initialState);
+        warningsRef.current = legacyWarningRef.current ? [legacyWarningRef.current] : [];
+        setCompatibilityWarning(warningsRef.current.join(' '));
+        addWarning(assertReplayCheckpoint(data, 0, initialState));
 
         const entryLogs: any[] = [];
         Effects.handleEntryAbilities(initialState.currentPokemon1, initialState.currentPokemon2, data.initialState.config?.weatherEnabled ?? true, entryLogs, initialState);
@@ -230,7 +243,7 @@ export default function ReplayPlayer({ onClose }: ReplayPlayerProps) {
                 }
 
                 // Só um turno efetivamente concluído pelo coordinator possui checkpoint.
-                assertReplayCheckpoint(replayData, currentTurnNum, stateRef.current!, stateBeforeTurn);
+                addWarning(assertReplayCheckpoint(replayData, currentTurnNum, stateRef.current!, stateBeforeTurn));
             }
 
             setStateHistory(prev => [...prev, stateRef.current!]);
