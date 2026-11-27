@@ -8,7 +8,7 @@
 - Mantenha `PROJECT_CONTEXT.md` atualizado a cada alteração.
 - Para economizar tokens: inspecione somente os arquivos da tarefa e suas dependências diretas, reutilize a baseline registrada, use testes focados durante a iteração e rode a suíte completa na validação final. Não refaça auditorias globais já concluídas.
 
-**Próximo item:** 3.4 — Parametrizar a IA pelo lado controlado e corrigir sua avaliação.
+**Próximo item:** 3.5 — Fazer a simulação usar o mesmo coordenador, configuração e regras da batalha real.
 
 ## Etapa 0 — Restaurar uma baseline confiável
 
@@ -192,8 +192,14 @@
   - Validação: 9 arquivos focados e 58 testes; suíte completa com 56 arquivos, 262 aprovados e 1 `it.todo` de 3.4 (263 registrados); `npm run lint`, `npm run build` e `git diff --check` aprovados. Um timeout de 5 s em `replayFixtureCompatibility` sob carga passou isolado (10/10) e a repetição integral ficou verde.
   - Smoke no bundle de produção (`NODE_ENV=production`, porta 38233): fixture real 3.2.2 (seed 533665) reproduzida até `Turno: 29 / 29` com os 29 checkpoints conferindo, dano, trocas e desmaios no log (turno 29 com Mismagius × Groudon Primitivo), zero `[role=alert]`, zero `[role=status]`, zero requisições (inclusive `/api/`) e zero erros de console; porta liberada.
   - Próximo item: 3.4. Commit: informado no resumo final após o push verificado em `origin/main`.
-- [ ] **3.4 — Parametrizar a IA pelo lado controlado e corrigir sua avaliação.**
-  - Dependência de 2.5: adaptar a avaliação para consumir os `newState`/snapshots transacionais; a caracterização de 1.5 passou a fixar legalidade e determinismo, não a escolha do golpe de maior poder.
+- [x] **3.4 — Parametrizar a IA pelo lado controlado e corrigir sua avaliação.**
+  - `decideAIAction` recebeu `botPlayerNum: 1 | 2 = 2` como último parâmetro: P1 passa `1` pelo chamador real (`triggerP1AI` em `useTurnManager`) e as chamadas existentes continuam recebendo `2`. Equipe, ativo, adversário percebido, itens, pivô defensivo, troca proativa, ações legais e o `playerNum` de toda ação retornada seguem o lado controlado; `getBestItemAction`, `getLegalActions` e `getLegacyBestMove` deixaram de fixar P2.
+  - `evaluateGameState` passou a ser exportada e recebe o lado do bot, devolvendo HP/estado do bot menos HP/estado do oponente; o adversário percebido é posicionado no lado oposto, nunca pela posição do objeto.
+  - Duas causas comprovadas de simulação inútil: (a) `simulateTurn` descartava os `newState` de `executeMove`/`performSwitch`/`processTurnEnd`, que trabalham em drafts, e avaliava o estado não alterado; agora encadeia os estados retornados e resolve atacante/alvo pelo lado no estado corrente, sem atingir o próprio lado; (b) `fixedRoll: 0.925` está na escala percentual do motor (85 a 100), de modo que todo dano simulado era 1 PV — corrigido em `SIMULATION_DAMAGE_ROLL = 92.5`.
+  - O `it.todo` de 3.4 virou `tests/integration/aiControlledSide.test.ts` com 10 testes: P1 com `playerNum 1` e alvo adversário sem dano próprio, P2 compatível pela assinatura padrão, avaliação positiva/negativa pelos dois lados, espelho coerente, golpe forte preferido ao fraco, consumo do estado retornado sem mutar o estado real, mesma espécie resolvida por `instanceId` com reserva disponível, determinismo com cursor real intacto, Tera/Mega exclusivos e PP legal.
+  - Validação: foco com 5 arquivos e 38 testes; suíte completa com 57 arquivos, 272 testes aprovados e **0 `it.todo`**; `npm run lint`, `npm run build` e `git diff --check` aprovados.
+  - Smoke no bundle de produção (`NODE_ENV=production`, porta 38391): P1 IA contra P2 manual usou Corpo a Corpo com Tera e causou 202 de dano no adversário (202→0), com P1 em 169/169; segunda batalha com IA dos dois lados mostrou Golpe na Garganta de P1 baixando somente o P2 (174→67) e o contra-ataque baixando somente P1, sem erros de console, sem `role=alert`/`role=status` e sem chamadas `/api/`; porta liberada.
+  - Próximo item: 3.5. Commit: informado no resumo final após o push verificado em `origin/main`.
 - [ ] **3.5 — Fazer a simulação usar o mesmo coordenador, configuração e regras da batalha real.**
 
 ## Etapa 4 — Endurecimento e expansão
@@ -207,7 +213,7 @@
 
 ## Registro resumido da baseline
 
-- Última suíte integral informada: **56 arquivos, 262 testes aprovados e 1 `it.todo`** (263 registrados); o todo restante é a lacuna de 3.4 e não conta como cobertura aprovada.
+- Última suíte integral informada: **57 arquivos, 272 testes aprovados e 0 `it.todo`**; a lacuna de 3.4 foi convertida e nenhum todo permanece.
 - `npm run lint`, `npm run build` e `git diff --check`: aprovados.
 - Auditoria do item 0.5: **17 → 0** ocorrências no total e **6 → 0** em produção; instalação por `npm ci` reproduzida sem alterações nos manifestos.
 - SHA dos itens 1.1 a 1.7 e dos itens 2.1/2.2/2.3/2.4/2.5 informados somente nos respectivos resumos finais após o push; último SHA registrado no roadmap: `baae8a606c37495f30810e2c646dbb234c75ac86` (item 0.4).

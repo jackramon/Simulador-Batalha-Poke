@@ -8,7 +8,7 @@ import * as Psyshock from './engine/handlers/moves/psyshock';
 import * as TerrainPulse from './engine/handlers/moves/terrainPulse';
 import * as Comatose from './engine/handlers/abilities/comatose';
 import * as LastResort from './engine/handlers/moves/lastResort';
-import { getPokemonPlayerNum, isPokemonOnTeam, isSamePokemonInstance, resolvePokemonTarget } from '../utils/pokemonIdentity';
+import { getPokemonPlayerNum, isSamePokemonInstance, resolvePokemonTarget } from '../utils/pokemonIdentity';
 
 // --- IMPORTS DO MOTOR (Para Simulação) ---
 import { executeMove } from './engine/moves';
@@ -20,6 +20,8 @@ import { BattlePRNG } from '../utils/prng';
 // --- CONFIGURAÇÃO DA IA ---
 const SIMULATION_DEPTH = 1; // 1 Turno completo
 const MAX_OPPONENT_ACTIONS = 3; // Considera apenas os 3 melhores movimentos do oponente para performance
+// Rolagem de dano fixa da simulação, na mesma escala percentual usada pelo motor (85 a 100).
+const SIMULATION_DAMAGE_ROLL = 92.5;
 
 // Configuração Mock para a simulação (assume regras padrão)
 const SIMULATION_CONFIG: BattleConfig = {
@@ -222,15 +224,13 @@ function getBestItemAction(
     user: Pokemon,
     team: Pokemon[],
     opponent: Pokemon,
-    state?: BattleState
+    state: BattleState | undefined,
+    playerNum: 1 | 2
 ): ScoredItemAction | null {
     if (!inventory || !inventory.items || inventory.items.length === 0) return null;
 
     let bestAction: ScoredItemAction | null = null;
     let maxScore = -Infinity;
-
-    // Definição de Player Num (Assumindo que user é da IA -> P2)
-    const playerNum = 2; 
 
     inventory.items.forEach(bagItem => {
         const itemData = ITEMS_DATA[bagItem.id];
@@ -468,10 +468,12 @@ function cloneBattleState(state: BattleState): BattleState {
     return structuredClone(state);
 }
 
-function evaluateGameState(state: BattleState): number {
+// A avaliação é sempre relativa ao lado controlado pelo bot:
+// HP/estado do bot menos HP/estado do oponente.
+export function evaluateGameState(state: BattleState, botPlayerNum: 1 | 2 = 2): number {
     let score = 0;
 
-    const evaluateTeam = (team: Pokemon[], active: Pokemon | null, isBot: boolean) => {
+    const evaluateTeam = (team: Pokemon[], active: Pokemon | null) => {
         let teamScore = 0;
         
         team.forEach(p => {
@@ -496,8 +498,12 @@ function evaluateGameState(state: BattleState): number {
         return teamScore;
     };
 
-    const botScore = evaluateTeam(state.team2, state.currentPokemon2, true);
-    const oppScore = evaluateTeam(state.team1, state.currentPokemon1, false);
+    const botScore = botPlayerNum === 1
+        ? evaluateTeam(state.team1, state.currentPokemon1)
+        : evaluateTeam(state.team2, state.currentPokemon2);
+    const oppScore = botPlayerNum === 1
+        ? evaluateTeam(state.team2, state.currentPokemon2)
+        : evaluateTeam(state.team1, state.currentPokemon1);
 
     return botScore - oppScore;
 }
@@ -573,7 +579,7 @@ function rehydrateActionForSimulation(originalAction: Action, simulationState: B
 }
 
 function simulateTurn(initialState: BattleState, botAction: Action, oppAction: Action, botConfigOverride?: Partial<BattleConfig>): BattleState {
-    const state = cloneBattleState(initialState);
+    let state = cloneBattleState(initialState);
     const prng = BattlePRNG.fromBattleState(initialState).fork();
     prng.attachTo(state);
     const logs: LogEntry[] = []; 
@@ -586,7 +592,9 @@ function simulateTurn(initialState: BattleState, botAction: Action, oppAction: A
     const actions = getSortedActions([simBotAction, simOppAction], state, prng);
 
     for (const action of actions) {
-        const userRef = action.user; 
+        // Atacante e alvo são resolvidos pelo lado da ação no estado corrente da simulação,
+        // de modo que o bot sempre atinge o adversário e nunca o próprio lado.
+        const userRef = action.playerNum === 1 ? state.currentPokemon1 : state.currentPokemon2;
         const targetRef = action.playerNum === 1 ? state.currentPokemon2 : state.currentPokemon1;
 
         if (!userRef || userRef.isFainted) continue;
@@ -596,10 +604,12 @@ function simulateTurn(initialState: BattleState, botAction: Action, oppAction: A
             currentConfig = { ...SIMULATION_CONFIG, ...botConfigOverride };
         }
 
+        // Cada etapa devolve um novo estado transacional; a simulação precisa consumi-lo
+        // para avaliar o resultado real produzido pelo golpe, pela troca e pelo fim de turno.
         if (action.type === 'switch') {
-            performSwitch(state, action.data, action.playerNum, currentConfig.weatherEnabled, false, prng);
-        } else if (action.type === 'move' && targetRef) {
-            executeMove(
+            state = performSwitch(state, action.data, action.playerNum, currentConfig.weatherEnabled, false, prng).newState;
+        } else if (action.type === 'move' && targetRef && !targetRef.isFainted) {
+            state = executeMove(
                 state, 
                 userRef, 
                 targetRef, 
@@ -611,11 +621,11 @@ function simulateTurn(initialState: BattleState, botAction: Action, oppAction: A
                 false,
                 action.shouldMegaEvolve,
                 prng
-            );
+            ).newState;
         }
     }
 
-    processTurnEnd(state, SIMULATION_CONFIG, prng);
+    state = processTurnEnd(state, SIMULATION_CONFIG, prng).newState;
     return state;
 }
 
@@ -701,17 +711,18 @@ export function decideAIAction(
     teraUsed: boolean = false, 
     state?: BattleState,
     megaEvolutionEnabled: boolean = false,
-    megaUsed: boolean = false
+    megaUsed: boolean = false,
+    botPlayerNum: 1 | 2 = 2
 ): Action {
     if (!state) {
-        return getLegacyBestMove(aiPokemon, opponentPokemon, weather, state);
+        return getLegacyBestMove(aiPokemon, opponentPokemon, weather, state, botPlayerNum);
     }
 
     // Se o Pokémon estiver carregando um movimento, ele DEVE usar esse movimento.
     if (aiPokemon.chargingMove) {
         const move = aiPokemon.moves.find(m => m.name === aiPokemon.chargingMove);
         if (move) {
-            return { type: 'move', data: move, user: aiPokemon, playerNum: 2, priority: move.priority };
+            return { type: 'move', data: move, user: aiPokemon, playerNum: botPlayerNum, priority: move.priority };
         }
     }
 
@@ -719,44 +730,36 @@ export function decideAIAction(
     if (aiPokemon.lockedMove) {
         const move = aiPokemon.moves.find(m => m.name === aiPokemon.lockedMove);
         if (move) {
-            return { type: 'move', data: move, user: aiPokemon, playerNum: 2, priority: move.priority };
+            return { type: 'move', data: move, user: aiPokemon, playerNum: botPlayerNum, priority: move.priority };
         } else {
-            return { type: 'move', data: { name: 'struggle', displayName: 'Debater-se', power: 50, type: 'normal' }, user: aiPokemon, playerNum: 2, priority: 0 };
+            return { type: 'move', data: { name: 'struggle', displayName: 'Debater-se', power: 50, type: 'normal' }, user: aiPokemon, playerNum: botPlayerNum, priority: 0 };
         }
     }
 
     // Se o Pokémon precisa recarregar (Hyper Beam, etc.), ele DEVE recarregar.
     if (aiPokemon.mustRecharge) {
-        return { type: 'move', data: { name: 'recharge', displayName: 'Recarregar', priority: 0 }, user: aiPokemon, playerNum: 2, priority: 0 };
+        return { type: 'move', data: { name: 'recharge', displayName: 'Recarregar', priority: 0 }, user: aiPokemon, playerNum: botPlayerNum, priority: 0 };
     }
 
     try {
         const perceivedOpponent = getPerceivedOpponent(opponentPokemon);
         const perceptionState = cloneBattleState(state);
-        
-        if (isSamePokemonInstance(perceptionState.currentPokemon1, opponentPokemon)) {
+        const opponentPlayerNum: 1 | 2 = botPlayerNum === 1 ? 2 : 1;
+
+        // O oponente percebido é posicionado pelo lado dele, nunca pela posição do objeto.
+        if (opponentPlayerNum === 1) {
             perceptionState.currentPokemon1 = perceivedOpponent;
-        } else if (isSamePokemonInstance(perceptionState.currentPokemon2, opponentPokemon)) {
+        } else {
             perceptionState.currentPokemon2 = perceivedOpponent;
         }
 
-        let simulatedAiPokemon: Pokemon | null = null;
-        let simulatedAiTeam: Pokemon[] = [];
-
-        if (isSamePokemonInstance(perceptionState.currentPokemon1, aiPokemon)) {
-            simulatedAiPokemon = perceptionState.currentPokemon1;
-            simulatedAiTeam = perceptionState.team1;
-        } else if (isSamePokemonInstance(perceptionState.currentPokemon2, aiPokemon)) {
-            simulatedAiPokemon = perceptionState.currentPokemon2;
-            simulatedAiTeam = perceptionState.team2;
-        } else {
-            simulatedAiPokemon = resolvePokemonTarget(
-                [...perceptionState.team1, ...perceptionState.team2],
-                aiPokemon.instanceId,
-                aiPokemon.id
-            ) || aiPokemon;
-            simulatedAiTeam = isPokemonOnTeam(simulatedAiPokemon, perceptionState.team1) ? perceptionState.team1 : perceptionState.team2;
-        }
+        // A equipe do bot é definida pelo lado controlado; a instância apenas localiza o ativo.
+        const simulatedAiTeam = botPlayerNum === 1 ? perceptionState.team1 : perceptionState.team2;
+        const botActiveInPerception = botPlayerNum === 1
+            ? perceptionState.currentPokemon1
+            : perceptionState.currentPokemon2;
+        const simulatedAiPokemon = resolvePokemonTarget(simulatedAiTeam, aiPokemon.instanceId, aiPokemon.id)
+            ?? (isSamePokemonInstance(botActiveInPerception, aiPokemon) ? botActiveInPerception : aiPokemon);
 
         // 0. DEFENSIVE PIVOT (New Layer - Switch Prediction)
         // Verifica se estamos em perigo de OHKO e se somos mais lentos
@@ -782,7 +785,7 @@ export function decideAIAction(
                                     type: 'switch',
                                     data: realPivot,
                                     user: aiPokemon,
-                                    playerNum: 2,
+                                    playerNum: botPlayerNum,
                                     priority: 6
                                 };
                              }
@@ -810,7 +813,7 @@ export function decideAIAction(
                             type: 'switch',
                             data: bestSwitch,
                             user: simulatedAiPokemon,
-                            playerNum: 2,
+                            playerNum: botPlayerNum,
                             priority: 6
                         }, aiPokemon, aiTeam);
                     }
@@ -820,7 +823,7 @@ export function decideAIAction(
 
         // 2. ANÁLISE DE USO DE ITENS (Alta Prioridade)
         if (inventory) {
-            const bestItemAction = getBestItemAction(inventory, simulatedAiPokemon!, simulatedAiTeam, perceivedOpponent, perceptionState);
+            const bestItemAction = getBestItemAction(inventory, simulatedAiPokemon!, simulatedAiTeam, perceivedOpponent, perceptionState, botPlayerNum);
             // Se a pontuação do item for alta (> 80), usa imediatamente
             // Isso cobre curas críticas e revives
             if (bestItemAction && bestItemAction.score > 80) {
@@ -829,7 +832,7 @@ export function decideAIAction(
         }
 
         // 3. SELEÇÃO DE MOVIMENTO (Minimax)
-        let aiActions = getLegalActions(simulatedAiPokemon, simulatedAiTeam, 2, perceivedOpponent, perceptionState, moveLimitEnabled);
+        let aiActions = getLegalActions(simulatedAiPokemon, simulatedAiTeam, botPlayerNum, perceivedOpponent, perceptionState, moveLimitEnabled);
         
         if (aiActions.length === 1) {
             return mapActionBackToReal(aiActions[0], aiPokemon, aiTeam);
@@ -837,8 +840,7 @@ export function decideAIAction(
 
         aiActions = filterIntelligentSwitches(aiActions, perceivedOpponent);
 
-        const oppPlayerNum = simulatedAiPokemon === perceptionState.currentPokemon1 ? 2 : 1;
-        let oppActions = getLegalActions(perceivedOpponent, opponentTeam, oppPlayerNum as 1|2, simulatedAiPokemon, perceptionState, moveLimitEnabled);
+        let oppActions = getLegalActions(perceivedOpponent, opponentTeam, opponentPlayerNum, simulatedAiPokemon, perceptionState, moveLimitEnabled);
         
         oppActions.sort((a, b) => {
             const scoreA = getActionHeuristicScore(a, perceivedOpponent, simulatedAiPokemon!, weather, perceptionState);
@@ -869,16 +871,17 @@ export function decideAIAction(
 
                     // Optimization: If hit chance is 100%, skip miss simulation
                     if (probHit >= 1.0) {
-                        const simulatedState = simulateTurn(perceptionState, myAction, theirAction, { forceAccuracyOutcome: 'hit', fixedRoll: 0.925 });
-                        score = evaluateGameState(simulatedState);
+                        // fixedRoll usa a escala percentual do motor (85 a 100); 0.925 gerava dano mínimo em toda simulação.
+                        const simulatedState = simulateTurn(perceptionState, myAction, theirAction, { forceAccuracyOutcome: 'hit', fixedRoll: SIMULATION_DAMAGE_ROLL });
+                        score = evaluateGameState(simulatedState, botPlayerNum);
                     } else {
                         // Node Chance: Hit
-                        const stateHit = simulateTurn(perceptionState, myAction, theirAction, { forceAccuracyOutcome: 'hit', fixedRoll: 0.925 });
-                        const scoreHit = evaluateGameState(stateHit);
+                        const stateHit = simulateTurn(perceptionState, myAction, theirAction, { forceAccuracyOutcome: 'hit', fixedRoll: SIMULATION_DAMAGE_ROLL });
+                        const scoreHit = evaluateGameState(stateHit, botPlayerNum);
 
                         // Node Chance: Miss
                         const stateMiss = simulateTurn(perceptionState, myAction, theirAction, { forceAccuracyOutcome: 'miss' });
-                        const scoreMiss = evaluateGameState(stateMiss);
+                        const scoreMiss = evaluateGameState(stateMiss, botPlayerNum);
 
                         score = (scoreHit * probHit) + (scoreMiss * (1 - probHit));
                         
@@ -889,7 +892,7 @@ export function decideAIAction(
                 } else {
                     // Switch is deterministic
                     const simulatedState = simulateTurn(perceptionState, myAction, theirAction);
-                    score = evaluateGameState(simulatedState);
+                    score = evaluateGameState(simulatedState, botPlayerNum);
                 }
 
                 if (score < minScoreForThisAction) {
@@ -964,7 +967,7 @@ export function decideAIAction(
 
     } catch (e) {
         console.error("Erro Crítico na IA Minimax (Usando Fallback):", e);
-        return getLegacyBestMove(aiPokemon, opponentPokemon, weather, state);
+        return getLegacyBestMove(aiPokemon, opponentPokemon, weather, state, botPlayerNum);
     }
 }
 
@@ -994,9 +997,9 @@ function mapActionBackToReal(simAction: Action, realUser: Pokemon, realTeam: Pok
 
 // --- HELPERS E HEURÍSTICAS ---
 
-function getLegacyBestMove(attacker: Pokemon, defender: Pokemon, weather: string, state?: BattleState): Action {
+function getLegacyBestMove(attacker: Pokemon, defender: Pokemon, weather: string, state: BattleState | undefined, botPlayerNum: 1 | 2): Action {
     const moves = attacker.moves;
-    if (!moves || moves.length === 0) return { type: 'move', data: {name: 'struggle', displayName: 'Struggle', power: 50, type: 'normal'}, user: attacker, playerNum: 2 };
+    if (!moves || moves.length === 0) return { type: 'move', data: {name: 'struggle', displayName: 'Struggle', power: 50, type: 'normal'}, user: attacker, playerNum: botPlayerNum };
     
     let bestMove = moves[0];
     let maxScore = -Infinity;
@@ -1008,7 +1011,7 @@ function getLegacyBestMove(attacker: Pokemon, defender: Pokemon, weather: string
             bestMove = move;
         }
     }
-    return { type: 'move', data: bestMove, user: attacker, playerNum: 2, priority: bestMove.priority || 0 };
+    return { type: 'move', data: bestMove, user: attacker, playerNum: botPlayerNum, priority: bestMove.priority || 0 };
 }
 
 function getActionHeuristicScore(action: Action, user: Pokemon, target: Pokemon, weather: string, state?: BattleState): number {

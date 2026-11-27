@@ -231,6 +231,4 @@ describe('IA por jogador e batalha espelho no núcleo', () => {
     });
     expect(fetchMock).toHaveBeenCalledTimes(1);
   });
-
-  it.todo('3.4: escolhe ação legal para P1 com playerNum 1, alvo correto e avaliação do próprio lado');
 });

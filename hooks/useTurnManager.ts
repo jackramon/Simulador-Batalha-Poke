@@ -283,7 +283,8 @@ export const useTurnManager = ({
                     currentState.p1TeraUsed,
                     currentState,
                     configRef.current.megaEvolutionEnabled,
-                    currentState.p1MegaUsed
+                    currentState.p1MegaUsed,
+                    1
                 );
             }
             if (!isCurrent() || !aiAction) return;
