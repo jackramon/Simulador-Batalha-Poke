@@ -225,7 +225,9 @@ export const useTurnManager = ({
                     currentState.p2TeraUsed,
                     currentState,
                     configRef.current.megaEvolutionEnabled,
-                    currentState.p2MegaUsed
+                    currentState.p2MegaUsed,
+                    2,
+                    configRef.current
                 );
             }
             if (!isCurrent() || !aiAction) return;
@@ -284,7 +286,8 @@ export const useTurnManager = ({
                     currentState,
                     configRef.current.megaEvolutionEnabled,
                     currentState.p1MegaUsed,
-                    1
+                    1,
+                    configRef.current
                 );
             }
             if (!isCurrent() || !aiAction) return;

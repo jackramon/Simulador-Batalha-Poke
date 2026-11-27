@@ -12,10 +12,11 @@ import { getPokemonPlayerNum, isSamePokemonInstance, resolvePokemonTarget } from
 import { createRechargeActionData, createStruggleActionData } from './engine/temporaryActions';
 
 // --- IMPORTS DO MOTOR (Para Simulação) ---
-import { executeMove } from './engine/moves';
+// A simulação roda o mesmo turno público da batalha real; só o reserva de trocas
+// forçadas/desmaio é escolhido aqui, de forma determinística, sem UI.
+import { BattleCoordinator } from './engine/coordinator';
+import type { TurnStepResult } from './engine/coordinator';
 import { performSwitch } from './engine/switching';
-import { getSortedActions } from './engine/actions';
-import { processTurnEnd } from './engine/turnEnd';
 import { BattlePRNG } from '../utils/prng';
 
 // --- CONFIGURAÇÃO DA IA ---
@@ -24,12 +25,28 @@ const MAX_OPPONENT_ACTIONS = 3; // Considera apenas os 3 melhores movimentos do 
 // Rolagem de dano fixa da simulação, na mesma escala percentual usada pelo motor (85 a 100).
 const SIMULATION_DAMAGE_ROLL = 92.5;
 
-// Configuração Mock para a simulação (assume regras padrão)
-const SIMULATION_CONFIG: BattleConfig = {
-    p1Mode: 'manual', p2Mode: 'manual', p1TeamSize: 6, p2TeamSize: 6, p1Input: '', p2Input: '', opponentMode: 'manual',
-    weatherEnabled: true, terrainEnabled: true, itemsEnabled: true, terastallizationEnabled: true, megaEvolutionEnabled: true, moveLimitEnabled: true,
-    p1AutoMode: false, randomIvs: true, randomLevels: false
+// Overrides da própria simulação: apenas a expectativa de precisão/dano do expectimax.
+// Todo o resto (clima, terreno, itens, Tera, Mega, limite de golpes) vem da configuração real.
+const SIMULATION_ACCURACY_OVERRIDES: Partial<BattleConfig> = {
+    forceAccuracyOutcome: 'hit',
+    fixedRoll: SIMULATION_DAMAGE_ROLL,
 };
+
+// Configuração da simulação: usa a configuração real da batalha. Chamadores antigos que não a
+// informam têm o mínimo reconstruído a partir dos parâmetros recebidos, sem habilitar mecanicamente
+// o que a batalha real pode ter desativado.
+function buildSimulationConfig(
+    battleConfig: BattleConfig | undefined,
+    known: Pick<BattleConfig, 'itemsEnabled' | 'terastallizationEnabled' | 'megaEvolutionEnabled' | 'moveLimitEnabled'>,
+): BattleConfig {
+    if (battleConfig) return battleConfig;
+    return {
+        p1Mode: 'manual', p2Mode: 'manual', p1TeamSize: 6, p2TeamSize: 6, p1Input: '', p2Input: '', opponentMode: 'manual',
+        weatherEnabled: true, terrainEnabled: true,
+        ...known,
+        p1AutoMode: false, randomIvs: true, randomLevels: false,
+    };
+}
 
 function getPerceivedOpponent(actualOpponent: Pokemon): Pokemon {
     const perceived = structuredClone(actualOpponent);
@@ -579,55 +596,97 @@ function rehydrateActionForSimulation(originalAction: Action, simulationState: B
     }
 }
 
-function simulateTurn(initialState: BattleState, botAction: Action, oppAction: Action, botConfigOverride?: Partial<BattleConfig>): BattleState {
-    let state = cloneBattleState(initialState);
+// Escolha determinística do reserva que entra no lugar do Pokémon que precisa sair
+// (troca própria ou troca forçada). Nenhum sorteio: reaproveita o critério de troca já usado pela IA.
+function pickSimulationReserve(state: BattleState, playerNum: 1 | 2, leaving: Pokemon): Pokemon | null {
+    const team = playerNum === 1 ? state.team1 : state.team2;
+    const opponent = playerNum === 1 ? state.currentPokemon2 : state.currentPokemon1;
+    const candidates = team.filter(p => !p.isFainted && !isSamePokemonInstance(p, leaving));
+    if (candidates.length === 0) return null;
+
+    return (opponent ? chooseBestSwitch(candidates, opponent) : null) ?? candidates[0];
+}
+
+// Resposta da simulação ao prompt de troca forçada (U-turn, Red Card, Emergency Exit...):
+// a escolha retoma o mesmo turno no coordenador, como a UI faz na batalha real.
+function buildForcedSwitchAction(state: BattleState, prompt: TurnStepResult['switchPrompt']): Action | undefined {
+    if (!prompt) return undefined;
+    const active = prompt.player === 1 ? state.currentPokemon1 : state.currentPokemon2;
+    if (!active) return undefined;
+
+    const reserve = pickSimulationReserve(state, prompt.player, active);
+    if (!reserve) return undefined;
+
+    return { type: 'switch', data: reserve, user: active, playerNum: prompt.player, priority: 6, tieBreaker: 0 };
+}
+
+// Consome todos os yields do turno público. O generator é sempre fechado, inclusive em erro
+// ou saída antecipada, para que a transação do coordenador seja liberada.
+function consumeSimulationTurn(
+    state: BattleState,
+    p1Action: Action | undefined,
+    p2Action: Action | undefined,
+    config: BattleConfig,
+): BattleState {
+    const generator = BattleCoordinator.runTurn(state, p1Action, p2Action, config);
+    let finalState = state;
+    let next = generator.next();
+
+    try {
+        while (next.done !== true) {
+            finalState = next.value.state;
+            const resume = next.value.phase === 'switch-forced'
+                ? buildForcedSwitchAction(next.value.state, next.value.switchPrompt)
+                : undefined;
+            next = generator.next(resume);
+        }
+    } finally {
+        if (next.done !== true) generator.return();
+    }
+
+    return finalState;
+}
+
+// O coordenador encerra o turno antes do desmaio e deixa a entrada do substituto para a UI.
+// Na simulação o reserva entra de forma determinística, sem UI e sem deadlock, para que o estado
+// avaliado seja o estado de jogo real.
+function resolveFaintedSwitch(state: BattleState, playerNum: 1 | 2, config: BattleConfig): BattleState {
+    const active = playerNum === 1 ? state.currentPokemon1 : state.currentPokemon2;
+    if (!active || !active.isFainted) return state;
+    if (!state.isBattleInProgress || state.winner) return state;
+
+    const reserve = pickSimulationReserve(state, playerNum, active);
+    if (!reserve) return state;
+
+    return performSwitch(state, reserve, playerNum, config.weatherEnabled, false).newState;
+}
+
+export function simulateTurn(
+    initialState: BattleState,
+    botAction: Action,
+    oppAction: Action,
+    botPlayerNum: 1 | 2,
+    config: BattleConfig,
+    overrides?: Partial<BattleConfig>,
+): BattleState {
+    // Clone com fork próprio do PRNG: a simulação nunca move o cursor da batalha real.
+    const state = cloneBattleState(initialState);
     const prng = BattlePRNG.fromBattleState(initialState).fork();
     prng.attachTo(state);
-    const logs: LogEntry[] = []; 
 
     const simBotAction = rehydrateActionForSimulation(botAction, state);
     const simOppAction = rehydrateActionForSimulation(oppAction, state);
 
     if (!simBotAction || !simOppAction) return state;
 
-    const actions = getSortedActions([simBotAction, simOppAction], state, prng);
+    // As duas ações entram juntas no coordenador: ele usa a ação oposta como defenderAction
+    // (Sucker Punch, Focus Punch, Upper Hand e equivalentes).
+    const p1Action = botPlayerNum === 1 ? simBotAction : simOppAction;
+    const p2Action = botPlayerNum === 1 ? simOppAction : simBotAction;
+    const simulationConfig: BattleConfig = overrides ? { ...config, ...overrides } : config;
 
-    for (const action of actions) {
-        // Atacante e alvo são resolvidos pelo lado da ação no estado corrente da simulação,
-        // de modo que o bot sempre atinge o adversário e nunca o próprio lado.
-        const userRef = action.playerNum === 1 ? state.currentPokemon1 : state.currentPokemon2;
-        const targetRef = action.playerNum === 1 ? state.currentPokemon2 : state.currentPokemon1;
-
-        if (!userRef || userRef.isFainted) continue;
-
-        let currentConfig = SIMULATION_CONFIG;
-        if (action === simBotAction && botConfigOverride) {
-            currentConfig = { ...SIMULATION_CONFIG, ...botConfigOverride };
-        }
-
-        // Cada etapa devolve um novo estado transacional; a simulação precisa consumi-lo
-        // para avaliar o resultado real produzido pelo golpe, pela troca e pelo fim de turno.
-        if (action.type === 'switch') {
-            state = performSwitch(state, action.data, action.playerNum, currentConfig.weatherEnabled, false, prng).newState;
-        } else if (action.type === 'move' && targetRef && !targetRef.isFainted) {
-            state = executeMove(
-                state, 
-                userRef, 
-                targetRef, 
-                action.data, 
-                currentConfig, 
-                undefined, 
-                false, 
-                action.shouldTerastallize,
-                false,
-                action.shouldMegaEvolve,
-                prng
-            ).newState;
-        }
-    }
-
-    state = processTurnEnd(state, SIMULATION_CONFIG, prng).newState;
-    return state;
+    const finalState = consumeSimulationTurn(state, p1Action, p2Action, simulationConfig);
+    return resolveFaintedSwitch(resolveFaintedSwitch(finalState, 1, simulationConfig), 2, simulationConfig);
 }
 
 // --- LOGICA DE DEFENSIVE PIVOT (SWITCH PREDICTION) ---
@@ -713,7 +772,8 @@ export function decideAIAction(
     state?: BattleState,
     megaEvolutionEnabled: boolean = false,
     megaUsed: boolean = false,
-    botPlayerNum: 1 | 2 = 2
+    botPlayerNum: 1 | 2 = 2,
+    battleConfig?: BattleConfig
 ): Action {
     if (!state) {
         return getLegacyBestMove(aiPokemon, opponentPokemon, weather, state, botPlayerNum);
@@ -761,6 +821,15 @@ export function decideAIAction(
             : perceptionState.currentPokemon2;
         const simulatedAiPokemon = resolvePokemonTarget(simulatedAiTeam, aiPokemon.instanceId, aiPokemon.id)
             ?? (isSamePokemonInstance(botActiveInPerception, aiPokemon) ? botActiveInPerception : aiPokemon);
+
+        // A simulação usa a configuração real da batalha; apenas precisão/dano do expectimax
+        // são sobrescritos por SIMULATION_ACCURACY_OVERRIDES.
+        const simulationConfig = buildSimulationConfig(battleConfig, {
+            itemsEnabled: !!inventory,
+            terastallizationEnabled,
+            megaEvolutionEnabled,
+            moveLimitEnabled,
+        });
 
         // 0. DEFENSIVE PIVOT (New Layer - Switch Prediction)
         // Verifica se estamos em perigo de OHKO e se somos mais lentos
@@ -873,15 +942,21 @@ export function decideAIAction(
                     // Optimization: If hit chance is 100%, skip miss simulation
                     if (probHit >= 1.0) {
                         // fixedRoll usa a escala percentual do motor (85 a 100); 0.925 gerava dano mínimo em toda simulação.
-                        const simulatedState = simulateTurn(perceptionState, myAction, theirAction, { forceAccuracyOutcome: 'hit', fixedRoll: SIMULATION_DAMAGE_ROLL });
+                        const simulatedState = simulateTurn(
+                            perceptionState, myAction, theirAction, botPlayerNum, simulationConfig, SIMULATION_ACCURACY_OVERRIDES,
+                        );
                         score = evaluateGameState(simulatedState, botPlayerNum);
                     } else {
                         // Node Chance: Hit
-                        const stateHit = simulateTurn(perceptionState, myAction, theirAction, { forceAccuracyOutcome: 'hit', fixedRoll: SIMULATION_DAMAGE_ROLL });
+                        const stateHit = simulateTurn(
+                            perceptionState, myAction, theirAction, botPlayerNum, simulationConfig, SIMULATION_ACCURACY_OVERRIDES,
+                        );
                         const scoreHit = evaluateGameState(stateHit, botPlayerNum);
 
                         // Node Chance: Miss
-                        const stateMiss = simulateTurn(perceptionState, myAction, theirAction, { forceAccuracyOutcome: 'miss' });
+                        const stateMiss = simulateTurn(
+                            perceptionState, myAction, theirAction, botPlayerNum, simulationConfig, { forceAccuracyOutcome: 'miss' },
+                        );
                         const scoreMiss = evaluateGameState(stateMiss, botPlayerNum);
 
                         score = (scoreHit * probHit) + (scoreMiss * (1 - probHit));
@@ -892,7 +967,7 @@ export function decideAIAction(
 
                 } else {
                     // Switch is deterministic
-                    const simulatedState = simulateTurn(perceptionState, myAction, theirAction);
+                    const simulatedState = simulateTurn(perceptionState, myAction, theirAction, botPlayerNum, simulationConfig);
                     score = evaluateGameState(simulatedState, botPlayerNum);
                 }
 

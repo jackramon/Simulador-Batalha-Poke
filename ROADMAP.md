@@ -8,7 +8,7 @@
 - Mantenha `PROJECT_CONTEXT.md` atualizado a cada alteração.
 - Para economizar tokens: inspecione somente os arquivos da tarefa e suas dependências diretas, reutilize a baseline registrada, use testes focados durante a iteração e rode a suíte completa na validação final. Não refaça auditorias globais já concluídas.
 
-**Próximo item:** 3.5 — Fazer a simulação usar o mesmo coordenador, configuração e regras da batalha real.
+**Próximo item:** 4.1 — Corrigir regras e ciclos de vida ainda incorretos após a base consolidada estar verde.
 
 ## Etapa 0 — Restaurar uma baseline confiável
 
@@ -215,7 +215,15 @@
   - Validação: 9/9 testes focados; suíte completa com 59 arquivos, 288 aprovados e **0 `it.todo`**; `npm run lint`, `npm run build` e `git diff --check` aprovados.
   - Smoke no bundle de produção (`NODE_ENV=production`, porta 38511) com a fixture real de 33 turnos: cinco turnos avançados com dois cliques extras cada durante a pausa, Próximo desabilitado no intervalo e contador avançando exatamente um turno por vez; reprodução automática com alternância rápida de Reproduzir/Pausar de 1 a 8; pausa no meio da transição concluiu o turno corrente e liberou os controles; reprodução completa até `Turno: 33 / 33` com todos os checkpoints conferindo, zero `role=alert`, zero `role=status`, zero requisições `/api/`, zero erros de console e porta liberada.
   - Próximo item: 3.5. Commit: informado no resumo final após o push verificado em `origin/main`.
-- [ ] **3.5 — Fazer a simulação usar o mesmo coordenador, configuração e regras da batalha real.**
+- [x] **3.5 — Fazer a simulação usar o mesmo coordenador, configuração e regras da batalha real.**
+  - `simulateTurn` (exportada para os testes de integração) deixou de encadear `executeMove`/`performSwitch`/`processTurnEnd` e passou a consumir `BattleCoordinator.runTurn` uma única vez por simulação, entregando as **duas** ações por lado — o que restaura o `defenderAction` no caminho simulado (Sucker Punch, Focus Punch, Upper Hand).
+  - A simulação usa a configuração real: `decideAIAction` recebeu `battleConfig?: BattleConfig` como último parâmetro e os dois chamadores de `useTurnManager` repassam `configRef.current`. `SIMULATION_CONFIG` (tudo habilitado) foi removido; só `SIMULATION_ACCURACY_OVERRIDES` (`forceAccuracyOutcome: 'hit'`, `fixedRoll: 92.5`) e o nó `miss` sobrescrevem a base. Chamadores antigos sem configuração reconstroem o mínimo a partir dos parâmetros recebidos, sem habilitar mecanicamente o que a batalha desativou.
+  - O consumo esgota todos os yields, responde `switch-forced` com o reserva determinístico de `chooseBestSwitch` (sem sorteio) e fecha o generator em `finally`, inclusive em erro ou saída antecipada. O `faint-switch` terminal entra com `performSwitch` determinístico, como o pós-KO real, e `processTurnEnd` não é mais chamado na simulação — dano, PP, hazards e `turnEnd` acontecem uma única vez. Trocas voluntárias e itens seguem o mesmo fluxo público.
+  - Fork do PRNG por simulação e cursor real permanecem intactos; heurística, profundidade, avaliação, ReplayPlayer e regras do motor não foram alterados.
+  - `tests/integration/aiSimulationCoordinator.test.ts` (11 testes) cobre `runTurn` uma vez por simulação com a configuração real + overrides, clima/terreno/itens/Tera/Mega desativados permanecendo desativados (clima limpo no estado simulado), `defenderAction` decidindo Sucker Punch, item consumido e aplicado uma única vez, troca voluntária/desmaio/troca forçada com reserva determinístico, dano/PP/hazards/`turnEnd` uma vez com igualdade a um turno real do coordenador, golpe mais forte em P1/P2 e estado/cursor imutáveis com decisão determinística. RED comprovado: sem `defenderAction` o golpe condicional não causa dano (400 → 400).
+  - Validação: 11 testes focados novos; 55 focados de IA/replay + 35 de UI/replay; suíte completa com 60 arquivos e **299 testes aprovados, 0 `it.todo`**; `npm run lint`, `npm run build` e `git diff --check` aprovados. Uma execução integral sob contenção estourou os 5 s de `replayFixtureCompatibility` (flake de carga pré-existente, 10/10 isolado); a repetição ficou verde.
+  - Smoke no bundle de produção (`NODE_ENV=production`, porta 38617): P1 manual × P2 IA com Explosão Lunar causando 56 de dano somente no P2 (134→78), PP 6→5 e P1 intacto em 180/180; depois IA × IA por 19 turnos, com um único `Início do Turno` por turno, Hidro Bomba de 152 e 181 derrubando Toxicroak/Excadrill com trocas pós-KO resolvidas, clima Areia/Granizo tiquando uma vez, zero erros de console, zero `role=alert`/`role=status` e zero chamadas `/api/` do app; porta liberada.
+  - Próximo item: 4.1. Commit: informado no resumo final após o push verificado em `origin/main`.
 
 ## Etapa 4 — Endurecimento e expansão
 
@@ -231,7 +239,7 @@
 
 ## Registro resumido da baseline
 
-- Última suíte integral informada: **59 arquivos, 288 testes aprovados e 0 `it.todo`**; a lacuna de 3.4 foi convertida e nenhum todo permanece.
+- Última suíte integral informada: **60 arquivos, 299 testes aprovados e 0 `it.todo`**; a lacuna de 3.4 foi convertida, a simulação da IA foi unificada em 3.5 e nenhum todo permanece.
 - `npm run lint`, `npm run build` e `git diff --check`: aprovados.
 - Auditoria do item 0.5: **17 → 0** ocorrências no total e **6 → 0** em produção; instalação por `npm ci` reproduzida sem alterações nos manifestos.
 - SHA dos itens 1.1 a 1.7 e dos itens 2.1/2.2/2.3/2.4/2.5 informados somente nos respectivos resumos finais após o push; último SHA registrado no roadmap: `baae8a606c37495f30810e2c646dbb234c75ac86` (item 0.4).
