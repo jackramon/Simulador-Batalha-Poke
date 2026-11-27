@@ -207,11 +207,22 @@
   - Nenhuma tolerância de compatibilidade, checkpoint, hash, PRNG ou regra foi alterada; `REPLAY_ENGINE_REVISION` segue `3.2.2` porque o formato do arquivo não mudou.
   - Validação: foco com 5 arquivos e 37 testes; suíte completa com 58 arquivos, 279 aprovados e **0 `it.todo`**; `npm run lint`, `npm run build` e `git diff --check` aprovados. Smoke no bundle de produção (`NODE_ENV=production`, porta 38421): fixture reproduzida até `Turno: 33 / 33` sem `role=alert`, sem `role=status`, sem chamadas de rede e sem erros de console; avanço manual até o turno 9 exibiu `Dialga Origem precisa recarregar!` com o mesmo resultado limpo e a porta foi liberada.
   - Próximo item: 3.5. Commit: informado no resumo final após o push verificado em `origin/main`.
+- [x] **3.4.2 — Tornar a navegação do replay idempotente, inclusive durante a pausa entre turnos.**
+  - **Causa comprovada**: `isAnimatingRef` era liberada no `finally` do generator, antes da pausa inter-turno e do incremento do índice. Durante a pausa (`INTER_TURN_DELAY_MS / speed`) o `currentTurnIndex` ainda não havia avançado, então um segundo clique em Próximo/Reproduzir repetia o mesmo turno: logs e histórico duplicados e draws extras de PRNG, que divergiam do checkpoint gravado e produziam alerta falso. Reiniciar, Voltar, novo upload e desmontagem nesse intervalo deixavam um `setCurrentTurnIndex(prev => prev + 1)` pendente escrevendo tarde.
+  - `ReplayTransition` passou a ser a trava única da transição em `components/ReplayPlayer.tsx`: trava síncrona em `transitionRef` (verificada e adquirida na mesma execução, antes de qualquer `await`), token `cancelled` e `closePendingWait` para encerrar a pausa. A trava só é liberada no `finally`, depois do incremento do índice, ou pelo cancelamento; cada `await` (passo da animação e pausa) é seguido de checagem do token, e Reiniciar, Voltar, novo upload e desmontagem invalidam a transição anterior. Próximo fica desabilitado enquanto a transição está pendente, Reproduzir só bloqueia o início (Pausar continua disponível quando já está reproduzindo) e `isAnimatingRef` foi removida.
+  - Verificação de integridade, checkpoints, canonicalização, PRNG e regras não foram alterados; `REPLAY_ENGINE_REVISION` segue `3.2.2` e nenhum hash ou formato mudou.
+  - `tests/integration/replayNavigationIdempotency.test.tsx` cobre com fake timers os oito cenários pedidos (o sexto dividido em upload e desmontagem, 9 testes): dois cliques rápidos, Próximo+Reproduzir simultâneos, rajada em três turnos, Reiniciar/Voltar/upload/desmontagem durante a pausa, cópia adulterada rejeitada uma única vez e fluxo manual + reprodução automática completa. RED comprovado ao liberar a trava antes da pausa: 6 dos 9 testes falham, com turno repetido (`['brasa-da-trava','brasa-da-trava']`), três execuções na rajada, Próximo habilitado durante a pausa e índice tardio (`1 / 2` em vez de `0 / 2`).
+  - Validação: 9/9 testes focados; suíte completa com 59 arquivos, 288 aprovados e **0 `it.todo`**; `npm run lint`, `npm run build` e `git diff --check` aprovados.
+  - Smoke no bundle de produção (`NODE_ENV=production`, porta 38511) com a fixture real de 33 turnos: cinco turnos avançados com dois cliques extras cada durante a pausa, Próximo desabilitado no intervalo e contador avançando exatamente um turno por vez; reprodução automática com alternância rápida de Reproduzir/Pausar de 1 a 8; pausa no meio da transição concluiu o turno corrente e liberou os controles; reprodução completa até `Turno: 33 / 33` com todos os checkpoints conferindo, zero `role=alert`, zero `role=status`, zero requisições `/api/`, zero erros de console e porta liberada.
+  - Próximo item: 3.5. Commit: informado no resumo final após o push verificado em `origin/main`.
 - [ ] **3.5 — Fazer a simulação usar o mesmo coordenador, configuração e regras da batalha real.**
 
 ## Etapa 4 — Endurecimento e expansão
 
-- [ ] **4.1 — Completar mecânicas faltantes após a base consolidada estar verde.**
+- [ ] **4.1 — Corrigir regras e ciclos de vida ainda incorretos após a base consolidada estar verde.**
+  - Corrigir Tera Stellar defensivo, duplicação de Rocky Payload, críticos com estágios, velocidade com terreno e distinção Snow/Hail.
+  - Conectar e testar os ticks ainda ausentes de Taunt, Encore, Disable, Magnet Rise, Telekinesis, Glaive Rush e efeitos equivalentes.
+  - Revisar wiring de habilidades já existentes, como Good as Gold, sem usar a quantidade de arquivos como prova de funcionamento.
 - [ ] **4.2 — Conectar a importação de equipes no formato Showdown.**
 - [ ] **4.3 — Melhorar acessibilidade, semântica dos diálogos e suporte a movimento reduzido.**
 - [ ] **4.4 — Separar animações e estatísticas da interpretação frágil de strings de logs.**
@@ -220,7 +231,7 @@
 
 ## Registro resumido da baseline
 
-- Última suíte integral informada: **58 arquivos, 279 testes aprovados e 0 `it.todo`**; a lacuna de 3.4 foi convertida e nenhum todo permanece.
+- Última suíte integral informada: **59 arquivos, 288 testes aprovados e 0 `it.todo`**; a lacuna de 3.4 foi convertida e nenhum todo permanece.
 - `npm run lint`, `npm run build` e `git diff --check`: aprovados.
 - Auditoria do item 0.5: **17 → 0** ocorrências no total e **6 → 0** em produção; instalação por `npm ci` reproduzida sem alterações nos manifestos.
 - SHA dos itens 1.1 a 1.7 e dos itens 2.1/2.2/2.3/2.4/2.5 informados somente nos respectivos resumos finais após o push; último SHA registrado no roadmap: `baae8a606c37495f30810e2c646dbb234c75ac86` (item 0.4).

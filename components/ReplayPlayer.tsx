@@ -32,6 +32,20 @@ const DEFAULT_SPEED = 0.25; // ← Velocidade padrão mais lenta (CORREÇÃO #3)
 // ── Delay entre turnos (além dos delays internos de cada step) ───────
 const INTER_TURN_DELAY_MS = 1800; // pausa após cada turno antes do próximo
 
+// ── Trava de transição do replay ─────────────────────────────────────
+//    isAnimatingRef cobria somente o generator e era liberada antes da pausa
+//    inter-turno e do incremento do índice. Nesse intervalo, Próximo/Reproduzir
+//    podia reexecutar o mesmo currentTurnIndex, gravando logs e draws repetidos
+//    e produzindo alerta falso de divergência. A transição passou a ser atômica:
+//    a trava é verificada/adquirida de forma síncrona (antes de qualquer await) e
+//    só é liberada quando o índice avança de fato ou quando a transição é
+//    cancelada por Reiniciar, Voltar, novo upload ou desmontagem.
+interface ReplayTransition {
+    cancelled: boolean;
+    /** Encerra a pausa inter-turno pendente, limpando o timer e liberando o await. */
+    closePendingWait: (() => void) | null;
+}
+
 interface ReplayPlayerProps {
     onClose: () => void;
 }
@@ -62,8 +76,46 @@ export default function ReplayPlayer({ onClose }: ReplayPlayerProps) {
     }, []);
 
     const stateRef        = useRef<BattleState | null>(null);
-    const isAnimatingRef  = useRef(false);
     const logContainerRef = useRef<HTMLDivElement>(null);
+
+    // ── Transição em andamento (trava síncrona + token de cancelamento) ─
+    const [isTransitioning, setIsTransitioning] = useState(false);
+    const transitionRef = useRef<ReplayTransition | null>(null);
+
+    /** Adquire a trava na mesma execução do clique: nenhum clique posterior passa. */
+    const beginTransition = useCallback((): ReplayTransition => {
+        const transition: ReplayTransition = { cancelled: false, closePendingWait: null };
+        transitionRef.current = transition;
+        setIsTransitioning(true);
+        return transition;
+    }, []);
+
+    /** Invalida a transição ativa sem tocar em estado React (caminho de desmontagem). */
+    const invalidateTransition = useCallback(() => {
+        const transition = transitionRef.current;
+        transitionRef.current = null;
+        if (!transition) return;
+        transition.cancelled = true;
+        transition.closePendingWait?.();
+    }, []);
+
+    /** Cancela a transição ativa: nenhuma continuação tardia escreve estado. */
+    const cancelTransition = useCallback(() => {
+        if (!transitionRef.current) return;
+        invalidateTransition();
+        setIsTransitioning(false);
+    }, [invalidateTransition]);
+
+    /** Libera a trava apenas se a transição liberada ainda for a ativa. */
+    const endTransition = useCallback((transition: ReplayTransition) => {
+        if (transitionRef.current !== transition) return; // já cancelada
+        transitionRef.current = null;
+        transition.closePendingWait?.();
+        setIsTransitioning(false);
+    }, []);
+
+    // Desmontagem: nenhuma continuação pendente pode escrever estado depois.
+    useEffect(() => () => invalidateTransition(), [invalidateTransition]);
 
     // Auto-scroll do log para o final sempre que logs mudam (CORREÇÃO #5)
     useEffect(() => {
@@ -81,6 +133,8 @@ export default function ReplayPlayer({ onClose }: ReplayPlayerProps) {
     const handleFileUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
         const file = e.target.files?.[0];
         if (!file) return;
+        // Um novo arquivo invalida qualquer transição pendente do replay anterior.
+        cancelTransition();
         try {
             const text = await file.text();
             const parsed = parseBattleReplay(JSON.parse(text));
@@ -99,6 +153,9 @@ export default function ReplayPlayer({ onClose }: ReplayPlayerProps) {
 
     // ── Reset / reiniciar replay ───────────────────────────────────────
     const resetReplay = useCallback((data: BattleReplay) => {
+        // Reiniciar/novo upload cancela a continuação pendente: o índice volta a 0
+        // e nenhum incremento tardio da transição anterior pode sobrescrevê-lo.
+        cancelTransition();
         setIsPlaying(false);
         setCurrentTurnIndex(0);
         setCurrentTurnEvents([]);
@@ -150,7 +207,7 @@ export default function ReplayPlayer({ onClose }: ReplayPlayerProps) {
         setReplayState(initialState);
         stateRef.current = initialState;
         setStateHistory([initialState]);
-    }, []);
+    }, [cancelTransition]);
 
     // ── updateStateWithLogs local (FIX #5: acumula via ref) ───────────
     const updateStateWithLogs = useCallback((newState: BattleState, logs: { message: string; color: string }[]) => {
@@ -164,7 +221,10 @@ export default function ReplayPlayer({ onClose }: ReplayPlayerProps) {
 
     // ── Reproduzir próximo turno ───────────────────────────────────────
     const playNextTurn = useCallback(async () => {
-        if (!replayData || !stateRef.current || isAnimatingRef.current) return;
+        // Trava síncrona: verificada e adquirida na mesma execução, antes de
+        // qualquer await. Cobre generator, animação, pausa inter-turno e o
+        // incremento do índice — a transição inteira é atômica.
+        if (transitionRef.current || !replayData || !stateRef.current) return;
 
         const currentTurnNum = turns[currentTurnIndex];
         if (currentTurnNum === undefined) {
@@ -178,10 +238,10 @@ export default function ReplayPlayer({ onClose }: ReplayPlayerProps) {
             return;
         }
 
+        const transition = beginTransition();
+
         // FIX #4: expor eventos do turno atual para exibir ações na UI
         setCurrentTurnEvents(turnEvents);
-
-        isAnimatingRef.current = true;
         setError('');
 
         try {
@@ -220,6 +280,8 @@ export default function ReplayPlayer({ onClose }: ReplayPlayerProps) {
                     if (!step) { result = generator.next(); continue; }
 
                     await TurnAnimator.processStep(step, uiActions, playbackSpeed);
+                    // Cancelamento durante a animação: nenhuma escrita tardia deste turno.
+                    if (transition.cancelled) return;
                     updateStateWithLogs(step.state, step.logs);
 
                     if (step.switchPrompt) {
@@ -257,19 +319,34 @@ export default function ReplayPlayer({ onClose }: ReplayPlayerProps) {
             }
 
             setStateHistory(prev => [...prev, stateRef.current!]);
+
+            // FIX #3: pausa entre turnos antes de avançar automaticamente.
+            // A trava segue ativa durante a pausa; o cancelamento a encerra aqui.
+            if (transition.cancelled) return;
+            await new Promise<void>(resolve => {
+                const timeoutId = setTimeout(() => {
+                    transition.closePendingWait = null;
+                    resolve();
+                }, INTER_TURN_DELAY_MS / playbackSpeed);
+                transition.closePendingWait = () => {
+                    clearTimeout(timeoutId);
+                    transition.closePendingWait = null;
+                    resolve();
+                };
+            });
+            if (transition.cancelled) return;
+
+            setCurrentTurnIndex(prev => prev + 1);
         } catch (err: any) {
             setError(err.message || 'Erro ao reproduzir replay.');
             setIsPlaying(false);
             return;
         } finally {
-            isAnimatingRef.current = false;
+            // Único ponto de liberação: depois do incremento do índice ou quando a
+            // transição já foi cancelada (endTransition não reescreve estado nesse caso).
+            endTransition(transition);
         }
-
-        // FIX #3: pausa entre turnos antes de avançar automaticamente
-        await new Promise(r => setTimeout(r, INTER_TURN_DELAY_MS / playbackSpeed));
-
-        setCurrentTurnIndex(prev => prev + 1);
-    }, [replayData, currentTurnIndex, turns, playbackSpeed, updateStateWithLogs]);
+    }, [replayData, currentTurnIndex, turns, playbackSpeed, updateStateWithLogs, beginTransition, endTransition]);
 
     // ── Efeito de auto-play ────────────────────────────────────────────
     useEffect(() => {
@@ -341,6 +418,8 @@ export default function ReplayPlayer({ onClose }: ReplayPlayerProps) {
                             className="flex items-center gap-1 px-4 py-2 bg-gray-500 hover:bg-gray-400 disabled:opacity-40 disabled:cursor-not-allowed text-white font-bold rounded-lg shadow transition-all active:scale-95 text-sm"
                             onClick={() => {
                                 if (currentTurnIndex > 0 && !isPlaying) {
+                                    // Voltar invalida a continuação pendente do turno em transição.
+                                    cancelTransition();
                                     const newIndex = currentTurnIndex - 1;
                                     setCurrentTurnIndex(newIndex);
                                     const prevState = stateHistory[newIndex];
@@ -366,7 +445,10 @@ export default function ReplayPlayer({ onClose }: ReplayPlayerProps) {
                                     : 'bg-green-500 hover:bg-green-600'
                             } disabled:opacity-40 disabled:cursor-not-allowed`}
                             onClick={() => setIsPlaying(p => !p)}
-                            disabled={currentTurnIndex >= turns.length}
+                            disabled={isTransitioning ? !isPlaying : currentTurnIndex >= turns.length}
+                            title={isTransitioning && !isPlaying
+                                ? 'Aguarde o turno em transição terminar para iniciar a reprodução'
+                                : undefined}
                         >
                             {isPlaying ? '⏸ Pausar' : '▶ Reproduzir'}
                         </button>
@@ -375,7 +457,10 @@ export default function ReplayPlayer({ onClose }: ReplayPlayerProps) {
                         <button
                             className="flex items-center gap-1 px-4 py-2 bg-gray-500 hover:bg-gray-400 disabled:opacity-40 disabled:cursor-not-allowed text-white font-bold rounded-lg shadow transition-all active:scale-95 text-sm"
                             onClick={() => { if (!isPlaying) playNextTurn(); }}
-                            disabled={isPlaying || currentTurnIndex >= turns.length}
+                            disabled={isTransitioning || isPlaying || currentTurnIndex >= turns.length}
+                            title={isTransitioning
+                                ? 'Aguarde o turno em transição terminar'
+                                : undefined}
                         >
                             Próximo ⏭
                         </button>
