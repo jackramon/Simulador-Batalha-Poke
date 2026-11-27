@@ -1,5 +1,5 @@
 
-import { Pokemon, Move, BattleState, Action, LogEntry } from '../../../types';
+import { Pokemon, Move, BattleState, Action, LogEntry, StatStages } from '../../../types';
 import { log } from '../utils';
 import { calculateStat } from './statCalculator';
 import { BATTLE_MESSAGES } from '../../../data/battleMessages';
@@ -144,10 +144,31 @@ export function calculateDamage(
     }
 
     const ignoresAbilities = MoldBreaker.suppressesAbilities(attacker.ability) || MoongeistBeam.ignoresAbilities(move);
-    const ignoreAttackerStages = Unaware.shouldIgnoreOpponentAttackStages(defender, attacker.ability, isGasActive);
+
+    // Acerto crítico ignora APENAS as mudanças de estágio que reduziriam o dano:
+    // reduções ofensivas do atacante e aumentos defensivos do defensor.
+    // Aumentos ofensivos e reduções defensivas continuam valendo (regra oficial).
+    const offensiveStageOwner = move.name === 'foul-play' ? defender : attacker;
+    const offensiveStageKey: keyof StatStages =
+        move.name === 'body-press'
+            ? 'defense'
+            : effectiveCategory === 'physical'
+                ? 'attack'
+                : 'spAttack';
+    const defensiveStageKey: keyof StatStages =
+        Psyshock.targetsPhysicalDefense(move.name) || effectiveCategory === 'physical'
+            ? 'defense'
+            : 'spDefense';
+    const critIgnoresOffensiveDrop = isCrit && offensiveStageOwner.statStages[offensiveStageKey] < 0;
+    const critIgnoresDefensiveBoost = isCrit && defender.statStages[defensiveStageKey] > 0;
+
+    const ignoreAttackerStages = Unaware.shouldIgnoreOpponentAttackStages(defender, attacker.ability, isGasActive)
+        || critIgnoresOffensiveDrop;
     
     // Unaware OR Chip Away ignores defender stages
-    const ignoreDefenderStages = Unaware.shouldIgnoreOpponentDefenseStages(attacker, isGasActive) || ChipAway.shouldIgnoreDefensiveStats(move);
+    const ignoreDefenderStages = Unaware.shouldIgnoreOpponentDefenseStages(attacker, isGasActive)
+        || ChipAway.shouldIgnoreDefensiveStats(move)
+        || critIgnoresDefensiveBoost;
 
     let attackStat = 0;
 

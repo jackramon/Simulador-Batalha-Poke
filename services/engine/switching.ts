@@ -6,6 +6,7 @@ import * as NaturalCure from './handlers/abilities/natural_cure';
 import * as ZeroToHero from './handlers/abilities/zero_to_hero';
 import * as Hazards from './handlers/hazards';
 import { acquireBattleDraft, rehydratePokemon, releaseBattleDraft } from './stateTransactions';
+import { isSnowyWeather } from './mechanics/weather';
 import { BattlePRNG } from '../../utils/prng';
 
 export function performSwitch(
@@ -150,7 +151,7 @@ function performSwitchDraft(
         if (newPokemon.heldItem === 'heat-rock' && state.weather === 'sun') state.weatherTurns = 8;
         if (newPokemon.heldItem === 'damp-rock' && state.weather === 'rain') state.weatherTurns = 8;
         if (newPokemon.heldItem === 'smooth-rock' && state.weather === 'sand') state.weatherTurns = 8;
-        if (newPokemon.heldItem === 'icy-rock' && state.weather === 'hail') state.weatherTurns = 8;
+        if (newPokemon.heldItem === 'icy-rock' && isSnowyWeather(state.weather)) state.weatherTurns = 8;
       }
   }
 

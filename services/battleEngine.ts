@@ -4,6 +4,7 @@ import { getRawStat, calculateTypeEffectiveness, calculateHitChance, getEffectiv
 import { TWO_TURN_MOVES, RECHARGE_MOVES, DRAIN_MOVES } from '../data/moves';
 import { WEATHER_DATA } from '../data/general';
 import { STAT_NAMES_PT } from '../data/pokemon';
+import { isSnowyWeather } from './engine/mechanics/weather';
 import * as Effects from './effectHandlers';
 
 function log(logs: LogEntry[], message: string, color: string = 'text-gray-700') {
@@ -55,7 +56,7 @@ export function performSwitch(
     if (newPokemon.heldItem === 'heat-rock' && state.weather === 'sun') state.weatherTurns = 8;
     if (newPokemon.heldItem === 'damp-rock' && state.weather === 'rain') state.weatherTurns = 8;
     if (newPokemon.heldItem === 'smooth-rock' && state.weather === 'sand') state.weatherTurns = 8;
-    if (newPokemon.heldItem === 'icy-rock' && state.weather === 'hail') state.weatherTurns = 8;
+    if (newPokemon.heldItem === 'icy-rock' && isSnowyWeather(state.weather)) state.weatherTurns = 8;
   }
 
   return { newState: state, logs };
@@ -202,6 +203,7 @@ export function executeMove(
             if (move.name === 'rain-dance') { state.weather = 'rain'; log(logs, 'Começou a chover!', 'text-blue-500'); }
             if (move.name === 'sandstorm') { state.weather = 'sand'; log(logs, 'Uma tempestade de areia se formou!', 'text-yellow-600'); }
             if (move.name === 'hail') { state.weather = 'hail'; log(logs, 'Começou a cair granizo!', 'text-cyan-500'); }
+            if (move.name === 'snowscape') { state.weather = 'snow'; log(logs, 'Começou a nevar!', 'text-cyan-500'); }
             state.weatherTurns = 5;
          } else if (move.name === 'trick-room') {
             state.trickRoomActive = !state.trickRoomActive;

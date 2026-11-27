@@ -242,7 +242,8 @@ export function getAbilityDamageMultiplier(
   const chargedMult = Electromorphosis.getChargedMultiplier(attacker, move.type);
   if (chargedMult > 1) multiplier *= chargedMult;
 
-  if (attacker.ability === 'rocky-payload' && move.type === 'rock') multiplier *= 1.5;
+  // Rocky Payload: o multiplicador de 1.5x vem exclusivamente do handler modular acima.
+  // Uma segunda multiplicação inline aqui acumulava 2.25x, contrariando a regra oficial.
   if (attacker.ability === 'rocky-payload' && hitIndex === 0 && move.type === 'rock') log(logs, `A Carga Rochosa de ${attacker.name} aumentou o poder do golpe!`, 'text-gray-700 font-bold italic text-xs');
 
   if (attacker.ability === 'water-bubble' && move.type === 'water') multiplier *= 2;

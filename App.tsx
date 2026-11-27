@@ -23,6 +23,7 @@ const WEATHER_BG_COLORS: Record<string, string> = {
     'sun': '#fcd34d', 
     'rain': '#93c5fd', 
     'sand': '#d6d3d1', 
+    'snow': '#e0f2fe',
     'hail': '#67e8f9', 
     'none': '#f3f4f6'  
 };
@@ -36,7 +37,7 @@ const TERRAIN_BG_COLORS: Record<string, string> = {
 };
 
 const WEATHER_BG_COLORS_DARK: Record<string, string> = {
-  'sun': '#451a03', 'rain': '#0c1a2e', 'sand': '#1c1917', 'hail': '#082f49', 'none': '#0f172a'
+  'sun': '#451a03', 'rain': '#0c1a2e', 'sand': '#1c1917', 'snow': '#0c4a6e', 'hail': '#082f49', 'none': '#0f172a'
 };
 const TERRAIN_BG_COLORS_DARK: Record<string, string> = {
   'electric': '#713f12', 'grassy': '#052e16', 'misty': '#500724', 'psychic': '#3b0764', 'none': '#0f172a'

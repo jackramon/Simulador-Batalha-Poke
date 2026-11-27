@@ -297,6 +297,7 @@ export const BattleScene: React.FC<BattleSceneProps> = ({
           </div>
         );
       case 'hail':
+      case 'snow':
         return (
           <div className="absolute inset-0 pointer-events-none z-20 opacity-70">
              <div className="absolute inset-0 animate-snow" style={{

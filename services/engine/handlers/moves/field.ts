@@ -3,6 +3,7 @@ import { BattleState, Move, Pokemon, LogEntry } from '../../../../types';
 import { getPokemonPlayerNum } from '../../../../utils/pokemonIdentity';
 import { log } from '../../utils';
 import { BATTLE_MESSAGES } from '../../../../data/battleMessages';
+import { isSnowyWeather } from '../../mechanics/weather';
 import * as Forecast from '../abilities/forecast';
 
 export function handleFieldMove(state: BattleState, move: Move, logs: LogEntry[]) {
@@ -28,7 +29,7 @@ export function handleFieldMove(state: BattleState, move: Move, logs: LogEntry[]
         weatherLog = 'Começou a cair granizo!';
         weatherColor = 'text-cyan-500 font-bold';
     } else if (move.name === 'snowscape') {
-        newWeather = 'hail'; // Represents Snow/Hail mechanics
+        newWeather = 'snow';
         weatherLog = 'Começou a nevar!';
         weatherColor = 'text-cyan-500 font-bold';
     }
@@ -78,7 +79,7 @@ export function handleScreens(state: BattleState, attacker: Pokemon, move: Move,
             log(logs, `Tela de Luz aumentou a defesa especial do time de ${attacker.name}!`, 'text-blue-600 font-bold');
         }
     } else if (move.name === 'aurora-veil') {
-        if (state.weather !== 'hail') {
+        if (!isSnowyWeather(state.weather)) {
             log(logs, `Véu Aurora falhou! Requer granizo/neve.`, 'text-gray-500 italic');
         } else if (hazards.auroraVeil > 0) {
             log(logs, `Véu Aurora já está ativo!`, 'text-gray-500 italic');

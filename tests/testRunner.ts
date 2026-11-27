@@ -21,6 +21,11 @@ import { handlePerishSongStart, handlePerishCount } from '../services/engine/han
 import { handleStrengthSap } from '../services/engine/handlers/moves/strengthSap';
 import { handleIonDeluge, getEffectiveMoveType } from '../services/engine/handlers/moves/ionDeluge';
 import { handleHowl } from '../services/engine/handlers/moves/howl';
+import { executeMove } from '../services/engine/moves';
+import { getAbilityDamageMultiplier } from '../services/engine/handlers/abilities/damageModifiers';
+import { getEffectiveSpeed } from '../services/battleUtils';
+import { handleWeatherDamage } from '../services/engine/handlers/moves/weather_damage';
+import { calculateStat } from '../services/engine/handlers/statCalculator';
 import { BattlePRNG } from '../utils/prng';
 
 export function runTests() {
@@ -319,6 +324,71 @@ export function runTests() {
   handleHowl(howlAttacker, howlLogs, howlState);
 
   console.log(howlAttacker.statStages.attack === 1 ? '✅ Ataque aumentado' : '❌ Falha ao aumentar ataque');
+  console.groupEnd();
+
+  // --- TESTE: REGRAS 4.1.1 (TERA STELLAR, ROCKY PAYLOAD, CRÍTICO, SURGE SURFER, SNOW/HAIL) ---
+  console.group('%c🔧 Teste: Regras 4.1.1', 'color: #7c3aed;');
+  const smokeConfig = {
+    p1Mode: 'manual', p1TeamSize: 1, p1Input: '', p2Mode: 'manual', p2TeamSize: 1, p2Input: '',
+    opponentMode: 'manual', weatherEnabled: false, terrainEnabled: false, itemsEnabled: false,
+    terastallizationEnabled: true, megaEvolutionEnabled: false, moveLimitEnabled: false,
+    p1AutoMode: false, randomIvs: false, randomLevels: false,
+    forceAccuracyOutcome: 'hit', fixedRoll: 92.5,
+  } as any;
+
+  const stellarMove: Move = { name: 'thunder-shock', type: 'electric', power: 60, damageClass: 'special', accuracy: 100 } as Move;
+  const stellarDamage = (defenderOverrides: Record<string, unknown>) => {
+    const attacker = createDummy({ id: 901, name: 'Atacante 4.1.1', types: ['normal'], attackStat: 120, spAttackStat: 120, speedStat: 120, moves: [stellarMove] });
+    const defender = createDummy({ id: 902, name: 'Defensor 4.1.1', types: ['water'], hp: 400, maxHP: 400, defenseStat: 100, spDefenseStat: 100, speedStat: 80, ...defenderOverrides });
+    const state = createBattleState([attacker], [defender], { prngState: { seed: 4111, state: 4111, cursor: 0 } });
+    const result = executeMove(state, attacker, defender, stellarMove, smokeConfig);
+    return { lost: 400 - result.newState.currentPokemon2!.hp, messages: result.logs.map(entry => entry.message) };
+  };
+  const stellarBaseline = stellarDamage({});
+  const stellarDefense = stellarDamage({ isTerastallized: true, teraType: 'stellar' });
+  console.log(stellarDefense.lost === stellarBaseline.lost && stellarDefense.messages.includes('É super efetivo!')
+    ? '✅ 4.1.1 Tera Stellar preserva os tipos defensivos e a eficácia'
+    : `❌ 4.1.1 Tera Stellar divergiu (${stellarDefense.lost} vs ${stellarBaseline.lost})`);
+
+  const rockyAttacker = createDummy({ name: 'Bombirdier', ability: 'rocky-payload' });
+  const rockyMove: Move = { name: 'rock-slide', type: 'rock', power: 75, damageClass: 'physical', accuracy: 100 } as Move;
+  const rockyMultiplier = getAbilityDamageMultiplier(rockyAttacker, createDummy(), rockyMove, 0, [], 'none', false, undefined, 1);
+  console.log(rockyMultiplier === 1.5
+    ? '✅ 4.1.1 Rocky Payload multiplica por 1.5'
+    : `❌ 4.1.1 Rocky Payload multiplicou por ${rockyMultiplier}`);
+
+  const critMove: Move = { name: 'golpe-fixo', type: 'normal', power: 80, damageClass: 'physical', accuracy: 100 } as Move;
+  const critDamage = (attackStage: number, defenseStage: number) => {
+    const attacker = createDummy({ types: ['normal'], attackStat: 120, speedStat: 100, moves: [critMove], statStages: { accuracy: 0, evasion: 0, attack: attackStage, defense: 0, spAttack: 0, spDefense: 0, speed: 0 } });
+    const defender = createDummy({ types: ['normal'], hp: 500, maxHP: 500, defenseStat: 100, speedStat: 80, statStages: { accuracy: 0, evasion: 0, attack: 0, defense: defenseStage, spAttack: 0, spDefense: 0, speed: 0 } });
+    const state = createBattleState([attacker], [defender]);
+    return calculateDamage(attacker, defender, critMove, 'none', true, 1, 0, [], state, 92.5);
+  };
+  console.log(critDamage(-2, 0) === critDamage(0, 0) && critDamage(0, 2) === critDamage(0, 0) && critDamage(2, 0) > critDamage(0, 0)
+    ? '✅ 4.1.1 Crítico ignora somente os estágios oficiais'
+    : '❌ 4.1.1 Crítico tratou os estágios incorretamente');
+
+  const surfer = createDummy({ speedStat: 100, ability: 'surge-surfer' });
+  const surferBase = getEffectiveSpeed(surfer, 'none', false, 'none', false);
+  console.log(getEffectiveSpeed(surfer, 'none', false, 'electric', false) === surferBase * 2
+    && getEffectiveSpeed(surfer, 'none', false, 'grass', false) === surferBase
+    && getEffectiveSpeed(surfer, 'none', false, 'electric', true) === surferBase
+    ? '✅ 4.1.1 Surge Surfer dobra somente no terreno elétrico e respeita a supressão'
+    : '❌ 4.1.1 Surge Surfer aplicou a velocidade incorretamente');
+
+  const snowTarget = createDummy({ types: ['normal'], hp: 160, maxHP: 160 });
+  const snowLogs: LogEntry[] = [];
+  handleWeatherDamage(snowTarget, 'snow', snowLogs);
+  const hailTarget = createDummy({ types: ['normal'], hp: 160, maxHP: 160 });
+  const hailLogs: LogEntry[] = [];
+  handleWeatherDamage(hailTarget, 'hail', hailLogs);
+  const iceTarget = createDummy({ types: ['ice'], defenseStat: 100 });
+  const iceBase = calculateStat(iceTarget, 'defense', 'none');
+  console.log(snowTarget.hp === 160 && snowLogs.length === 0
+    && hailTarget.hp < 160
+    && calculateStat(iceTarget, 'defense', 'snow') === Math.floor(iceBase * 1.5)
+    ? '✅ 4.1.1 Snow não causa dano, mantém a Defesa de Gelo e o Hail legado segue separado'
+    : '❌ 4.1.1 Snow/Hail divergiram');
   console.groupEnd();
 
   console.groupEnd();

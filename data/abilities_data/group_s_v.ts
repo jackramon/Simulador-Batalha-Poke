@@ -25,7 +25,7 @@ export const GROUP_S_V: Record<string, any> = {
   'slush-rush': { name: 'Raspa-Neve', type: 'passive', desc: 'Dobra a Velocidade durante granizo/neve.' },
   'sniper': { name: 'Franco-Atirador', type: 'passive', desc: 'Aumenta o multiplicador de dano dos acertos críticos de 1.5x para 2.25x.' },
   'snow-cloak': { name: 'Manto de Neve', type: 'passive', desc: 'Aumenta a evasiva sob granizo/neve.' },
-  'snow-warning': { name: 'Alerta de Neve', type: 'onEntry', desc: 'Invoca Granizo ao entrar em batalha.', weather: 'hail' },
+  'snow-warning': { name: 'Alerta de Neve', type: 'onEntry', desc: 'Invoca a neve ao entrar em batalha.', weather: 'snow' },
   'solar-power': { name: 'Poder Solar', type: 'passive', desc: 'Aumenta o Atq. Especial em 50% sob sol forte, mas perde HP a cada turno.' },
   'solid-rock': { name: 'Rocha Sólida', type: 'immunity', value: 'super-effective', desc: 'Reduz o dano de ataques super efetivos.' },
   'soul-heart': { name: 'Coração de Alma', type: 'passive', desc: 'Aumenta o Atq. Especial toda vez que algum Pokémon em campo desmaia.' },

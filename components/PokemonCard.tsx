@@ -188,7 +188,7 @@ export const PokemonCard: React.FC<PokemonCardProps> = ({ pokemon, isPlayer, wea
     if (stat === 'speed') {
         const isSwiftSwim = pokemon?.ability === 'swift-swim' && weather === 'rain';
         const isChlorophyll = pokemon?.ability === 'chlorophyll' && weather === 'sun';
-        const isSlushRush = pokemon?.ability === 'slush-rush' && weather === 'hail';
+        const isSlushRush = pokemon?.ability === 'slush-rush' && (weather === 'snow' || weather === 'hail');
         const isSandRush = pokemon?.ability === 'sand-rush' && weather === 'sand';
         const isUnburden = !!pokemon?.statusEffects?.['unburden-active'];
         const isScarf = pokemon?.heldItem === 'choice-scarf';

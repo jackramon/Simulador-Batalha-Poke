@@ -11,6 +11,7 @@ import * as MoldBreaker from '../handlers/abilities/mold_breaker';
 import * as MyceliumMight from '../handlers/abilities/mycelium_might';
 import * as Unaware from '../handlers/abilities/unaware';
 import * as ChipAway from '../handlers/moves/chipAway';
+import { isSnowyWeather } from './weather';
 
 export function calculateHitChance(move: Move, attacker: Pokemon, defender: Pokemon, weather: string, gravity: boolean = false): number | '∞' {
   // ==================================================================
@@ -40,7 +41,7 @@ export function calculateHitChance(move: Move, attacker: Pokemon, defender: Poke
   }
 
   // Clima: Granizo/Neve (Blizzard)
-  if (weather === 'hail' && move.name === 'blizzard') return '∞';
+  if (isSnowyWeather(weather) && move.name === 'blizzard') return '∞';
 
   // Toxic usado por tipo Venenoso
   if (move.name === 'toxic' && attacker.types.includes('poison')) return '∞';
@@ -112,7 +113,7 @@ export function calculateHitChance(move: Move, attacker: Pokemon, defender: Poke
 
   if (!ignoresAbilities) {
       if (defender.ability === 'sand-veil' && weather === 'sand') defenderModifier *= 0.8;
-      if (defender.ability === 'snow-cloak' && weather === 'hail') defenderModifier *= 0.8;
+      if (defender.ability === 'snow-cloak' && isSnowyWeather(weather)) defenderModifier *= 0.8;
       if (defender.ability === 'tangled-feet' && defender.statusEffects.confusion) defenderModifier *= 0.5;
   }
 

@@ -8,7 +8,7 @@
 - Mantenha `PROJECT_CONTEXT.md` atualizado a cada alteração.
 - Para economizar tokens: inspecione somente os arquivos da tarefa e suas dependências diretas, reutilize a baseline registrada, use testes focados durante a iteração e rode a suíte completa na validação final. Não refaça auditorias globais já concluídas.
 
-**Próximo item:** 4.1 — Corrigir regras e ciclos de vida ainda incorretos após a base consolidada estar verde.
+**Próximo item:** 4.1.2 — Conectar efeitos temporários ainda sem ciclo de vida completo.
 
 ## Etapa 0 — Restaurar uma baseline confiável
 
@@ -227,10 +227,21 @@
 
 ## Etapa 4 — Endurecimento e expansão
 
-- [ ] **4.1 — Corrigir regras e ciclos de vida ainda incorretos após a base consolidada estar verde.**
-  - Corrigir Tera Stellar defensivo, duplicação de Rocky Payload, críticos com estágios, velocidade com terreno e distinção Snow/Hail.
-  - Conectar e testar os ticks ainda ausentes de Taunt, Encore, Disable, Magnet Rise, Telekinesis, Glaive Rush e efeitos equivalentes.
-  - Revisar wiring de habilidades já existentes, como Good as Gold, sem usar a quantidade de arquivos como prova de funcionamento.
+- [x] **4.1.1 — Corrigir regras de dano, tipo e velocidade.**
+  - **Tera Stellar defensivo**: `movePipeline` só substitui os tipos defensivos quando o `teraType` é um tipo real; com `stellar` mantém `defender.types`. O tipo Estelar segue ofensivo (Tera Blast/Tera Starstorm, 2x contra alvos Terastalizados). Antes a defesa virava `['stellar']`, que não tem tabela defensiva, e todo golpe ficava neutro.
+  - **Rocky Payload**: removida a segunda multiplicação inline em `damageModifiers`; o modificador agora é exatamente 1.5x (antes o handler e o inline acumulavam 2.25x).
+  - **Críticos com estágios**: `damageUtils` ignora no crítico a redução ofensiva do atacante e o aumento defensivo do defensor, preservando aumentos ofensivos e reduções defensivas. Foul Play usa o Ataque do alvo, Body Press usa a Defesa do atacante e Psyshock usa a Defesa física; Unaware/Chip Away/Sacred Sword/Darkest Lariat permanecem intactos.
+  - **Surge Surfer**: `getEffectiveSpeed` passou a receber terreno e estado do Gás Neutralizante, e `getSortedActions` repassa `state.terrain` e a supressão. A Velocidade dobra somente no Campo Elétrico.
+  - **Snow/Hail**: novo clima `snow` (Neve da Gen 9) sem dano residual e com o aumento de Defesa de Gelo (1.5x); `hail` permanece como Granizo legado, com dano residual separado. Alerta de Neve e Paisagem de Neve produzem `snow`; Blizzard, Manto de Neve, Corpo de Gelo, Raspa-Neve, Cara de Gelo, Previsão, Bola Climática, Raio Solar, Véu Aurora e Icy Rock aceitam os dois climas via `isSnowyWeather`. A UI cobre `snow` (cores, partículas, BGM, indicador de Raspa-Neve).
+  - **Replay**: `REPLAY_ENGINE_REVISION` passou a `4.1.1` para registrar a mudança semântica das regras; `formatVersion` permanece `1`. Replays antigos podem divergir e a divergência continua sendo reportada como divergência real, sem tolerância que a esconda.
+  - Cobertura: 6 arquivos e 24 testes (`teraStellarDefense`, `rockyPayloadBoost`, `criticalStatStages`, `surgeSurferOrdering`, `snowHailSeparation`, `replayEngineRevision411`), com RED comprovado antes da correção (13 falhas) e comparação de estado final, hash e cursor no replay.
+  - Validação: 24 testes focados; suíte completa com 66 arquivos e **323 aprovados, 0 `it.todo`**; `npm run lint`, `npm run build` e `git diff --check` aprovados.
+  - Smoke no bundle de produção (`NODE_ENV=production`, porta 38841, `assets/index-*.js` sem `@vite/client`): os cinco casos executados no playground do navegador (`window.loadAndRunTests`) exibiram `✅` para Tera Stellar, Rocky Payload 1.5x, crítico, Surge Surfer e Snow/Hail, com zero `❌`, zero erros de console e zero requisições de rede; porta liberada.
+  - Próximo item: 4.1.2. Commit: informado no resumo final após o push verificado em `origin/main`.
+- [ ] **4.1.2 — Conectar efeitos temporários ainda sem ciclo de vida completo.**
+  - Conectar e testar os ticks ainda ausentes de Taunt, Encore, Disable, Magnet Rise, Telekinesis, Glaive Rush e efeitos equivalentes, sem duplicar execuções no turnEnd.
+- [ ] **4.1.3 — Revisar wiring de habilidades existentes.**
+  - Usar Good as Gold como caso de prova e fazer auditoria dirigida de handlers sem importadores, sem usar a quantidade de arquivos como evidência de funcionamento.
 - [ ] **4.2 — Conectar a importação de equipes no formato Showdown.**
 - [ ] **4.3 — Melhorar acessibilidade, semântica dos diálogos e suporte a movimento reduzido.**
 - [ ] **4.4 — Separar animações e estatísticas da interpretação frágil de strings de logs.**

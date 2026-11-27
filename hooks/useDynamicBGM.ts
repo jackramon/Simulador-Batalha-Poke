@@ -55,6 +55,7 @@ export const useDynamicBGM = (state: BattleState) => {
                     case 'rain': track = BGM_WEATHER_RAIN; break;
                     case 'sand': track = BGM_WEATHER_SAND; break;
                     case 'hail': track = BGM_WEATHER_HAIL; break;
+                    case 'snow': track = BGM_WEATHER_HAIL; break;
                     default: track = BGM_BATTLE_NORMAL;
                 }
             }

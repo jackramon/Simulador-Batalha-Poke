@@ -14,6 +14,7 @@ import * as OrichalcumPulse from './abilities/orichalcum_pulse';
 import * as HadronEngine from './abilities/hadron_engine';
 import * as SwiftSwim from './abilities/swift_swim';
 import * as SurgeSurfer from './abilities/surge_surfer';
+import { isSnowyWeather } from '../mechanics/weather';
 
 export function getStatStageMultiplier(stage: number): number {
   stage = Math.max(-6, Math.min(6, stage));
@@ -97,7 +98,7 @@ export function calculateStat(
   }
 
   // Modificador de Neve (Snow/Hail) para Defesa de tipos Gelo (Gen 9)
-  if (statType === 'defense' && weather === 'hail' && pokemon.types.includes('ice')) {
+  if (statType === 'defense' && isSnowyWeather(weather) && pokemon.types.includes('ice')) {
     val = Math.floor(val * 1.5);
   }
 
@@ -122,7 +123,7 @@ export function calculateStat(
         val = Math.floor(val * SandRush.getSpeedMultiplier(pokemon, weather));
         val = Math.floor(val * SurgeSurfer.getSpeedMultiplier(pokemon, terrain));
         
-        if (pokemon.ability === 'slush-rush' && weather === 'hail') val *= 2;
+        if (pokemon.ability === 'slush-rush' && isSnowyWeather(weather)) val *= 2;
         
         val = Math.floor(val * QuickFeet.getSpeedMultiplier(pokemon, isGasActive));
 

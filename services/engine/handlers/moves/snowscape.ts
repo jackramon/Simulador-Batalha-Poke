@@ -1,12 +1,13 @@
 
 import { BattleState, LogEntry, Pokemon } from '../../../../types';
 import { log } from '../../utils';
+import { isSnowyWeather } from '../../mechanics/weather';
 import * as Forecast from '../abilities/forecast';
 
 /**
  * Lógica para o movimento Paisagem de Neve (Snowscape).
  * Efeito:
- * 1. Muda o clima para Neve (Hail no sistema) por 5 turnos.
+ * 1. Muda o clima para Neve (`snow`, sem dano residual) por 5 turnos.
  * 2. Se o usuário segurar Icy Rock, dura 8 turnos.
  * 3. Aumenta a Defesa de tipos Gelo em 50% (implementado em statCalculator.ts).
  */
@@ -15,12 +16,12 @@ export function handleSnowscape(
     logs: LogEntry[], 
     attacker: Pokemon
 ) {
-    if (state.weather === 'hail') {
+    if (isSnowyWeather(state.weather)) {
         log(logs, `Mas falhou! Já está nevando.`, 'text-gray-500 italic');
         return;
     }
 
-    state.weather = 'hail';
+    state.weather = 'snow';
     state.weatherTurns = attacker.heldItem === 'icy-rock' ? 8 : 5;
 
     log(logs, `Começou a nevar!`, 'text-cyan-500 font-bold');

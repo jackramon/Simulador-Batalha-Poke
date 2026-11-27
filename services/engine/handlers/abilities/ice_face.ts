@@ -1,5 +1,6 @@
 import { Pokemon, Move } from '../../../../types';
 import { log } from '../../utils';
+import { isSnowyWeather } from '../../mechanics/weather';
 
 /**
  * Lógica para a habilidade Cara de Gelo (Ice Face).
@@ -32,7 +33,7 @@ export function handleIceFaceDamage(defender: Pokemon, move: Move, damage: numbe
 }
 
 export function checkIceFaceRestoration(pokemon: Pokemon, weather: string, logs: {message: string, color: string}[]): boolean {
-    if (pokemon.ability !== 'ice-face' || !pokemon.statusEffects['ice-face-broken'] || weather !== 'hail' || pokemon.isFainted) {
+    if (pokemon.ability !== 'ice-face' || !pokemon.statusEffects['ice-face-broken'] || !isSnowyWeather(weather) || pokemon.isFainted) {
         return false;
     }
 

@@ -1,6 +1,7 @@
 import { Pokemon, BattleState } from '../../../../types';
 import { log } from '../../utils';
 import { TYPE_NAMES_PT } from '../../../../data/types';
+import { isSnowyWeather } from '../../mechanics/weather';
 import * as NeutralizingGas from './neutralizing_gas';
 import * as AirLock from './air_lock';
 
@@ -35,7 +36,7 @@ export function handleForecast(pokemon: Pokemon, state: BattleState, logs: { mes
     } else if (effectiveWeather === 'rain') {
         targetType = 'water';
         spriteId = 10014;
-    } else if (effectiveWeather === 'hail') {
+    } else if (isSnowyWeather(effectiveWeather)) {
         targetType = 'ice';
         spriteId = 10015;
     }

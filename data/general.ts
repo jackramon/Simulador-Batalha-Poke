@@ -4,7 +4,8 @@ export const WEATHER_DATA: Record<string, {name: string; class: string; desc: st
   'sun': { name: 'Sol Forte', class: 'bg-orange-100 border-orange-400 text-orange-800', desc: 'Aumenta ataques de Fogo (1.5x), reduz Água (0.5x).', icon: '🔥' },
   'rain': { name: 'Chuva', class: 'bg-blue-100 border-blue-400 text-blue-800', desc: 'Aumenta ataques de Água (1.5x), reduz Fogo (0.5x).', icon: '💧' },
   'sand': { name: 'Tempestade de Areia', class: 'bg-yellow-100 border-yellow-400 text-yellow-800', desc: 'Dano residual em não-Pedra/Terra/Aço. Aumenta Def. Esp. de Pedra (1.5x).', icon: '🌪️' },
-  'hail': { name: 'Granizo', class: 'bg-cyan-100 border-cyan-400 text-cyan-800', desc: 'Dano residual em não-Gelo.', icon: '❄️' }
+  'snow': { name: 'Neve', class: 'bg-cyan-50 border-cyan-300 text-cyan-700', desc: 'Sem dano residual. Aumenta a Defesa de tipos Gelo (1.5x).', icon: '🌨️' },
+  'hail': { name: 'Granizo', class: 'bg-cyan-100 border-cyan-400 text-cyan-800', desc: 'Clima legado: dano residual em não-Gelo.', icon: '❄️' }
 };
 
 export const TERRAIN_DATA: Record<string, {name: string; class: string; desc: string; icon: string}> = {

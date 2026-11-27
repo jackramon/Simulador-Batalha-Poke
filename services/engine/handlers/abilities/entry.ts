@@ -45,6 +45,7 @@ import * as Pressure from './pressure';
 import * as Forewarn from './forewarn';
 import * as OrichalcumPulse from './orichalcum_pulse';
 import * as SnowWarning from './snow_warning';
+import { isSnowyWeather } from '../../mechanics/weather';
 import * as Drought from './drought';
 import * as Frisk from './frisk';
 import * as SupremeOverlord from './supreme_overlord';
@@ -176,7 +177,7 @@ export function handleEntryAbilities(
     MagmaArmor.checkMagmaArmor(pokemon, logs);
     BallFetch.handleBallFetch(pokemon, logs);
     
-    if (weatherEnabled && state.weather === 'hail') {
+    if (weatherEnabled && isSnowyWeather(state.weather)) {
         IceFace.checkIceFaceRestoration(pokemon, state.weather, logs);
     }
 

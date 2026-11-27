@@ -1,4 +1,6 @@
 
+import { isSnowyWeather } from '../../mechanics/weather';
+
 /**
  * Lógica para o movimento Bola Climática (Weather Ball).
  * Regra Oficial:
@@ -14,7 +16,7 @@ export function getEffectiveType(weather: string): string {
     if (weather === 'sun') return 'fire';
     if (weather === 'rain') return 'water';
     if (weather === 'sand') return 'rock';
-    if (weather === 'hail') return 'ice';
+    if (isSnowyWeather(weather)) return 'ice';
     return 'normal';
 }
 

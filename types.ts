@@ -233,7 +233,7 @@ export interface BattleState {
   p2MegaUsed?: boolean;
   
   turn: number;
-  weather: 'none' | 'sun' | 'rain' | 'sand' | 'hail';
+  weather: 'none' | 'sun' | 'rain' | 'sand' | 'snow' | 'hail';
   weatherTurns: number;
   terrain: 'none' | 'electric' | 'grassy' | 'misty' | 'psychic'; // Adicionado terrenos
   terrainTurns: number; // Adicionado contador de turnos de terreno

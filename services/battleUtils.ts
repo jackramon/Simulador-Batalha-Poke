@@ -38,10 +38,14 @@ export function getRawStat(
 export function getEffectiveSpeed(
     pokemon: Pokemon, 
     weather: string,
-    isTailwindActive: boolean = false
+    isTailwindActive: boolean = false,
+    terrain: string = 'none',
+    isGasActive: boolean = false
 ): number {
-  // Speed calculation with terrain and tailwind
-  return StatCalculator.calculateStat(pokemon, 'speed', weather, false, false, 'none', isTailwindActive);
+  // Velocidade efetiva da ordenação de ações: inclui terreno (Surge Surfer) e
+  // supressão de habilidade (Gás Neutralizante). O clima vem do chamador já filtrado
+  // por Air Lock/Cloud Nine.
+  return StatCalculator.calculateStat(pokemon, 'speed', weather, isGasActive, false, terrain, isTailwindActive);
 }
 
 export function isContactMove(move: Move): boolean {

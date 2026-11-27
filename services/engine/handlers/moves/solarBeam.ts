@@ -2,6 +2,7 @@
 import { Pokemon, Move, BattleState } from '../../../../types';
 import { log } from '../../utils';
 import { BATTLE_MESSAGES } from '../../../../data/battleMessages';
+import { isSnowyWeather } from '../../mechanics/weather';
 
 /**
  * Lógica para o movimento Raio Solar (Solar Beam).
@@ -22,7 +23,7 @@ export function getSolarBeamPower(
 
     const weather = state.weather;
     // Reduz o poder se o clima for Chuva, Areia ou Granizo
-    if (weather === 'rain' || weather === 'sand' || weather === 'hail') {
+    if (weather === 'rain' || weather === 'sand' || isSnowyWeather(weather)) {
         if (hitIndex === 0) {
             log(logs, BATTLE_MESSAGES.WEATHER_REDUCED_POWER(move.displayName), 'text-gray-500 text-xs italic');
         }

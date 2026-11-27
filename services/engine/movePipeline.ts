@@ -445,7 +445,11 @@ export function executeDamageMoveStep(ctx: MovePipelineContext): void {
         // CORREÇÃO CRÍTICA: Passar state para verificar Lucky Chant
         if (isCrit && CriticalAbility.isImmuneToCritical(defender, ignoresAbilities, state)) isCrit = false;
 
-        const defenderTypes = defender.isTerastallized ? [defender.teraType || 'normal'] : defender.types;
+        // Terastal Estelar não tem tipo defensivo: os tipos originais continuam valendo.
+        // O tipo 'stellar' existe apenas ofensivamente (Tera Blast/Tera Starstorm).
+        const defenderTypes = defender.isTerastallized && defender.teraType !== 'stellar'
+            ? [defender.teraType || 'normal']
+            : defender.types;
         const defenderStatus = { ...defender.statusEffects, isTerastallized: defender.isTerastallized };
         const eff = calculateTypeEffectiveness(effectiveType, defenderTypes, defender.ability, attacker.ability, move.name, defenderStatus);
       

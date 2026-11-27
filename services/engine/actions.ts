@@ -10,6 +10,7 @@ import * as QuickDraw from './handlers/abilities/quick_draw';
 import * as Pursuit from './handlers/moves/pursuit';
 import * as GrassyGlide from './handlers/moves/grassyGlide';
 import * as PriorityItems from './handlers/items/priority';
+import * as NeutralizingGas from './handlers/abilities/neutralizing_gas';
 import { getPokemonPlayerNum } from '../../utils/pokemonIdentity';
 import { BattlePRNG } from '../../utils/prng';
 
@@ -97,8 +98,9 @@ export function getSortedActions(actions: Action[], state: BattleState, prng?: B
     const isP1B = getPokemonPlayerNum(state, b.action.user) === 1;
     const tailwindB = isP1B ? state.p1Hazards.tailwind > 0 : state.p2Hazards.tailwind > 0;
 
-    let speedA = getEffectiveSpeed(a.action.user, effectiveWeather, tailwindA);
-    let speedB = getEffectiveSpeed(b.action.user, effectiveWeather, tailwindB);
+    const isGasActive = NeutralizingGas.isGasActive(state);
+    let speedA = getEffectiveSpeed(a.action.user, effectiveWeather, tailwindA, state.terrain, isGasActive);
+    let speedB = getEffectiveSpeed(b.action.user, effectiveWeather, tailwindB, state.terrain, isGasActive);
     
     // Speed Tie RNG: Se as velocidades forem idênticas, usa o tieBreaker pré-calculado
     if (speedA === speedB) {
