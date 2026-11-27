@@ -8,7 +8,7 @@
 - Mantenha `PROJECT_CONTEXT.md` atualizado a cada alteração.
 - Para economizar tokens: inspecione somente os arquivos da tarefa e suas dependências diretas, reutilize a baseline registrada, use testes focados durante a iteração e rode a suíte completa na validação final. Não refaça auditorias globais já concluídas.
 
-**Próximo item:** 3.3 — Preservar a identidade entre Pokémon ativo e entrada correspondente da equipe.
+**Próximo item:** 3.4 — Parametrizar a IA pelo lado controlado e corrigir sua avaliação.
 
 ## Etapa 0 — Restaurar uma baseline confiável
 
@@ -183,7 +183,15 @@
   - Validação: 6 arquivos focados e 41 testes; suíte completa com 55 arquivos, 255 aprovados e 2 `it.todo` antigos (257 registrados); `npm run lint`, `npm run build` e `git diff --check` aprovados, sem novos todos.
   - Smoke no bundle de produção (`NODE_ENV=production`, porta 38131): fixture real reproduzida até `Turno: 29 / 29` sem alerta nem aviso, troca de Chi-Yu por Groudon Primitivo no turno 22 e turno 23 iniciando com o substituto; zero chamadas de rede, zero erros de console e porta liberada.
   - Próximo item: 3.3. Commit: informado no resumo final após o push verificado em `origin/main`.
-- [ ] **3.3 — Preservar a identidade entre Pokémon ativo e entrada correspondente da equipe.**
+- [x] **3.3 — Preservar a identidade entre Pokémon ativo e entrada correspondente da equipe.**
+  - `resetReplay` (`components/ReplayPlayer.tsx`) clona cada equipe uma única vez e inicializa `currentPokemon1/2` com `team1[0]`/`team2[0]` da mesma estrutura clonada, passando o resultado por `restoreActivePokemonIdentity`; nenhum ponto do player cria mais um clone independente do ativo.
+  - A identidade se mantém em dano, PP, status, desmaio, trocas voluntárias/forçadas, Mega, reinício e histórico/voltar turno: as fronteiras transacionais existentes preservam o alias e cada snapshot continua com suas próprias instâncias, sem aliases entre turnos.
+  - O `it.todo` de 3.3 virou `tests/integration/replayActiveIdentity.test.tsx`, com 7 testes executáveis no player real (mocks de `PokemonCard`/`BattleHeader`/`TurnAnimator`, espiões de `runTurn`, `assertReplayCheckpoint` e `performSwitch`): identidade após o reset e após Reiniciar; dano/PP/status/efeito de entrada na mesma instância; U-turn e troca pós-desmaio entregando exatamente o objeto da equipe; hidratação de `megaProfile` sem separar ativo e equipe; voltar turno com identidade dentro de cada snapshot e instâncias distintas entre snapshots; reprodução completa determinística.
+  - RED comprovado ao restaurar os clones independentes: falha de identidade no estado inicial e estágio de Ataque `+0` em vez de `-1` — o efeito da Intimidação aplicado na entrada ficava no clone do ativo e era descartado na primeira fronteira transacional, divergindo do checkpoint gravado.
+  - Nenhuma alteração em canonicalização, hashes, PRNG, formato ou `REPLAY_ENGINE_REVISION` (segue `3.2.2`); coordinator e motor não foram editados.
+  - Validação: 9 arquivos focados e 58 testes; suíte completa com 56 arquivos, 262 aprovados e 1 `it.todo` de 3.4 (263 registrados); `npm run lint`, `npm run build` e `git diff --check` aprovados. Um timeout de 5 s em `replayFixtureCompatibility` sob carga passou isolado (10/10) e a repetição integral ficou verde.
+  - Smoke no bundle de produção (`NODE_ENV=production`, porta 38233): fixture real 3.2.2 (seed 533665) reproduzida até `Turno: 29 / 29` com os 29 checkpoints conferindo, dano, trocas e desmaios no log (turno 29 com Mismagius × Groudon Primitivo), zero `[role=alert]`, zero `[role=status]`, zero requisições (inclusive `/api/`) e zero erros de console; porta liberada.
+  - Próximo item: 3.4. Commit: informado no resumo final após o push verificado em `origin/main`.
 - [ ] **3.4 — Parametrizar a IA pelo lado controlado e corrigir sua avaliação.**
   - Dependência de 2.5: adaptar a avaliação para consumir os `newState`/snapshots transacionais; a caracterização de 1.5 passou a fixar legalidade e determinismo, não a escolha do golpe de maior poder.
 - [ ] **3.5 — Fazer a simulação usar o mesmo coordenador, configuração e regras da batalha real.**
@@ -199,7 +207,7 @@
 
 ## Registro resumido da baseline
 
-- Última suíte integral informada: **55 arquivos, 255 testes aprovados e 2 `it.todo`** (257 registrados); os todos são lacunas de 3.3/3.4 e não contam como cobertura aprovada.
+- Última suíte integral informada: **56 arquivos, 262 testes aprovados e 1 `it.todo`** (263 registrados); o todo restante é a lacuna de 3.4 e não conta como cobertura aprovada.
 - `npm run lint`, `npm run build` e `git diff --check`: aprovados.
 - Auditoria do item 0.5: **17 → 0** ocorrências no total e **6 → 0** em produção; instalação por `npm ci` reproduzida sem alterações nos manifestos.
 - SHA dos itens 1.1 a 1.7 e dos itens 2.1/2.2/2.3/2.4/2.5 informados somente nos respectivos resumos finais após o push; último SHA registrado no roadmap: `baae8a606c37495f30810e2c646dbb234c75ac86` (item 0.4).

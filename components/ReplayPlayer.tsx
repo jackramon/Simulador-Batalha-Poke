@@ -5,6 +5,7 @@ import { BattleCoordinator } from '../services/engine/coordinator';
 import { TurnAnimator } from '../services/animation/turnAnimator';
 import { PokemonCard } from './PokemonCard';
 import { BattleHeader } from './BattleLayout';
+import { restoreActivePokemonIdentity } from '../utils/pokemonIdentity';
 import * as BattleEngine from '../services/engine';
 import * as Effects from '../services/effectHandlers';
 import {
@@ -108,12 +109,17 @@ export default function ReplayPlayer({ onClose }: ReplayPlayerProps) {
         accumulatedLogsRef.current = [initialLog];
 
         const normalizedTeams = normalizeReplayTeams(data.initialState);
-        const initialState: BattleState = {
+        // Cada equipe é clonada uma única vez e o Pokémon ativo é a própria entrada da equipe
+        // (mesma instância), como na batalha ao vivo. Clones independentes separariam ativo e
+        // equipe já no primeiro turno e fariam o hash do checkpoint divergir.
+        const team1 = structuredClone(normalizedTeams.team1);
+        const team2 = structuredClone(normalizedTeams.team2);
+        const initialState: BattleState = restoreActivePokemonIdentity({
             prngState: createBattlePRNGState(data.seed),
-            team1: structuredClone(normalizedTeams.team1),
-            team2: structuredClone(normalizedTeams.team2),
-            currentPokemon1: structuredClone(normalizedTeams.team1[0]),
-            currentPokemon2: structuredClone(normalizedTeams.team2[0]),
+            team1,
+            team2,
+            currentPokemon1: team1[0],
+            currentPokemon2: team2[0],
             p1Inventory: structuredClone(data.initialState.p1Inventory),
             p2Inventory: structuredClone(data.initialState.p2Inventory),
             p1TeraUsed: false, p2TeraUsed: false,
@@ -128,7 +134,7 @@ export default function ReplayPlayer({ onClose }: ReplayPlayerProps) {
             p2Hazards: { toxicSpikes: 0, reflect: 0, lightScreen: 0, safeguard: 0, mist: 0, luckyChant: 0, auroraVeil: 0, stealthRock: false, stickyWeb: false, spikes: 0, tailwind: 0 },
             logs: [initialLog],
             isBattleInProgress: true, winner: null, waitingForAction: false,
-        };
+        });
 
         // O checkpoint inicial antecede os efeitos de entrada, como na batalha ao vivo.
         applyReplayCheckpointMegaProfiles(data, 0, initialState);

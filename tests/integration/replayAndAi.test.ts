@@ -391,6 +391,4 @@ describe('replay manual e decisões de IA no núcleo', () => {
     expect(fetchMock).toHaveBeenCalledTimes(1);
     expect(fetchMock).toHaveBeenCalledWith('/api/llm-action', expect.objectContaining({ method: 'POST' }));
   });
-
-  it.todo('3.3: preservar a identidade entre o Pokémon ativo e sua entrada na equipe no ReplayPlayer');
 });
