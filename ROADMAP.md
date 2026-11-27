@@ -200,6 +200,13 @@
   - Validação: foco com 5 arquivos e 38 testes; suíte completa com 57 arquivos, 272 testes aprovados e **0 `it.todo`**; `npm run lint`, `npm run build` e `git diff --check` aprovados.
   - Smoke no bundle de produção (`NODE_ENV=production`, porta 38391): P1 IA contra P2 manual usou Corpo a Corpo com Tera e causou 202 de dano no adversário (202→0), com P1 em 169/169; segunda batalha com IA dos dois lados mostrou Golpe na Garganta de P1 baixando somente o P2 (174→67) e o contra-ataque baixando somente P1, sem erros de console, sem `role=alert`/`role=status` e sem chamadas `/api/`; porta liberada.
   - Próximo item: 3.5. Commit: informado no resumo final após o push verificado em `origin/main`.
+- [x] **Hotfix 3.4.1 — Usar as mesmas ações temporárias no replay e na batalha ao vivo.**
+  - `services/engine/temporaryActions.ts` passou a ser a fonte única das ações temporárias: `recharge` é exatamente `{ name: 'recharge', displayName: 'Recarregar', priority: 0 }` e `struggle` preserva o comportamento real (`power 50`, `type normal`, `displayName: 'Debater-se'`). A definição é usada por `buildReplayAction`, pela IA local (`getLegalActions`, `decideAIAction` e `getLegacyBestMove`), pelo fallback do LLM e pelo botão de descanso do `App`.
+  - Causa comprovada com o arquivo anexado (seed 649171): o coordinator grava `action.data` em `selectedMove`, campo canonicalizado; o replay enriquecia `recharge` com `type/category/power/accuracy/pp/maxPP` (turno 9 obtinha `fnv1a32:8db89414` em vez de `fnv1a32:84f2edb4`, com PRNG idêntico) e reconstruía `struggle` como status de `power 0`, anulando dano e recuo e divergindo da IA ao vivo.
+  - Fixture real reduzida em `tests/fixtures/replay-3.2.2-recharge.json` (seed, eventos, checkpoints e revisão idênticos ao original) e `tests/integration/replayTemporaryActions.test.ts` com 7 testes: 33/33 turnos sem divergência passando por 9, 11, 19 e 21, `fnv1a32:84f2edb4` exato no turno 9, paridade estrutural da recarga com a ação de `decideAIAction`, Debater com power 50 e mesmo dano/recuo/cursor/hash do caminho ao vivo, PRNG de todos os checkpoints conferindo com `fetch` nunca chamado, cópia adulterada no turno 9 rejeitada e evidência original preservada.
+  - Nenhuma tolerância de compatibilidade, checkpoint, hash, PRNG ou regra foi alterada; `REPLAY_ENGINE_REVISION` segue `3.2.2` porque o formato do arquivo não mudou.
+  - Validação: foco com 5 arquivos e 37 testes; suíte completa com 58 arquivos, 279 aprovados e **0 `it.todo`**; `npm run lint`, `npm run build` e `git diff --check` aprovados. Smoke no bundle de produção (`NODE_ENV=production`, porta 38421): fixture reproduzida até `Turno: 33 / 33` sem `role=alert`, sem `role=status`, sem chamadas de rede e sem erros de console; avanço manual até o turno 9 exibiu `Dialga Origem precisa recarregar!` com o mesmo resultado limpo e a porta foi liberada.
+  - Próximo item: 3.5. Commit: informado no resumo final após o push verificado em `origin/main`.
 - [ ] **3.5 — Fazer a simulação usar o mesmo coordenador, configuração e regras da batalha real.**
 
 ## Etapa 4 — Endurecimento e expansão
@@ -213,7 +220,7 @@
 
 ## Registro resumido da baseline
 
-- Última suíte integral informada: **57 arquivos, 272 testes aprovados e 0 `it.todo`**; a lacuna de 3.4 foi convertida e nenhum todo permanece.
+- Última suíte integral informada: **58 arquivos, 279 testes aprovados e 0 `it.todo`**; a lacuna de 3.4 foi convertida e nenhum todo permanece.
 - `npm run lint`, `npm run build` e `git diff --check`: aprovados.
 - Auditoria do item 0.5: **17 → 0** ocorrências no total e **6 → 0** em produção; instalação por `npm ci` reproduzida sem alterações nos manifestos.
 - SHA dos itens 1.1 a 1.7 e dos itens 2.1/2.2/2.3/2.4/2.5 informados somente nos respectivos resumos finais após o push; último SHA registrado no roadmap: `baae8a606c37495f30810e2c646dbb234c75ac86` (item 0.4).

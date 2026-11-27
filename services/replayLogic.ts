@@ -1,6 +1,7 @@
 import { Action, BattleConfig, BattleReplay, BattleReplayCheckpoint, BattleReplayEvent, BattleState, Move, Pokemon } from '../types';
 import { normalizeBattleTeams, resolvePokemonTarget } from '../utils/pokemonIdentity';
 import { createBattlePRNGState } from '../utils/prng';
+import { createTemporaryActionData } from './engine/temporaryActions';
 
 export const REPLAY_FORMAT_VERSION = 1;
 export const REPLAY_ENGINE_REVISION = '3.2.2';
@@ -361,19 +362,10 @@ export const buildReplayAction = (
   if (event.actionType === 'move') {
     data = user.moves.find(move => move.name === event.moveId);
     if (!data) {
-      if (event.moveId !== 'recharge' && event.moveId !== 'struggle') return null;
-      // Recarga e Debater são decisões temporárias legítimas fora do set original.
-      data = {
-        name: event.moveId,
-        displayName: event.moveId === 'recharge' ? 'Recarregar' : 'Debater',
-        priority: 0,
-        type: 'normal',
-        category: 'status',
-        power: 0,
-        accuracy: 100,
-        pp: 1,
-        maxPP: 1,
-      };
+      // Recarga e Debater não fazem parte do moveset: usam a mesma definição da batalha ao vivo,
+      // porque o objeto escolhido é gravado em `selectedMove` e entra no hash do checkpoint.
+      data = createTemporaryActionData(event.moveId);
+      if (!data) return null;
     }
     priority = data.priority || 0;
   } else if (event.actionType === 'switch') {

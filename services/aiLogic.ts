@@ -9,6 +9,7 @@ import * as TerrainPulse from './engine/handlers/moves/terrainPulse';
 import * as Comatose from './engine/handlers/abilities/comatose';
 import * as LastResort from './engine/handlers/moves/lastResort';
 import { getPokemonPlayerNum, isSamePokemonInstance, resolvePokemonTarget } from '../utils/pokemonIdentity';
+import { createRechargeActionData, createStruggleActionData } from './engine/temporaryActions';
 
 // --- IMPORTS DO MOTOR (Para Simulação) ---
 import { executeMove } from './engine/moves';
@@ -524,14 +525,14 @@ function getLegalActions(
 
     // Movimentos
     if (pokemon.mustRecharge) {
-        actions.push({ type: 'move', data: { name: 'recharge', displayName: 'Recarregar', priority: 0 }, user: pokemon, playerNum, tieBreaker: 0 });
+        actions.push({ type: 'move', data: createRechargeActionData(), user: pokemon, playerNum, tieBreaker: 0 });
     } else if (pokemon.chargingMove) {
         const move = pokemon.moves.find(m => m.name === pokemon.chargingMove);
         if (move) actions.push({ type: 'move', data: move, user: pokemon, playerNum, priority: move.priority, tieBreaker: 0 });
     } else if (pokemon.lockedMove) {
         const move = pokemon.moves.find(m => m.name === pokemon.lockedMove);
         if (move) actions.push({ type: 'move', data: move, user: pokemon, playerNum, priority: move.priority, tieBreaker: 0 });
-        else actions.push({ type: 'move', data: { name: 'struggle', displayName: 'Debater-se', power: 50, type: 'normal' }, user: pokemon, playerNum, tieBreaker: 0 });
+        else actions.push({ type: 'move', data: createStruggleActionData(), user: pokemon, playerNum, tieBreaker: 0 });
     } else {
         const validMoves = pokemon.moves.filter(m => {
             const isDisabled = pokemon.disabledMoves && pokemon.disabledMoves[m.name] && pokemon.disabledMoves[m.name] > 0;
@@ -540,7 +541,7 @@ function getLegalActions(
         });
 
         if (validMoves.length === 0) {
-            actions.push({ type: 'move', data: { name: 'struggle', displayName: 'Debater-se', power: 50, type: 'normal' }, user: pokemon, playerNum, tieBreaker: 0 });
+            actions.push({ type: 'move', data: createStruggleActionData(), user: pokemon, playerNum, tieBreaker: 0 });
         } else {
             validMoves.forEach(m => actions.push({ type: 'move', data: m, user: pokemon, playerNum, priority: m.priority, tieBreaker: 0 }));
         }
@@ -732,13 +733,13 @@ export function decideAIAction(
         if (move) {
             return { type: 'move', data: move, user: aiPokemon, playerNum: botPlayerNum, priority: move.priority };
         } else {
-            return { type: 'move', data: { name: 'struggle', displayName: 'Debater-se', power: 50, type: 'normal' }, user: aiPokemon, playerNum: botPlayerNum, priority: 0 };
+            return { type: 'move', data: createStruggleActionData(), user: aiPokemon, playerNum: botPlayerNum, priority: 0 };
         }
     }
 
     // Se o Pokémon precisa recarregar (Hyper Beam, etc.), ele DEVE recarregar.
     if (aiPokemon.mustRecharge) {
-        return { type: 'move', data: { name: 'recharge', displayName: 'Recarregar', priority: 0 }, user: aiPokemon, playerNum: botPlayerNum, priority: 0 };
+        return { type: 'move', data: createRechargeActionData(), user: aiPokemon, playerNum: botPlayerNum, priority: 0 };
     }
 
     try {
@@ -999,7 +1000,7 @@ function mapActionBackToReal(simAction: Action, realUser: Pokemon, realTeam: Pok
 
 function getLegacyBestMove(attacker: Pokemon, defender: Pokemon, weather: string, state: BattleState | undefined, botPlayerNum: 1 | 2): Action {
     const moves = attacker.moves;
-    if (!moves || moves.length === 0) return { type: 'move', data: {name: 'struggle', displayName: 'Struggle', power: 50, type: 'normal'}, user: attacker, playerNum: botPlayerNum };
+    if (!moves || moves.length === 0) return { type: 'move', data: createStruggleActionData(), user: attacker, playerNum: botPlayerNum };
     
     let bestMove = moves[0];
     let maxScore = -Infinity;

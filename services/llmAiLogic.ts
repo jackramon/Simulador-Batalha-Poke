@@ -1,5 +1,6 @@
 import { Pokemon, Move, BattleState, PlayerInventory, Action } from '../types';
 import { getPokemonPlayerNum, isSamePokemonInstance } from '../utils/pokemonIdentity';
+import { createStruggleActionData } from './engine/temporaryActions';
 
 function extractJson(text: string): any {
     // Remove DeepSeek reasoning tags if present
@@ -188,8 +189,8 @@ Escolha a melhor ação para vencer a batalha.
         if (availableMoves.length > 0) {
             return { type: 'move', data: availableMoves[0], user: attacker, playerNum, priority: availableMoves[0].priority || 0 };
         } else {
-            // Struggle fallback
-            return { type: 'move', data: { name: 'struggle', type: 'normal', power: 50, accuracy: 100, uses: 1, maxUses: 1, category: 'physical', description: '' }, user: attacker, playerNum, priority: 0 };
+            // Struggle fallback: mesma definição usada pela IA local e pelo replay.
+            return { type: 'move', data: createStruggleActionData(), user: attacker, playerNum, priority: 0 };
         }
     }
 }

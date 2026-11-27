@@ -3,6 +3,7 @@ import React, { useRef, useEffect, useState } from 'react';
 import { ITEMS_DATA, MEGA_STONES } from './data/items'; 
 import { useBattleController } from './hooks/useBattleController';
 import * as BattleEngine from './services/engine'; 
+import { createRechargeActionData } from './services/engine/temporaryActions';
 import { useDynamicBGM } from './hooks/useDynamicBGM'; // Novo Hook
 import { useDarkMode } from './hooks/useDarkMode';
 
@@ -761,7 +762,7 @@ export default function App() {
                                                     )}
                                                 </div>
                                             ) : currentActive?.mustRecharge ? (
-                                                <button className="bg-gray-600 text-white font-bold py-4 rounded-lg w-auto mx-auto block px-12 shadow-lg" onClick={() => handlePlayerAction(currentPlayer, 'move', { name: 'recharge', displayName: 'Recarregar', priority: 0 })}>
+                                                <button className="bg-gray-600 text-white font-bold py-4 rounded-lg w-auto mx-auto block px-12 shadow-lg" onClick={() => handlePlayerAction(currentPlayer, 'move', createRechargeActionData())}>
                                                     {`O ${currentActive?.name ?? 'Pokémon'} precisa descansar. (Clique aqui!)`}
                                                 </button>
                                             ) : (
