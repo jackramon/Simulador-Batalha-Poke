@@ -7,7 +7,7 @@ import { getFromCache, saveToCache } from './cache';
 
 export const POKEAPI_BASE_URL = 'https://pokeapi.co/api/v2/pokemon/';
 
-const POKEAPI_NAME_MAP: Record<string, string> = {
+export const POKEAPI_NAME_MAP: Record<string, string> = {
   'necrozma-dusk-mane': 'necrozma-dusk',
   'necrozma-dawn-wings': 'necrozma-dawn',
   'cherrim-sunshine': 'cherrim-sunny',
@@ -193,6 +193,9 @@ export async function fetchMoveDetails(moveUrl: string): Promise<Move | null> {
       description,
       uses: 0, 
       maxUses: 0,
+      // PP oficial da PokeAPI; a importação Showdown usa esse valor para iniciar com usos cheios.
+      // A geração aleatória/manual continua sobrescrevendo uses/maxUses com a escala do simulador.
+      pp: data.pp || undefined,
       priority: data.priority,
       recoilType,
       recoilValue,

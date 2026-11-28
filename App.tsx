@@ -14,6 +14,7 @@ import { BattleHeader, BattleLogs } from './components/BattleLayout';
 import { BagButton } from './components/BagButton'; 
 import { BagModal } from './components/BagModal';   
 import { TeamBuilderModal } from './components/TeamBuilderModal'; 
+import { ShowdownImportPanel } from './components/ShowdownImportPanel';
 import { BattleScene } from './components/BattleScene'; 
 import { VolumeControl } from './components/VolumeControl'; 
 import ReplayPlayer from './components/ReplayPlayer';
@@ -173,6 +174,7 @@ export default function App() {
                                     <option value="manual" className="text-gray-900">Manual (Texto)</option>
                                     <option value="builder" className="text-gray-900 font-bold">🛠️ Construtor Avançado</option>
                                     <option value="import" className="text-gray-900 font-bold">📥 Importar Equipe (JSON)</option>
+                                    <option value="showdown" className="text-gray-900 font-bold">📥 Importar Equipe (Showdown)</option>
                                 </select>
                             </div>
                             
@@ -244,6 +246,16 @@ export default function App() {
                                 </div>
                             )}
 
+                            {config.p1Mode === 'showdown' && (
+                                <ShowdownImportPanel
+                                    playerNum={1}
+                                    teamSize={config.p1TeamSize}
+                                    accent="green"
+                                    currentTeam={p1CustomTeamRef.current}
+                                    onImported={(team) => { p1CustomTeamRef.current = team; }}
+                                />
+                            )}
+
                             <div className="grid grid-cols-2 gap-3">
                                 <div>
                                     <label className="text-xs font-bold text-green-700 uppercase mb-1 block">Qtd. Pokémon</label>
@@ -277,6 +289,7 @@ export default function App() {
                                     <option value="manual" className="text-gray-900">Escolher Pokémon (Manual)</option>
                                     <option value="builder" className="text-gray-900 font-bold">🛠️ Construtor Avançado</option>
                                     <option value="import" className="text-gray-900 font-bold">📥 Importar Equipe (JSON)</option>
+                                    <option value="showdown" className="text-gray-900 font-bold">📥 Importar Equipe (Showdown)</option>
                                 </select>
                             </div>
 
@@ -346,6 +359,16 @@ export default function App() {
                                     />
                                     {p2ImportStatus && <p className="text-xs font-bold text-red-700">{p2ImportStatus}</p>}
                                 </div>
+                            )}
+
+                            {config.p2Mode === 'showdown' && (
+                                <ShowdownImportPanel
+                                    playerNum={2}
+                                    teamSize={config.p2TeamSize}
+                                    accent="red"
+                                    currentTeam={p2CustomTeamRef.current}
+                                    onImported={(team) => { p2CustomTeamRef.current = team; }}
+                                />
                             )}
 
                             <div className="grid grid-cols-2 gap-3">

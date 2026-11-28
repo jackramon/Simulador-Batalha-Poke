@@ -20,6 +20,39 @@ View your app in AI Studio: https://ai.studio/apps/drive/1m42kPQjiBa3rF93xKb6FKt
 3. Run the app:
    `npm run dev`
 
+## Importar e exportar equipes no formato Showdown
+
+O seletor de equipe de cada jogador tem a opção **📥 Importar Equipe (Showdown)**, separada da importação JSON. Ela aceita o texto colado ou um arquivo `.txt` no formato de sets do Pokémon Showdown:
+
+```text
+Acerola (Mimikyu) (F) @ Life Orb
+Ability: Disguise
+Level: 50
+Shiny: Yes
+Tera Type: Fairy
+EVs: 252 Atk / 4 SpD / 252 Spe
+Jolly Nature
+IVs: 0 SpA
+- Shadow Claw
+- Play Rough
+- Swords Dance
+- Protect
+```
+
+Campos suportados por Pokémon: espécie, apelido, gênero (`(M)`/`(F)`), item, habilidade, nível, Shiny, Tera Type, EVs, IVs, Natureza e de 1 a 4 golpes. Metadados do Showdown que não afetam a batalha (`Happiness`, `Ball`, `Dynamax Level`, `Gigantamax`, `Hidden Power`) são aceitos e ignorados.
+
+Regras aplicadas na importação:
+
+- A equipe precisa ter **exatamente** a quantidade escolhida em "Qtd. Pokémon" (1, 3 ou 6). Nada é importado parcialmente.
+- Os seis atributos saem do caminho canônico (`services/api/factory.ts` + `statCalculator`): HP por `calculateMaxHP` e os demais derivados de base stats, nível, EVs, IVs e Natureza em `calculateStat`. Nenhuma fórmula é duplicada.
+- O PP inicial vem do campo `pp` da PokeAPI, com usos cheios; golpes importados nunca começam com 0 PP.
+- `instanceId` é gerado pela normalização existente (`normalizeTeamInstanceIds`), inclusive para espécies repetidas.
+- A importação precisa da PokeAPI (ou do cache local) para validar espécies, golpes e habilidades.
+
+Erros de validação exibidos em português, sem travar a configuração nem importar nada: quantidade diferente do modo (`TEAM_SIZE_MISMATCH`), espécie ou golpe inexistente, habilidade/item desconhecidos, nível fora de 1–100, IV fora de 0–31, EV fora de 0–255, soma de EVs acima de 510, mais de 4 golpes, nenhum golpe, Natureza/Tera Type inválidos, linha não reconhecida e texto vazio.
+
+A exportação para texto Showdown usa os botões **📤 Exportar (Showdown)** no painel de importação e **📤 Exportar Time (Showdown)** no Construtor. A espécie vem de `speciesId` e o apelido de `name`; IVs só aparecem quando diferentes de 31 e EVs só quando diferentes de 0. A **exportação JSON continua inalterada** e independente deste formato.
+
 ## Segurança e configuração do servidor
 
 Por padrão, o servidor escuta apenas em `127.0.0.1`. O endpoint `/api/llm-action` aceita exclusivamente chamadas originadas do loopback, mesmo quando `LLM_PROXY_HOST` expõe a aplicação na rede. O endereço é obtido do socket e cabeçalhos como `X-Forwarded-For` são ignorados, pois podem ser falsificados. Não há autenticação remota nesta versão: chamadas remotas ao proxy de LLM permanecem bloqueadas.

@@ -15,7 +15,7 @@ function getRandomInt(min: number, max: number) {
   return Math.floor(Math.random() * (max - min + 1)) + min;
 }
 
-function formatPokemonName(name: string): string {
+export function formatPokemonName(name: string): string {
     if (POKEMON_NAME_TRANSLATIONS[name]) {
         return POKEMON_NAME_TRANSLATIONS[name];
     }
@@ -38,7 +38,8 @@ export async function fetchPokemonData(
     randomIvs: boolean = true, 
     randomLevels: boolean = false,
     megaEnabled: boolean = false,
-    itemsEnabled: boolean = true
+    itemsEnabled: boolean = true,
+    forcedShiny?: boolean
 ): Promise<Pokemon> {
   const data = await fetchRawPokemonData(identifier);
 
@@ -94,7 +95,8 @@ export async function fetchPokemonData(
       heldItem = memories[Math.floor(Math.random() * memories.length)];
   }
 
-  const isShiny = Math.random() < 0.01; 
+  // A importação Showdown define o Shiny pelo texto do set; sem override mantém o sorteio original.
+  const isShiny = forcedShiny ?? (Math.random() < 0.01);
   let spriteUrl = data.sprites.other?.['official-artwork']?.front_default || data.sprites.front_default;
   
   // Pixel Art Sprites Extraction

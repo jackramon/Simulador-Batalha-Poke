@@ -8,7 +8,7 @@
 - Mantenha `PROJECT_CONTEXT.md` atualizado a cada alteração.
 - Para economizar tokens: inspecione somente os arquivos da tarefa e suas dependências diretas, reutilize a baseline registrada, use testes focados durante a iteração e rode a suíte completa na validação final. Não refaça auditorias globais já concluídas.
 
-**Próximo item:** 4.2 — Conectar a importação de equipes no formato Showdown.
+**Próximo item:** 4.3 — Melhorar acessibilidade, semântica dos diálogos e suporte a movimento reduzido.
 
 ## Etapa 0 — Restaurar uma baseline confiável
 
@@ -256,7 +256,15 @@
   - Validação: 28 testes focados; suíte completa com 69 arquivos e 371 testes (370 no primeiro ciclo, com o timeout de 5 s pré-existente de `replayFixtureCompatibility` sob carga passando 10/10 isolado); `npm run lint`, `npm run build` e `git diff --check` aprovados.
   - Smoke no bundle de produção (`NODE_ENV=production`, porta 39133, `assets/index-CqWUU2hF.js` sem `@vite/client`): `✅` no Vale Ouro (bloqueio de status, dano aceito e hazard aplicado) e nas quatro habilidades da Ruína, zero `❌` nas 50 linhas do playground, zero `console.error`, zero erro de página e zero requisições `fetch`/XHR; porta liberada.
   - Próximo item: 4.2.
-- [ ] **4.2 — Conectar a importação de equipes no formato Showdown.**
+- [x] **4.2 — Conectar a importação de equipes no formato Showdown.**
+  - Nova opção distinta **📥 Importar Equipe (Showdown)** para P1 e P2 (`components/ShowdownImportPanel.tsx`), com texto colado, arquivo `.txt`, estados de carregamento/sucesso/erro em português e exportação da equipe carregada; o Construtor ganhou **📤 Exportar Time (Showdown)**. Os fluxos anteriores (aleatória, manual, Construtor, JSON interno, motor, replay e persistência) permanecem intactos.
+  - `services/showdownParser.ts` (antes sem importadores) foi endurecido e reutilizado como parser único: espécie, apelido, gênero, item, habilidade, nível, Shiny, Tera Type, EVs, IVs, Natureza e 1–4 golpes. A validação é tudo-ou-nada e o primeiro problema interrompe a importação com `ShowdownParseError` específico (quantidade exata do modo 1/3/6, espécie/golpe inexistentes — inclusive o fallback silencioso para a espécie-base da PokeAPI —, habilidade/item desconhecidos, nível 1–100, IV 0–31, EV 0–255 e soma ≤ 510, mais de 4 golpes, nenhum golpe, Natureza/Tera Type inválidos, linha desconhecida e texto vazio), sem equipe parcial.
+  - Atributos pelo caminho canônico: `fetchPokemonData` determinístico (IVs/EVs/nível) + `calculateMaxHP` para HP e `calculateStat` para os demais, sem fórmula duplicada. PP inicial usa o campo `pp` real da PokeAPI (`uses = maxUses = pp`), nunca zero; a escala de PP da geração aleatória foi preservada. `instanceId` único pela normalização existente, inclusive com espécies repetidas.
+  - Exportação usa `speciesId` para a espécie e `name` só como apelido, com gênero, item, habilidade, nível (≠ 100), Shiny, Tera Type, EVs (≠ 0), Natureza, IVs (< 31) e golpes; a ida e volta preserva os dados semânticos e a exportação JSON não mudou.
+  - Cobertura: `tests/services/showdownParser.test.ts` com 11 testes em PokeAPI mockada (set básico, Tera/Shiny, stats com nível/IV/EV/Natureza, PP cheio, apelido/forma/gênero/acento, limites, espécie e golpe inexistentes sem importação parcial, quantidade exata e duplicatas com `instanceId` único, ida e volta e JSON interno intacto), com RED comprovado na normalização de PP.
+  - Validação: suíte completa com 70 arquivos e **382 testes aprovados, 0 `it.todo`** (o timeout de 5 s pré-existente de `replayFixtureCompatibility` sob carga passou isolado em 10/10 e a repetição ficou verde); `npm run lint`, `npm run build` e `git diff --check` aprovados. `REPLAY_ENGINE_REVISION` segue `4.1.3` e nenhuma regra do motor foi alterada.
+  - Smoke no bundle de produção (`NODE_ENV=production`, porta 39317, `assets/index-*.js` sem `@vite/client`) com PokeAPI stubada localmente: importação por texto no P1, exportação capturada e reimportada (texto idêntico), erros de espécie inexistente (404), nível 101 e quantidade divergente exibidos sem desmontar a configuração, importação do P2 por arquivo `.txt` real e batalha iniciada no turno 1 com Charizard 153/153 (Nv. 50, Tera Fogo, item e Shiny do texto) e Gengar 153/153; zero `console.error`, zero rejeições e zero requisições fora do stub; porta liberada.
+  - Próximo item: 4.3.
 - [ ] **4.3 — Melhorar acessibilidade, semântica dos diálogos e suporte a movimento reduzido.**
 - [ ] **4.4 — Separar animações e estatísticas da interpretação frágil de strings de logs.**
 - [ ] **4.5 — Dividir o bundle e remover o aviso informativo de chunk acima de 500 kB.**
@@ -265,7 +273,8 @@
 
 ## Registro resumido da baseline
 
-- Última suíte integral informada: **69 arquivos, 371 testes aprovados e 0 `it.todo`**; a lacuna de 3.4 foi convertida, a simulação da IA foi unificada em 3.5, os efeitos de 4.1.2 passaram a expirar, o wiring de habilidades de 4.1.3 foi provado por importadores reais e nenhum todo permanece.
+- Última suíte integral informada: **70 arquivos, 382 testes aprovados e 0 `it.todo`**; a lacuna de 3.4 foi convertida, a simulação da IA foi unificada em 3.5, os efeitos de 4.1.2 passaram a expirar, o wiring de habilidades de 4.1.3 foi provado por importadores reais e o item 4.2 conectou a importação/exportação Showdown sem novos todos.
+- Próximo item do roadmap: **4.3 — acessibilidade, semântica dos diálogos e movimento reduzido**.
 - `npm run lint`, `npm run build` e `git diff --check`: aprovados.
 - Auditoria do item 0.5: **17 → 0** ocorrências no total e **6 → 0** em produção; instalação por `npm ci` reproduzida sem alterações nos manifestos.
 - SHA dos itens 1.1 a 1.7 e dos itens 2.1/2.2/2.3/2.4/2.5 informados somente nos respectivos resumos finais após o push; último SHA registrado no roadmap: `baae8a606c37495f30810e2c646dbb234c75ac86` (item 0.4).

@@ -50,6 +50,8 @@ export interface Move {
   description: string;
   uses: number;
   maxUses: number;
+  /** PP real informado pela PokeAPI; usado na importação Showdown para iniciar com usos cheios. */
+  pp?: number;
   priority?: number;
   recoilType?: 'damage' | 'max-hp'; // Added recoil type
   recoilValue?: number; // Added recoil percentage
@@ -257,10 +259,10 @@ export interface BattleState {
 }
 
 export interface BattleConfig {
-  p1Mode: 'manual' | 'random' | 'builder' | 'import'; // Added 'builder' and 'import'
+  p1Mode: 'manual' | 'random' | 'builder' | 'import' | 'showdown'; // Added 'builder', 'import' e 'showdown'
   p1TeamSize: number;
   p1Input: string;
-  p2Mode: 'manual' | 'random' | 'builder' | 'import'; // Added 'builder' and 'import'
+  p2Mode: 'manual' | 'random' | 'builder' | 'import' | 'showdown'; // Added 'builder', 'import' e 'showdown'
   p2TeamSize: number;
   p2Input: string;
   opponentMode: 'manual' | 'auto';

@@ -1,6 +1,6 @@
 
 import { useState, useRef } from 'react';
-import { Action } from '../types';
+import { Action, Pokemon } from '../types';
 import { isTrapped } from '../services/battleUtils';
 import { useBattleState } from './useBattleState';
 import { useBattleUI } from './useBattleUI';
@@ -62,6 +62,25 @@ export const useBattleController = () => {
               return;
           }
       }
+
+      // Showdown exige a quantidade exata: sem importação parcial ou silenciosa.
+      const showdownIncomplete = (
+          mode: string,
+          team: Pokemon[] | null,
+          size: number,
+          label: string
+      ): boolean => {
+          if (mode !== 'showdown') return false;
+          const imported = team?.length ?? 0;
+          if (imported === size) return false;
+          window.dispatchEvent(new CustomEvent('show-toast', {
+              detail: `⚠️ Equipe Showdown de ${label}: importe exatamente ${size} Pokémon (atuais: ${imported}).`
+          }));
+          return true;
+      };
+
+      if (showdownIncomplete(config.p1Mode, p1CustomTeamRef.current, config.p1TeamSize, 'Jogador 1')) return;
+      if (showdownIncomplete(config.p2Mode, p2CustomTeamRef.current, config.p2TeamSize, 'Oponente')) return;
 
       startBattle();
   };

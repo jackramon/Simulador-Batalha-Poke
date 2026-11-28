@@ -367,7 +367,14 @@ export const useBattleState = () => {
       let t1: Pokemon[] = [];
       let t2: Pokemon[] = [];
 
-      if (config.p1Mode === 'builder' || config.p1Mode === 'import') {
+      if (config.p1Mode === 'showdown') {
+          // Modo Showdown: a equipe importada precisa ter exatamente o tamanho escolhido.
+          const imported = p1CustomTeamRef.current;
+          if (!imported || imported.length !== config.p1TeamSize) {
+              throw new Error(`Erro: a equipe Showdown do Jogador 1 precisa ter exatamente ${config.p1TeamSize} Pokémon (importados: ${imported?.length ?? 0}).`);
+          }
+          t1 = structuredClone(imported);
+      } else if (config.p1Mode === 'builder' || config.p1Mode === 'import') {
           if (p1CustomTeamRef.current && p1CustomTeamRef.current.length > 0) {
               t1 = structuredClone(p1CustomTeamRef.current).slice(0, config.p1TeamSize);
           } else {
@@ -378,7 +385,14 @@ export const useBattleState = () => {
       }
       if (!battleSession.isCurrent(sessionId)) return;
 
-      if ((config.p2Mode as any) === 'builder' || config.p2Mode === 'import') {
+      if (config.p2Mode === 'showdown') {
+                // Modo Showdown: a equipe importada precisa ter exatamente o tamanho escolhido.
+                const imported = p2CustomTeamRef.current;
+                if (!imported || imported.length !== config.p2TeamSize) {
+                    throw new Error(`Erro: a equipe Showdown do Oponente precisa ter exatamente ${config.p2TeamSize} Pokémon (importados: ${imported?.length ?? 0}).`);
+                }
+                t2 = structuredClone(imported);
+            } else if (config.p2Mode === 'builder' || config.p2Mode === 'import') {
           if (p2CustomTeamRef.current && p2CustomTeamRef.current.length > 0) {
                t2 = structuredClone(p2CustomTeamRef.current).slice(0, config.p2TeamSize);
           } else {

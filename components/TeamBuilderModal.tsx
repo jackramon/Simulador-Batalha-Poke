@@ -9,6 +9,7 @@ import { NATURES } from '../data/natures';
 import { calculateMaxHP } from '../services/engine/handlers/statCalculator';
 import { ABILITY_EFFECTS } from '../data/abilities';
 import { normalizeTeamInstanceIds } from '../utils/pokemonIdentity';
+import { exportShowdownTeam } from '../services/showdownParser';
 
 interface TeamBuilderModalProps {
   onSave: (team: Pokemon[]) => void;
@@ -606,6 +607,25 @@ export const TeamBuilderModal: React.FC<TeamBuilderModalProps> = ({ onSave, onCa
                     disabled={slots.filter(s => s.pokemon !== null).length === 0}
                 >
                     📤 Exportar Time (JSON)
+                </button>
+                <button
+                    onClick={() => {
+                        const currentTeam = slots.filter(s => s.pokemon !== null).map(s => s.pokemon!);
+                        if (currentTeam.length === 0) return;
+                        const txt = exportShowdownTeam(currentTeam);
+                        const blob = new Blob([txt], { type: 'text/plain;charset=utf-8' });
+                        const url = URL.createObjectURL(blob);
+                        const a = document.createElement('a');
+                        a.href = url;
+                        a.download = `equipe_p${playerNum}_showdown.txt`;
+                        a.click();
+                        URL.revokeObjectURL(url);
+                        alert('Time exportado no formato Showdown!');
+                    }}
+                    className="text-xs bg-indigo-100 text-indigo-700 px-3 py-1.5 rounded font-bold hover:bg-indigo-200 border border-indigo-200"
+                    disabled={slots.filter(s => s.pokemon !== null).length === 0}
+                >
+                    📤 Exportar Time (Showdown)
                 </button>
                 <button onClick={onCancel} className="text-gray-400 hover:text-gray-600 font-bold text-2xl ml-2">✕</button>
             </div>
