@@ -97,6 +97,9 @@ function performSwitchDraft(
     oldPokemon.chargingMove = null;
     oldPokemon.mustRecharge = false;
     oldPokemon.lockedMove = null;
+    // Desativação (Disable) não passa pela troca, nem por Baton Pass: os contadores
+    // pertencem ao Pokémon que sai e precisam ser limpos para não voltarem com ele.
+    delete oldPokemon.disabledMoves;
     oldPokemon.protectCounter = 0; // Reset ao sair
     oldPokemon.movesUsed = []; 
     oldPokemon.lastMoveUsed = null;

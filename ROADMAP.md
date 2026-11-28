@@ -8,7 +8,7 @@
 - Mantenha `PROJECT_CONTEXT.md` atualizado a cada alteração.
 - Para economizar tokens: inspecione somente os arquivos da tarefa e suas dependências diretas, reutilize a baseline registrada, use testes focados durante a iteração e rode a suíte completa na validação final. Não refaça auditorias globais já concluídas.
 
-**Próximo item:** 4.1.2 — Conectar efeitos temporários ainda sem ciclo de vida completo.
+**Próximo item:** 4.1.3 — Revisar wiring de habilidades existentes.
 
 ## Etapa 0 — Restaurar uma baseline confiável
 
@@ -238,8 +238,15 @@
   - Validação: 24 testes focados; suíte completa com 66 arquivos e **323 aprovados, 0 `it.todo`**; `npm run lint`, `npm run build` e `git diff --check` aprovados.
   - Smoke no bundle de produção (`NODE_ENV=production`, porta 38841, `assets/index-*.js` sem `@vite/client`): os cinco casos executados no playground do navegador (`window.loadAndRunTests`) exibiram `✅` para Tera Stellar, Rocky Payload 1.5x, crítico, Surge Surfer e Snow/Hail, com zero `❌`, zero erros de console e zero requisições de rede; porta liberada.
   - Próximo item: 4.1.2. Commit: informado no resumo final após o push verificado em `origin/main`.
-- [ ] **4.1.2 — Conectar efeitos temporários ainda sem ciclo de vida completo.**
-  - Conectar e testar os ticks ainda ausentes de Taunt, Encore, Disable, Magnet Rise, Telekinesis, Glaive Rush e efeitos equivalentes, sem duplicar execuções no turnEnd.
+- [x] **4.1.2 — Conectar efeitos temporários ainda sem ciclo de vida completo.**
+  - `services/engine/handlers/moves/temporaryEffectTicks.ts` concentra os seis ticks e a fonte canônica `processTurnEnd` os executa uma única vez por turno, para o ativo de cada lado, sem chamadas duplicadas do coordenador.
+  - **Taunt** decrementa 3→0 e, ao expirar, remove `statusEffects['taunt']`, liberando novamente os golpes de status na validação de ações. **Encore** decrementa 3→0 e remove apenas o bloqueio do golpe associado, sem tocar no `lockedMove` de Choice Items. **Disable** decrementa cada entrada de `disabledMoves` individualmente, remove somente a entrada zerada e apaga o campo quando fica vazio; `performSwitch` passou a limpar `disabledMoves` do Pokémon que sai, inclusive em Baton Pass, sem transferir contadores. **Magnet Rise** decrementa 5 turnos e devolve a imunidade ao solo (golpes de Terra e `isGrounded`). **Telekinesis** decrementa 3 turnos e encerra imunidade ao solo e precisão garantida. **Glaive Rush** decrementa 2 turnos e encerra dano dobrado e precisão garantida.
+  - Nenhum draw de PRNG foi acrescentado, nenhuma ativação/wiring de golpe foi alterada, nenhum handler fora do escopo foi tocado e a IA permaneceu intacta. Magnet Rise continua sendo herdado pelo Baton Pass (comportamento existente preservado); Telekinesis e Glaive Rush não atravessam a troca.
+  - **Replay**: `REPLAY_ENGINE_REVISION` passou a `4.1.2` para registrar a mudança semântica (efeitos antes permanentes agora expiram), com `formatVersion` mantido em `1` e nenhuma tolerância nova — replays de revisões anteriores podem divergir e a divergência continua sendo reportada como real.
+  - Cobertura: `tests/integration/temporaryEffectTicks.test.ts` com 23 testes em ciclos RED→GREEN — criação de cada efeito pelo caminho público (movimentos Provocar, Bis, Desativar, Levitação Magnética, Telecinesia e o golpe Investida de Glaive), decremento turno a turno, expiração exata, comportamento antes/depois, tick único nos dois caminhos (direto e `BattleCoordinator.runTurn`), limpeza na troca e no Baton Pass, Encore preservando o lock de Choice, Disable removendo somente o contador expirado, perda da imunidade ao solo e do dano dobrado. `tests/integration/replayEngineRevision411.test.ts` foi renomeado para `replayEngineRevision412.test.ts` cobrindo a nova revisão, hash, cursor e ausência de tolerância.
+  - Validação: 23 testes focados; suíte completa com 67 arquivos e **346 aprovados, 0 `it.todo`**; `npm run lint`, `npm run build` e `git diff --check` aprovados.
+  - Smoke no bundle de produção (`NODE_ENV=production`, porta 38911, `assets/index-*.js` sem `@vite/client`): playground com `✅` nos seis efeitos, zero `❌`, zero erros de console e zero requisições de rede; porta liberada.
+  - Próximo item: 4.1.3. Commit: informado no resumo final após o push verificado em `origin/main`.
 - [ ] **4.1.3 — Revisar wiring de habilidades existentes.**
   - Usar Good as Gold como caso de prova e fazer auditoria dirigida de handlers sem importadores, sem usar a quantidade de arquivos como evidência de funcionamento.
 - [ ] **4.2 — Conectar a importação de equipes no formato Showdown.**
@@ -250,7 +257,7 @@
 
 ## Registro resumido da baseline
 
-- Última suíte integral informada: **60 arquivos, 299 testes aprovados e 0 `it.todo`**; a lacuna de 3.4 foi convertida, a simulação da IA foi unificada em 3.5 e nenhum todo permanece.
+- Última suíte integral informada: **67 arquivos, 346 testes aprovados e 0 `it.todo`**; a lacuna de 3.4 foi convertida, a simulação da IA foi unificada em 3.5, os efeitos de 4.1.2 passaram a expirar e nenhum todo permanece.
 - `npm run lint`, `npm run build` e `git diff --check`: aprovados.
 - Auditoria do item 0.5: **17 → 0** ocorrências no total e **6 → 0** em produção; instalação por `npm ci` reproduzida sem alterações nos manifestos.
 - SHA dos itens 1.1 a 1.7 e dos itens 2.1/2.2/2.3/2.4/2.5 informados somente nos respectivos resumos finais após o push; último SHA registrado no roadmap: `baae8a606c37495f30810e2c646dbb234c75ac86` (item 0.4).

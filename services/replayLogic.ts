@@ -6,10 +6,12 @@ import { createTemporaryActionData } from './engine/temporaryActions';
 export const REPLAY_FORMAT_VERSION = 1;
 // Revisão semântica do motor. A 4.1.1 corrigiu regras de batalha (Tera Stellar defensivo,
 // Rocky Payload em 1.5x, críticos com estágios, Surge Surfer na ordenação de ações e
-// distinção Snow/Hail). Replays gravados em revisões anteriores foram produzidos com as
-// regras antigas e podem divergir na reprodução: a divergência é real e continua sendo
-// reportada, sem tolerância que a esconda.
-export const REPLAY_ENGINE_REVISION = '4.1.1';
+// distinção Snow/Hail). A 4.1.2 deu ciclo de vida completo a Taunt, Encore, Disable,
+// Magnet Rise, Telekinesis e Glaive Rush: os efeitos passaram a decrementar e expirar no
+// `processTurnEnd` canônico, em vez de durarem indefinidamente. Replays gravados em
+// revisões anteriores foram produzidos com as regras antigas e podem divergir na
+// reprodução: a divergência é real e continua sendo reportada, sem tolerância que a esconda.
+export const REPLAY_ENGINE_REVISION = '4.1.2';
 export const LEGACY_REPLAY_WARNING = 'Replay legado: arquivo sem checkpoints; a reprodução continuará sem verificação de integridade.';
 // Revisões que gravavam o checkpoint dentro do updater React, com hash sobre um estado
 // possivelmente alterado depois da conclusão do turno: não têm integridade confiável.

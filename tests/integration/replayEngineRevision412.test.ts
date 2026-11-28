@@ -13,7 +13,7 @@ import { createBattlePRNGState } from '../../utils/prng';
 import { createBattleState, createMove, createPokemon } from '../factories';
 import { createBattleConfig, runCoordinatorTurn } from './coordinator.helpers';
 
-// 4.1.1 — As regras de dano, tipo e velocidade mudaram. A revisão semântica do motor
+// 4.1.2 — Os efeitos temporários passaram a ter ciclo de vida completo. A revisão semântica do motor
 // precisa registrar isso para que replays antigos sejam reconhecidos como gravados por
 // regras anteriores, sem criar tolerância que esconda divergências reais.
 // formatVersion permanece 1: o formato do arquivo não mudou.
@@ -68,9 +68,9 @@ const buildTeams = () => {
   return { rockMove, tackle, bombirdier, target };
 };
 
-describe('4.1.1 revisão semântica do replay', () => {
+describe('4.1.2 revisão semântica do replay', () => {
   it('avança a revisão do motor sem mudar o formato', () => {
-    expect(REPLAY_ENGINE_REVISION).toBe('4.1.1');
+    expect(REPLAY_ENGINE_REVISION).toBe('4.1.2');
     expect(REPLAY_FORMAT_VERSION).toBe(1);
   });
 
@@ -81,7 +81,7 @@ describe('4.1.1 revisão semântica do replay', () => {
       prngState: createBattlePRNGState(SEED),
     });
     const replay = createBattleReplay(liveState, CONFIG, SEED);
-    expect(replay.engineRevision).toBe('4.1.1');
+    expect(replay.engineRevision).toBe('4.1.2');
 
     const liveActions = {
       p1Action: { type: 'move', data: rockMove, user: bombirdier, playerNum: 1 } as Action,

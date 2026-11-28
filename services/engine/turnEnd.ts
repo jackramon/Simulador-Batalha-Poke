@@ -12,6 +12,7 @@ import * as Uproar from './handlers/moves/uproar';
 import * as Wish from './handlers/moves/wish';
 import * as Yawn from './handlers/moves/yawn';
 import * as LuckyChant from './handlers/moves/luckyChant';
+import * as TemporaryEffectTicks from './handlers/moves/temporaryEffectTicks';
 import { acquireBattleDraft, releaseBattleDraft } from './stateTransactions';
 import { BattlePRNG } from '../../utils/prng';
 
@@ -265,6 +266,12 @@ function processTurnEndDraft(currentState: BattleState, config: BattleConfig, pr
         Uproar.handleUproarTurnEnd(p, logs);
         Wish.handleWishEnd(p, logs);
         Yawn.handleYawnTurnEnd(p, logs, state);
+        TemporaryEffectTicks.handleTauntTurnEnd(p, logs);
+        TemporaryEffectTicks.handleEncoreTurnEnd(p, logs);
+        TemporaryEffectTicks.handleDisableTurnEnd(p, logs);
+        TemporaryEffectTicks.handleMagnetRiseTurnEnd(p, logs);
+        TemporaryEffectTicks.handleTelekinesisTurnEnd(p, logs);
+        TemporaryEffectTicks.handleGlaiveRushTurnEnd(p, logs);
         
         if (!p.isFainted) p.turnsActive++;
     }

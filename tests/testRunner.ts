@@ -27,6 +27,9 @@ import { getEffectiveSpeed } from '../services/battleUtils';
 import { handleWeatherDamage } from '../services/engine/handlers/moves/weather_damage';
 import { calculateStat } from '../services/engine/handlers/statCalculator';
 import { BattlePRNG } from '../utils/prng';
+import { processTurnEnd } from '../services/engine/turnEnd';
+import { checkRestriction } from '../services/engine/handlers/moves/restrictions';
+import { isGrounded } from '../services/engine/handlers/terrain';
 
 export function runTests() {
   console.clear();
@@ -389,6 +392,84 @@ export function runTests() {
     && calculateStat(iceTarget, 'defense', 'snow') === Math.floor(iceBase * 1.5)
     ? '✅ 4.1.1 Snow não causa dano, mantém a Defesa de Gelo e o Hail legado segue separado'
     : '❌ 4.1.1 Snow/Hail divergiram');
+  console.groupEnd();
+
+  // --- TESTE: EFEITOS TEMPORÁRIOS 4.1.2 (TAUNT, ENCORE, DISABLE, MAGNET RISE, TELEKINESIS, GLAIVE RUSH) ---
+  console.group('%c⏱️ Teste: Efeitos temporários 4.1.2', 'color: #7c3aed;');
+  const smokeStatusMove: Move = { name: 'howl', displayName: 'Uivo', type: 'normal', power: 0, isStatus: true, damageClass: 'status', accuracy: 100 } as Move;
+  const smokeDamageMove: Move = { name: 'tackle', displayName: 'Investida', type: 'normal', power: 40, isStatus: false, damageClass: 'physical', accuracy: 100 } as Move;
+  const tickState = (overrides: Record<string, { turns: number; moveName?: string }>) => {
+    const user = createDummy({ id: 921, name: 'Efeito 4.1.2', types: ['normal'], moves: [], speedStat: 100 });
+    const enemy = createDummy({ id: 922, name: 'Alvo 4.1.2', types: ['normal'], hp: 400, maxHP: 400, speedStat: 80 });
+    const state = createBattleState([user], [enemy]);
+    Object.entries(overrides).forEach(([status, effect]) => { state.currentPokemon1!.statusEffects[status] = { ...effect }; });
+    return state;
+  };
+
+  const tauntState = tickState({ taunt: { turns: 3 } });
+  const tauntBlockedBefore = checkRestriction(tauntState.currentPokemon1!, smokeStatusMove, []) === false;
+  const taunt1 = processTurnEnd(tauntState, smokeConfig);
+  const taunt2 = processTurnEnd(taunt1.newState, smokeConfig);
+  const taunt3 = processTurnEnd(taunt2.newState, smokeConfig);
+  const tauntReleased = checkRestriction(taunt3.newState.currentPokemon1!, smokeStatusMove, []) === true;
+  console.log(taunt1.newState.currentPokemon1!.statusEffects.taunt?.turns === 2
+    && taunt2.newState.currentPokemon1!.statusEffects.taunt?.turns === 1
+    && taunt3.newState.currentPokemon1!.statusEffects.taunt === undefined
+    && tauntBlockedBefore && tauntReleased
+    ? '✅ 4.1.2 Taunt decrementa 3→0 e libera os golpes de status'
+    : '❌ 4.1.2 Taunt divergiu');
+
+  const encoreState = tickState({ encore: { turns: 1, moveName: 'tackle' } });
+  encoreState.currentPokemon1!.heldItem = 'choice-scarf';
+  encoreState.currentPokemon1!.lockedMove = 'tackle';
+  const encoreTicked = processTurnEnd(encoreState, smokeConfig);
+  console.log(encoreTicked.newState.currentPokemon1!.statusEffects.encore === undefined
+    && encoreTicked.newState.currentPokemon1!.lockedMove === 'tackle'
+    ? '✅ 4.1.2 Encore expira sem apagar o lockedMove de Choice'
+    : '❌ 4.1.2 Encore apagou o lock de Choice');
+
+  const disableState = tickState({});
+  disableState.currentPokemon1!.disabledMoves = { tackle: 1, howl: 3 };
+  const disableTicked = processTurnEnd(disableState, smokeConfig);
+  const disableCounters = disableTicked.newState.currentPokemon1!.disabledMoves;
+  console.log(disableCounters && Object.keys(disableCounters).length === 1 && disableCounters.howl === 2
+    ? '✅ 4.1.2 Disable decrementa e remove somente o contador expirado'
+    : '❌ 4.1.2 Disable manteve contadores incorretos');
+
+  const magnetState = tickState({ 'magnet-rise': { turns: 5 } });
+  const magnetGroundedBefore = isGrounded(magnetState.currentPokemon1!);
+  let magnetChain = magnetState;
+  for (let turn = 0; turn < 5; turn += 1) magnetChain = processTurnEnd(magnetChain, smokeConfig).newState;
+  console.log(magnetGroundedBefore === false
+    && magnetChain.currentPokemon1!.statusEffects['magnet-rise'] === undefined
+    && isGrounded(magnetChain.currentPokemon1!) === true
+    ? '✅ 4.1.2 Magnet Rise decrementa 5 turnos e devolve a imunidade ao solo'
+    : '❌ 4.1.2 Magnet Rise divergiu');
+
+  const telekinesisState = tickState({ telekinesis: { turns: 3 } });
+  const telekinesisHitBefore = calculateHitChance(smokeStatusMove, telekinesisState.currentPokemon2!, telekinesisState.currentPokemon1!, 'none');
+  const telekinesisGroundedBefore = isGrounded(telekinesisState.currentPokemon1!);
+  let telekinesisChain = telekinesisState;
+  for (let turn = 0; turn < 3; turn += 1) telekinesisChain = processTurnEnd(telekinesisChain, smokeConfig).newState;
+  const telekinesisHitAfter = calculateHitChance(smokeStatusMove, telekinesisChain.currentPokemon2!, telekinesisChain.currentPokemon1!, 'none');
+  console.log(telekinesisHitBefore === '∞' && telekinesisGroundedBefore === false
+    && telekinesisChain.currentPokemon1!.statusEffects['telekinesis'] === undefined
+    && isGrounded(telekinesisChain.currentPokemon1!) === true && telekinesisHitAfter === 100
+    ? '✅ 4.1.2 Telekinesis expira e encerra imunidade ao solo e precisão garantida'
+    : '❌ 4.1.2 Telekinesis divergiu');
+
+  const glaiveState = tickState({ 'glaive-rush': { turns: 2 } });
+  const glaiveHitBefore = calculateHitChance(smokeDamageMove, glaiveState.currentPokemon2!, glaiveState.currentPokemon1!, 'none');
+  const glaiveDamageBefore = calculateDamage(glaiveState.currentPokemon2!, glaiveState.currentPokemon1!, smokeDamageMove, 'none', false, 1, 0, [], glaiveState, 100);
+  let glaiveChain = glaiveState;
+  for (let turn = 0; turn < 2; turn += 1) glaiveChain = processTurnEnd(glaiveChain, smokeConfig).newState;
+  const glaiveHitAfter = calculateHitChance(smokeDamageMove, glaiveChain.currentPokemon2!, glaiveChain.currentPokemon1!, 'none');
+  const glaiveDamageAfter = calculateDamage(glaiveChain.currentPokemon2!, glaiveChain.currentPokemon1!, smokeDamageMove, 'none', false, 1, 0, [], glaiveChain, 100);
+  console.log(glaiveHitBefore === '∞' && glaiveDamageBefore === glaiveDamageAfter * 2
+    && glaiveChain.currentPokemon1!.statusEffects['glaive-rush'] === undefined
+    && glaiveHitAfter === 100
+    ? '✅ 4.1.2 Glaive Rush expira e encerra dano dobrado e precisão garantida'
+    : '❌ 4.1.2 Glaive Rush divergiu');
   console.groupEnd();
 
   console.groupEnd();
