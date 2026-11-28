@@ -1,23 +1,35 @@
 
-import { Move } from '../../../../types';
+import { StatStages } from '../../../../types';
+
+/** Identificador oficial da habilidade (mesmo valor usado em data/abilities_data). */
+export const ABILITY_ID = 'beads-of-ruin';
+
+/** Atributo reduzido pela habilidade. */
+export const AFFECTED_STAT: keyof StatStages = 'spDefense';
 
 /**
- * Lógica para a habilidade Contas da Ruína (Beads of Ruin).
- * Regra Oficial: Reduz a Defesa Especial de todos os outros Pokémon em campo em 25%.
- * No cálculo de dano (1v1), isso equivale a um multiplicador de ~1.33x (4/3) no dano final especial do portador.
- * Nota: Pokémon com a habilidade Contas da Ruína são imunes a este efeito.
+ * Contas da Ruína (Beads of Ruin).
+ * Regra Oficial: reduz a Defesa Especial de todos os outros Pokémon em campo em 25% (0.75x).
+ *
+ * - O portador nunca é reduzido: a habilidade não afeta quem a possui.
+ * - Duas cópias da mesma habilidade se anulam, porque cada portador é imune à cópia do outro;
+ *   assim o multiplicador é aplicado no máximo uma vez por atributo.
+ * - Aplicada no cálculo do atributo (`statCalculator`), de onde o dano deriva. Não existe
+ *   segundo multiplicador de dano, o que evita acúmulo com o cálculo principal.
  */
-export function getDamageMultiplier(attackerAbility: string | undefined, defenderAbility: string | undefined, move: Move): number {
-    // A habilidade só afeta movimentos da categoria Especial
-    if (attackerAbility !== 'beads-of-ruin' || move.damageClass !== 'special') {
+export function getStatMultiplier(
+    statType: keyof StatStages,
+    targetAbility: string | undefined,
+    opponentAbility: string | undefined
+): number {
+    if (opponentAbility !== ABILITY_ID || statType !== AFFECTED_STAT) {
         return 1.0;
     }
 
-    // Regra Oficial: Imunidade se o alvo possuir a mesma habilidade de Ruína
-    if (defenderAbility === 'beads-of-ruin') {
+    // Regra Oficial: imunidade recíproca entre portadores da mesma habilidade.
+    if (targetAbility === ABILITY_ID) {
         return 1.0;
     }
 
-    // Reduzir Defesa Especial em 25% (0.75x) resulta em um aumento de dano de 1 / 0.75 = 1.3333...
-    return 1.3333;
+    return 0.75;
 }

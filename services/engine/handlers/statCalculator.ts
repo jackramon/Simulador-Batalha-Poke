@@ -14,6 +14,10 @@ import * as OrichalcumPulse from './abilities/orichalcum_pulse';
 import * as HadronEngine from './abilities/hadron_engine';
 import * as SwiftSwim from './abilities/swift_swim';
 import * as SurgeSurfer from './abilities/surge_surfer';
+import * as BeadsOfRuin from './abilities/beads_of_ruin';
+import * as SwordOfRuin from './abilities/sword_of_ruin';
+import * as TabletsOfRuin from './abilities/tablets_of_ruin';
+import * as VesselOfRuin from './abilities/vessel_of_ruin';
 import { isSnowyWeather } from '../mechanics/weather';
 
 export function getStatStageMultiplier(stage: number): number {
@@ -177,16 +181,16 @@ export function calculateStat(
   
   if (statType === 'speed' && pokemon.heldItem === 'iron-ball' && !itemsSuppressed) val = Math.floor(val * 0.5);
 
-  if (opponentAbility) {
-      if (statType === 'attack' && opponentAbility === 'tablets-of-ruin' && pokemon.ability !== 'tablets-of-ruin') {
-          val = Math.floor(val * 0.75);
-      } else if (statType === 'defense' && opponentAbility === 'sword-of-ruin' && pokemon.ability !== 'sword-of-ruin') {
-          val = Math.floor(val * 0.75);
-      } else if (statType === 'spAttack' && opponentAbility === 'vessel-of-ruin' && pokemon.ability !== 'vessel-of-ruin') {
-          val = Math.floor(val * 0.75);
-      } else if (statType === 'spDefense' && opponentAbility === 'beads-of-ruin' && pokemon.ability !== 'beads-of-ruin') {
-          val = Math.floor(val * 0.75);
-      }
+  // Habilidades da Ruína: cada handler aplica 0.75 ao atributo correspondente dos OUTROS
+  // Pokémon em campo; o portador e cópias da mesma habilidade são imunes, então o
+  // multiplicador entra no máximo uma vez por atributo. Nenhum segundo multiplicador de
+  // dano existe para essas habilidades, o que impede acúmulo. Com o Gás Neutralizante
+  // ativo a habilidade está suprimida e a redução não se aplica.
+  if (opponentAbility && !isGasActive) {
+      val = Math.floor(val * BeadsOfRuin.getStatMultiplier(statType, pokemon.ability, opponentAbility));
+      val = Math.floor(val * SwordOfRuin.getStatMultiplier(statType, pokemon.ability, opponentAbility));
+      val = Math.floor(val * TabletsOfRuin.getStatMultiplier(statType, pokemon.ability, opponentAbility));
+      val = Math.floor(val * VesselOfRuin.getStatMultiplier(statType, pokemon.ability, opponentAbility));
   }
 
   return val;

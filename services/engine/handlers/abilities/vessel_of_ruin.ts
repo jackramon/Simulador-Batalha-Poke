@@ -1,18 +1,32 @@
-import { Move } from '../../../../types';
+import { StatStages } from '../../../../types';
+
+/** Identificador oficial da habilidade (mesmo valor usado em data/abilities_data). */
+export const ABILITY_ID = 'vessel-of-ruin';
+
+/** Atributo reduzido pela habilidade. */
+export const AFFECTED_STAT: keyof StatStages = 'spAttack';
 
 /**
- * Lógica para a habilidade Vaso da Ruína (Vessel of Ruin).
- * Regra Oficial: Reduz o Ataque Especial de todos os outros Pokémon em campo em 25%.
- * No cálculo de dano, isso equivale a um multiplicador de 0.75x no dano final especial do oponente.
- * Nota: Pokémon com a habilidade Vaso da Ruína são imunes a este efeito.
+ * Vaso da Ruína (Vessel of Ruin).
+ * Regra Oficial: reduz o Ataque Especial de todos os outros Pokémon em campo em 25% (0.75x).
+ *
+ * - O portador nunca é reduzido: a habilidade não afeta quem a possui.
+ * - Duas cópias da mesma habilidade se anulam, porque cada portador é imune à cópia do outro;
+ *   assim o multiplicador é aplicado no máximo uma vez por atributo.
+ * - Aplicada no cálculo do atributo (`statCalculator`), de onde o dano deriva. Não existe
+ *   segundo multiplicador de dano, o que evita acúmulo com o cálculo principal.
  */
-export function getDamageMultiplier(defenderAbility: string | undefined, attackerAbility: string | undefined, move: Move): number {
-    if (defenderAbility !== 'vessel-of-ruin' || move.damageClass !== 'special') {
+export function getStatMultiplier(
+    statType: keyof StatStages,
+    targetAbility: string | undefined,
+    opponentAbility: string | undefined
+): number {
+    if (opponentAbility !== ABILITY_ID || statType !== AFFECTED_STAT) {
         return 1.0;
     }
 
-    // Regra Oficial: Imunidade se o atacante possuir a mesma habilidade de Ruína
-    if (attackerAbility === 'vessel-of-ruin') {
+    // Regra Oficial: imunidade recíproca entre portadores da mesma habilidade.
+    if (targetAbility === ABILITY_ID) {
         return 1.0;
     }
 

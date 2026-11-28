@@ -15,6 +15,7 @@ export const BATTLE_MESSAGES = {
   MISS: () => `O ataque falhou!`,
   CRASH_DAMAGE: (attacker: string, damage: number) => `${attacker} continuou e se machucou! (-${damage})`,
   WONDER_GUARD_IMMUNE: (defender: string) => `A Guarda Mágica de ${defender} o protegeu!`,
+  GOOD_AS_GOLD_IMMUNE: (defender: string) => `${defender} é imune a golpes de status devido ao seu corpo dourado!`,
   MULTI_HIT_DAMAGE: (hit: number, damage: number, isCrit: boolean) => `Acerto ${hit}: causou ${damage} de dano!${isCrit ? ' (Crítico!)' : ''}`,
   CRITICAL_HIT: () => `Um acerto crítico!`,
   WEATHER_REDUCED_POWER: (move: string) => `O poder de ${move} foi reduzido pelo clima!`,

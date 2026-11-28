@@ -1,23 +1,34 @@
-import { Move } from '../../../../types';
+import { StatStages } from '../../../../types';
+
+/** Identificador oficial da habilidade (mesmo valor usado em data/abilities_data). */
+export const ABILITY_ID = 'sword-of-ruin';
+
+/** Atributo reduzido pela habilidade. */
+export const AFFECTED_STAT: keyof StatStages = 'defense';
 
 /**
- * Lógica para a habilidade Espada da Ruína (Sword of Ruin).
- * Regra Oficial: Reduz a Defesa de todos os outros Pokémon em campo em 25%.
- * No cálculo de dano, isso equivale a um multiplicador de ~1.33x no dano final físico.
- * Nota: Pokémon com a habilidade Espada da Ruína são imunes a este efeito.
+ * Espada da Ruína (Sword of Ruin).
+ * Regra Oficial: reduz a Defesa de todos os outros Pokémon em campo em 25% (0.75x).
+ *
+ * - O portador nunca é reduzido: a habilidade não afeta quem a possui.
+ * - Duas cópias da mesma habilidade se anulam, porque cada portador é imune à cópia do outro;
+ *   assim o multiplicador é aplicado no máximo uma vez por atributo.
+ * - Aplicada no cálculo do atributo (`statCalculator`), de onde o dano deriva. Não existe
+ *   segundo multiplicador de dano, o que evita acúmulo com o cálculo principal.
  */
-export function getDamageMultiplier(attackerAbility: string | undefined, defenderAbility: string | undefined, move: Move): number {
-    if (attackerAbility !== 'sword-of-ruin' || move.damageClass === 'status') {
-        return 1.0;
-    }
-    
-    // Regra Oficial: Imunidade se o alvo possuir a mesma habilidade de Ruína
-    if (defenderAbility === 'sword-of-ruin') {
+export function getStatMultiplier(
+    statType: keyof StatStages,
+    targetAbility: string | undefined,
+    opponentAbility: string | undefined
+): number {
+    if (opponentAbility !== ABILITY_ID || statType !== AFFECTED_STAT) {
         return 1.0;
     }
 
-    if (move.damageClass === 'physical') {
-        return 1.333334;
+    // Regra Oficial: imunidade recíproca entre portadores da mesma habilidade.
+    if (targetAbility === ABILITY_ID) {
+        return 1.0;
     }
-    return 1.0;
+
+    return 0.75;
 }

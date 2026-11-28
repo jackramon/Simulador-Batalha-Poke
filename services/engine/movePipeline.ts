@@ -23,6 +23,7 @@ import * as AirLock from './handlers/abilities/air_lock';
 import * as Dazzling from './handlers/abilities/dazzling';
 import * as MyceliumMight from './handlers/abilities/mycelium_might';
 import * as MoldBreaker from './handlers/abilities/mold_breaker';
+import * as GoodAsGold from './handlers/abilities/good_as_gold';
 import * as Refrigerate from './handlers/abilities/refrigerate';
 import * as Pixilate from './handlers/abilities/pixilate';
 import * as LiquidVoice from './handlers/abilities/liquid_voice';
@@ -241,7 +242,7 @@ export function preExecutionStep(ctx: MovePipelineContext): void {
     }
 }
 
-function targetsOpponent(move: Move): boolean {
+function targetsOpponent(attacker: Pokemon, move: Move): boolean {
     const opponentTargetMoves = [
         'sand-attack', 'baby-doll-eyes', 'attract', 'swagger', 'flatter', 'yawn', 'taunt', 'torment',
         'encore', 'disable', 'roar', 'whirlwind', 'telekinesis', 'strength-sap', 'heal-block',
@@ -254,6 +255,12 @@ function targetsOpponent(move: Move): boolean {
     ];
     
     if (opponentTargetMoves.includes(move.name)) return true;
+
+    // Curse só mira o adversário quando usado por um Pokémon do tipo Fantasma.
+    if (move.name === 'curse') {
+        const isGhost = attacker.isTerastallized ? attacker.teraType === 'ghost' : attacker.types.includes('ghost');
+        if (isGhost) return true;
+    }
     
     if (move.effect) {
         if (move.effect.status.includes('-down')) return true;
@@ -265,6 +272,20 @@ function targetsOpponent(move: Move): boolean {
 
 export function executeStatusMoveStep(ctx: MovePipelineContext): void {
     const { state, attacker, defender, move, logs, effectiveType } = ctx;
+
+    // --- VALE OURO (GOOD AS GOLD) ---
+    // Imunidade a golpes de status usados por outros Pokémon que tenham o portador como alvo.
+    // Movimentos de campo/lado do campo (hazards, telas, Tailwind) não miram o Pokémon e
+    // continuam valendo. Mold Breaker/Teravolt/Turboblaze não contornam esta imunidade
+    // (regra oficial); Gás Neutralizante e Ácido Gástrico suprimem a habilidade.
+    if (
+        targetsOpponent(attacker, move)
+        && GoodAsGold.isImmuneToStatusMove(defender, move, NeutralizingGas.isGasActive(state))
+    ) {
+        log(logs, BATTLE_MESSAGES.GOOD_AS_GOLD_IMMUNE(defender.name), 'text-yellow-600 font-bold italic');
+        attacker.lastMoveFailed = true;
+        return;
+    }
 
     // Quick Guard Check (Moves with priority)
     if (defender.statusEffects['quick-guard']) {
@@ -294,11 +315,7 @@ export function executeStatusMoveStep(ctx: MovePipelineContext): void {
         const isSoundMove = SOUND_MOVES.includes(move.name);
         const bypassesSubstitute = Infiltrator.canInfiltrate(attacker, state) || isSoundMove;
         
-        let isOpponentTarget = targetsOpponent(move);
-        if (move.name === 'curse') {
-            const isGhost = attacker.isTerastallized ? attacker.teraType === 'ghost' : attacker.types.includes('ghost');
-            if (isGhost) isOpponentTarget = true;
-        }
+        const isOpponentTarget = targetsOpponent(attacker, move);
         
         if (!bypassesSubstitute && isOpponentTarget) {
             log(logs, `O Substitute protegeu ${defender.name} do efeito!`, 'text-gray-500 italic text-[10px]');

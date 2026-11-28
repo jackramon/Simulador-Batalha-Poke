@@ -472,5 +472,69 @@ export function runTests() {
     : '❌ 4.1.2 Glaive Rush divergiu');
   console.groupEnd();
 
+  // --- TESTE: HABILIDADES 4.1.3 (VALE OURO E AS QUATRO RUÍNAS) ---
+  console.group('%c🏅 Teste: Habilidades 4.1.3', 'color: #b45309;');
+  const smokeGolden = createDummy({
+    id: 931, name: 'Gholdengo', ability: 'good-as-gold', types: ['normal'],
+    hp: 300, maxHP: 300, attackStat: 100, defenseStat: 100, spAttackStat: 100, spDefenseStat: 100, speedStat: 80,
+  });
+  const smokeRuinAttacker = createDummy({
+    id: 932, name: 'Atacante 4.1.3', types: ['normal'],
+    attackStat: 120, spAttackStat: 120, speedStat: 120,
+  });
+  const smokeToxic: Move = {
+    name: 'toxic', displayName: 'Tóxico', type: 'poison', power: 0, accuracy: 100,
+    isStatus: true, damageClass: 'status', effect: { status: 'poison', chance: 100 },
+  } as Move;
+  const smokeTackle: Move = {
+    name: 'tackle', displayName: 'Investida', type: 'normal', power: 60, accuracy: 100,
+    isStatus: false, damageClass: 'physical',
+  } as Move;
+  const smokeRock: Move = {
+    name: 'stealth-rock', displayName: 'Pedras Flutuantes', type: 'rock', power: 0, accuracy: 100,
+    isStatus: true, damageClass: 'status',
+  } as Move;
+
+  const toxicState = createBattleState([smokeRuinAttacker], [smokeGolden], { prngState: { seed: 4131, state: 4131, cursor: 0 } });
+  const toxicResult = executeMove(toxicState, toxicState.currentPokemon1!, toxicState.currentPokemon2!, smokeToxic, smokeConfig);
+  const tackleState = createBattleState([smokeRuinAttacker], [smokeGolden], { prngState: { seed: 4132, state: 4132, cursor: 0 } });
+  const tackleResult = executeMove(tackleState, tackleState.currentPokemon1!, tackleState.currentPokemon2!, smokeTackle, smokeConfig);
+  const rockState = createBattleState([smokeRuinAttacker], [smokeGolden], { prngState: { seed: 4133, state: 4133, cursor: 0 } });
+  const rockResult = executeMove(rockState, rockState.currentPokemon1!, rockState.currentPokemon2!, smokeRock, smokeConfig);
+  console.log(
+    toxicResult.newState.currentPokemon2!.statusEffects.poison === undefined
+    && toxicResult.logs.some(entry => entry.message.includes('corpo dourado'))
+    && tackleResult.newState.currentPokemon2!.hp < 300
+    && rockResult.newState.p2Hazards.stealthRock === true
+      ? '✅ 4.1.3 Vale Ouro bloqueia status do oponente, aceita dano e não bloqueia hazards'
+      : '❌ 4.1.3 Vale Ouro divergiu',
+  );
+
+  const ruinStages = { accuracy: 0, evasion: 0, attack: 0, defense: 0, spAttack: 0, spDefense: 0, speed: 0 };
+  const ruinCounters = [
+    ['Contas da Ruína', 'beads-of-ruin', 'spDefense'],
+    ['Espada da Ruína', 'sword-of-ruin', 'defense'],
+    ['Tabuletas da Ruína', 'tablets-of-ruin', 'attack'],
+    ['Vaso da Ruína', 'vessel-of-ruin', 'spAttack'],
+  ] as const;
+  const ruinOk = ruinCounters.every(([, ability, stat]) => {
+    const target = createDummy({
+      id: 933, name: 'Alvo Ruína', ability: 'synchronize', types: ['normal'], statStages: { ...ruinStages },
+    });
+    const holder = createDummy({
+      id: 934, name: 'Portador Ruína', ability, types: ['normal'], statStages: { ...ruinStages },
+    });
+    const base = calculateStat(target, stat, 'none');
+    const reduced = calculateStat(target, stat, 'none', false, false, 'none', false, false, ability);
+    const kept = calculateStat(holder, stat, 'none', false, false, 'none', false, false, ability);
+    return reduced === Math.floor(base * 0.75) && kept === base;
+  });
+  console.log(
+    ruinOk
+      ? '✅ 4.1.3 As quatro habilidades da Ruína reduzem 25% do atributo dos outros e preservam o portador'
+      : '❌ 4.1.3 As habilidades da Ruína divergiram',
+  );
+  console.groupEnd();
+
   console.groupEnd();
 }

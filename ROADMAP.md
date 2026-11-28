@@ -8,7 +8,7 @@
 - Mantenha `PROJECT_CONTEXT.md` atualizado a cada alteração.
 - Para economizar tokens: inspecione somente os arquivos da tarefa e suas dependências diretas, reutilize a baseline registrada, use testes focados durante a iteração e rode a suíte completa na validação final. Não refaça auditorias globais já concluídas.
 
-**Próximo item:** 4.1.3 — Revisar wiring de habilidades existentes.
+**Próximo item:** 4.2 — Conectar a importação de equipes no formato Showdown.
 
 ## Etapa 0 — Restaurar uma baseline confiável
 
@@ -247,17 +247,25 @@
   - Validação: 23 testes focados; suíte completa com 67 arquivos e **346 aprovados, 0 `it.todo`**; `npm run lint`, `npm run build` e `git diff --check` aprovados.
   - Smoke no bundle de produção (`NODE_ENV=production`, porta 38911, `assets/index-*.js` sem `@vite/client`): playground com `✅` nos seis efeitos, zero `❌`, zero erros de console e zero requisições de rede; porta liberada.
   - Próximo item: 4.1.3. Commit: informado no resumo final após o push verificado em `origin/main`.
-- [ ] **4.1.3 — Revisar wiring de habilidades existentes.**
-  - Usar Good as Gold como caso de prova e fazer auditoria dirigida de handlers sem importadores, sem usar a quantidade de arquivos como evidência de funcionamento.
+- [x] **4.1.3 — Revisar wiring de habilidades existentes.**
+  - **Auditoria dirigida**: o caminho auditado foi o de golpes de status e o do cálculo de atributos (`movePipeline.executeStatusMoveStep` → `statusMoveRouter` → handlers, e `damageUtils` → `statCalculator`). O levantamento por importadores — nunca pela quantidade de arquivos — encontrou 9 handlers de `services/engine/handlers/abilities/` sem nenhum importador; cinco eram exatamente os desta rodada (`good_as_gold`, `beads_of_ruin`, `sword_of_ruin`, `tablets_of_ruin`, `vessel_of_ruin`). Os quatro restantes foram comprovados órfãos no mesmo caminho e ficam registrados para 4.6, sem ampliar esta rodada: **`wonder_skin`** (precisão dos golpes de status usados contra o portador), **`queenly_majesty`** (delega a `dazzling`, que é a única conectada ao bloqueio de prioridade), **`magician`** (roubo de item no acerto) e **`toxic_chain`** (30% de tóxico no acerto).
+  - **Vale Ouro**: `good_as_gold.ts` passou a ser consumido por `movePipeline.executeStatusMoveStep`, antes de Quick Guard/Crafty Shield/Substitute/Magic Bounce. A imunidade vale apenas para golpes de status cujo alvo é o próprio portador: `targetsOpponent` (extraído da checagem de Substitute, agora com o caso do Curse de Fantasma) separa alvo de campo, de modo que Stealth Rock, Spikes, Reflect, Tailwind e efeitos próprios/de itens continuam valendo, enquanto Tóxico, Provocar e afins falham com mensagem própria (`BATTLE_MESSAGES.GOOD_AS_GOLD_IMMUNE`). Mold Breaker/Teravolt/Turboblaze não contornam a imunidade (regra oficial) e Gás Neutralizante/Ácido Gástrico a suprimem.
+  - **Habilidades da Ruína**: os quatro handlers deixaram de ser multiplicadores de dano sem uso e passaram a expor `getStatMultiplier(statType, targetAbility, opponentAbility)`, consumido por `statCalculator` no lugar do bloco inline. Cada um aplica 0.75 no atributo próprio — Contas: Def. Esp.; Espada: Def.; Tabuletas: Atq.; Vaso: Atq. Esp. —, nunca no portador, e cópias da mesma habilidade concedem imunidade recíproca (uma única aplicação por atributo). Não existe segundo multiplicador de dano e a redução agora respeita `isGasActive`.
+  - **Replay**: `REPLAY_ENGINE_REVISION = '4.1.3'`, `formatVersion` mantido em `1`; `replayEngineRevision412.test.ts` renomeado para `replayEngineRevision413.test.ts`. A mudança semântica foi documentada em `replayLogic.ts` sem nenhuma tolerância nova — replays antigos que divergirem continuam sendo reportados como divergência real.
+  - Cobertura: `tests/integration/goodAsGoldStatusImmunity.test.ts` (9 testes: Tóxico com controle positivo no mesmo turno, Provocar, dano nos dois sentidos, efeitos próprios, item, campo/telas/hazards, Mold Breaker, Gás Neutralizante e imutabilidade do estado de entrada) e `tests/integration/ruinAbilities.test.ts` (16 testes em `describe.each`: multiplicador do handler igual ao do `calculateStat`, portador intacto, ausência de acúmulo, supressão por gás, dano pelo coordenador com cursor idêntico ao cenário sem habilidade e estado imutável). RED comprovado antes da implementação: 12 falhas.
+  - Validação: 28 testes focados; suíte completa com 69 arquivos e 371 testes (370 no primeiro ciclo, com o timeout de 5 s pré-existente de `replayFixtureCompatibility` sob carga passando 10/10 isolado); `npm run lint`, `npm run build` e `git diff --check` aprovados.
+  - Smoke no bundle de produção (`NODE_ENV=production`, porta 39133, `assets/index-CqWUU2hF.js` sem `@vite/client`): `✅` no Vale Ouro (bloqueio de status, dano aceito e hazard aplicado) e nas quatro habilidades da Ruína, zero `❌` nas 50 linhas do playground, zero `console.error`, zero erro de página e zero requisições `fetch`/XHR; porta liberada.
+  - Próximo item: 4.2.
 - [ ] **4.2 — Conectar a importação de equipes no formato Showdown.**
 - [ ] **4.3 — Melhorar acessibilidade, semântica dos diálogos e suporte a movimento reduzido.**
 - [ ] **4.4 — Separar animações e estatísticas da interpretação frágil de strings de logs.**
 - [ ] **4.5 — Dividir o bundle e remover o aviso informativo de chunk acima de 500 kB.**
 - [ ] **4.6 — Ampliar a cobertura de habilidades, itens e integrações.**
+  - Pendentes comprovados na auditoria de 4.1.3 (handlers sem importadores no caminho de golpes de status/atributos): `wonder_skin`, `queenly_majesty`, `magician` e `toxic_chain`.
 
 ## Registro resumido da baseline
 
-- Última suíte integral informada: **67 arquivos, 346 testes aprovados e 0 `it.todo`**; a lacuna de 3.4 foi convertida, a simulação da IA foi unificada em 3.5, os efeitos de 4.1.2 passaram a expirar e nenhum todo permanece.
+- Última suíte integral informada: **69 arquivos, 371 testes aprovados e 0 `it.todo`**; a lacuna de 3.4 foi convertida, a simulação da IA foi unificada em 3.5, os efeitos de 4.1.2 passaram a expirar, o wiring de habilidades de 4.1.3 foi provado por importadores reais e nenhum todo permanece.
 - `npm run lint`, `npm run build` e `git diff --check`: aprovados.
 - Auditoria do item 0.5: **17 → 0** ocorrências no total e **6 → 0** em produção; instalação por `npm ci` reproduzida sem alterações nos manifestos.
 - SHA dos itens 1.1 a 1.7 e dos itens 2.1/2.2/2.3/2.4/2.5 informados somente nos respectivos resumos finais após o push; último SHA registrado no roadmap: `baae8a606c37495f30810e2c646dbb234c75ac86` (item 0.4).

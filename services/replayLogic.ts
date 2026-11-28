@@ -8,10 +8,13 @@ export const REPLAY_FORMAT_VERSION = 1;
 // Rocky Payload em 1.5x, críticos com estágios, Surge Surfer na ordenação de ações e
 // distinção Snow/Hail). A 4.1.2 deu ciclo de vida completo a Taunt, Encore, Disable,
 // Magnet Rise, Telekinesis e Glaive Rush: os efeitos passaram a decrementar e expirar no
-// `processTurnEnd` canônico, em vez de durarem indefinidamente. Replays gravados em
-// revisões anteriores foram produzidos com as regras antigas e podem divergir na
-// reprodução: a divergência é real e continua sendo reportada, sem tolerância que a esconda.
-export const REPLAY_ENGINE_REVISION = '4.1.2';
+// `processTurnEnd` canônico, em vez de durarem indefinidamente. A 4.1.3 conectou Vale Ouro
+// (Good as Gold) ao caminho público de golpes de status e tornou as quatro habilidades da
+// Ruína a única fonte da regra de atributo (0.75 nos outros Pokémon, nunca no portador).
+// Replays gravados em revisões anteriores foram produzidos com as regras antigas e podem
+// divergir na reprodução: a divergência é real e continua sendo reportada, sem tolerância
+// que a esconda.
+export const REPLAY_ENGINE_REVISION = '4.1.3';
 export const LEGACY_REPLAY_WARNING = 'Replay legado: arquivo sem checkpoints; a reprodução continuará sem verificação de integridade.';
 // Revisões que gravavam o checkpoint dentro do updater React, com hash sobre um estado
 // possivelmente alterado depois da conclusão do turno: não têm integridade confiável.
